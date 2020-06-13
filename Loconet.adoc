@@ -253,7 +253,7 @@ the <loco adr hi> to always zero. You can check the <TRK> return bits to see if 
 
 *The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* 
 If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREEfootnote:["NEW" in original] the throttle
-may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<MOVE_CLOTS,OPC_MOVE_SLOTS>>
+may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<MOVE_SLOTS,OPC_MOVE_SLOTS>>
 `<BA>,<slotX>,<slotX>,<chk>`) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
 
 If the SLOT return information shows the Locomotive requested is IN_USE or UP-CONSISTED (i.e. the SL_CONUP, bit 6 of STATUS1 =1 ) the user should NOT use the SLOT. Any UP_CONSISTED locos must be UNLINKED before usage! Always process the result from the LINK and UNLINK commands, since the Master reserves the right to change the reply slot number and can reject the linking tasks under
@@ -309,7 +309,7 @@ DRAFT DEFINITIONS October 16, 1997 SUBJECT TO REVISION
 
 [cols="2,1,4,1"]
 |===
-| | | | FOLLOW ON MSG? RESPONSE TYPE
+| Opcode | Byte | Description | Follow-on message? Response opcode
 
 
 4+a| ### 2 Byte MESSAGE opcodes
@@ -750,35 +750,31 @@ setting the Page register, the read will be aborted, showing no Write acknowledg
 
 ### FAST Clock: 
 
-The system FAST clock and parameters are implemented in Slot#123 <7B>.
-Use <EF> to write new clock information, Slot read of 0x7B,<BB><7B>.., will return current System
-clock information, and other throttles will update to this SYNC. Note that all attached display devices
-keep a current clock calculation based on this SYNC read value, i.e. devices MUST not continuously poll
-the clock SLOT to generate time, but use this merely to restore SYNC and follow current RATE etc. This
-clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds , by a single user, so all attached
-devices can synchronise any phase drifts. Upon seeing a SYNC read, all devices should reset their local
+The system FAST clock and parameters are implemented in Slot 123 (0x7B).
+Use <<WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information; Request to read slot 0x7B (<<RQ_SLOT_DATA, <BB><7B>..>>), will return current System clock information, and other throttles will update to this SYNC. Note that all attached display devices
+keep a current clock calculation based on this SYNC read value, i.e. devices MUST not continuously poll the clock SLOT to generate time, but use this merely to restore SYNC and follow current RATE etc. This clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds , by a single user, so all attached devices can synchronise any phase drifts. Upon seeing a SYNC read, all devices should reset their local
 sub-minute phase counter and invalidate the SYNC update ping generator.
 
-#### Clock Slot Format:
+#### Clock slot format:
 
-<0xEF>,<0E>,<7B>,<CLK_RATE>,<FRAC_MINSL>,<FRAC_MINSH>,<256-MINS_60>,<TRK>
-;<256-HRS_24>,<DAYS>,<CLK_CNTRL>,<ID1>,<1D2>,<CHK>
+`<0xEF>,<0E>,<7B>,<CLK_RATE>,<FRAC_MINSL>,<FRAC_MINSH>,<256-MINS_60>,<TRK><256-HRS_24>,<DAYS>,<CLK_CNTRL>,<ID1>,<1D2>,<CHK>`
 
-<CLK_RATE>, 0=Freeze clock, 1=normal 1:1 rate, 10=10:1 etc, max VALUE is 7F/128 to 1
+[horizontal]
+<CLK_RATE>:: 0=Freeze clock, 1=normal 1:1 rate, 10=10:1 etc, max VALUE is 128(0x7F) to 1
 
-<FRAC_MINSL>, FRAC mins hi/lo are a sub-minute counter , depending on the CLOCK generator
+<FRAC_MINSL>:: FRAC mins hi/lo are a sub-minute counter, depending on the CLOCK generator
 
-<FRAC_MINSH>, Not for ext. usage. This counter is reset when valid <E6><7B> SYNC msg seen
+<FRAC_MINSH>:: Not for ext. usage. This counter is reset when valid <E6><7B> SYNC msg seen
 
-<256-MINS_60>, This is FAST clock MINUTES subtracted from 256. Modulo 0-59
+<256-MINS_60>:: This is FAST clock MINUTES subtracted from 256. Modulo 0-59
 
-<256-HRS_24>,This is FAST clock HOURS subtracted from 256. Modulo 0-23
+<256-HRS_24>:: This is FAST clock HOURS subtracted from 256. Modulo 0-23
 
-<DAYS>, number of 24 Hr clock rolls, positive count
+<DAYS>:: number of 24 Hr clock rolls, positive count
 
-<CLK_CNTRL> Clock Control Byte
-D6- 1=This is valid Clock information, 0=ignore this <E6><7B>, SYNC reply
+<CLK_CNTRL>:: Clock Control Byte
+D6- 1=This is valid Clock information, 0=ignore this `<E6><7B>`, SYNC reply
 
-<ID1>,<1D2> This is device ID last setting the clock. <00><00> shows no set has happened <7F><7x> are reserved for PC access
+<ID1>,<1D2>:: This is device ID last setting the clock. `<00><00>` shows no set has happened; `<7F><7x>` are reserved for PC access.
 
 +++[END]+++
