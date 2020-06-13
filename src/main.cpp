@@ -1,14 +1,3 @@
-// LocoNet Packet Monitor
-// Demonstrates the use of the:
-//
-//   LocoNet.processSwitchSensorMessage(LnPacket)
-//
-//   Requires the ESP8266 and ESP32 SSD1306 OLED
-//   library by Daniel Eichhorn (@squix78) and
-//   Fabrice Weinberg (@FWeinb)
-//   https://github.com/squix78/esp8266-oled-ssd1306
-//
-// function and examples of each of the notifyXXXXXXX user call-back functions
 #include <stdio.h>
 #include <Arduino.h>
 
@@ -17,17 +6,27 @@
 #include <LocoNetESP32.h>
 LocoNetESP32 locoNet;
 
+#include <LocoNetSlotManager.h>
+LocoNetSlotManager slotMan(&locoNet);
+
+/*
 #include <WiFi.h>
 #include <ESPmDNS.h>
 
-#define LOCONET_TCP_PORT  1234
-WiFiServer lnServer(LOCONET_TCP_PORT);
-WiFiClient lnClient;
+#define LBSERVER_TCP_PORT  1234
+WiFiServer lbServer(LBSERVER_TCP_PORT);
+WiFiClient lbClient;
+*/
+void sendWifi(lnMsg *msg);
 
 #define IN_PIN 25
 int inState = HIGH;
 unsigned long nextInRead = 0;
 
+void send(lnMsg *msg) {
+    locoNet.send(msg);
+    sendWifi(msg);
+}
 
 void setup() {
   
@@ -50,11 +49,11 @@ void setup() {
             Serial.print(' ');
         }
         Serial.print("\r\n");
-
-        if(lnClient) {
-            lnClient.write(rxPacket->data, lnPacketSize(rxPacket));
-        }
+        sendWifi(rxPacket);
     });
+
+    slotMan.registerCallbacks();
+
     locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         Serial.print("Switch Request: ");
         Serial.print(address, DEC);
@@ -62,8 +61,6 @@ void setup() {
         Serial.print(direction ? "Closed" : "Thrown");
         Serial.print(" - ");
         Serial.println(output ? "On" : "Off");
-
-
     });
     locoNet.onSwitchReport([](uint16_t address, bool state, bool sensor) {
         Serial.print("Switch/Sensor Report: ");
@@ -81,15 +78,17 @@ void setup() {
     });
 
 
-/*
+    /*
     WifiManager wifiManager;
 	wifiManager.setConfigPortalTimeout(300); // 5 min
 	if ( !wifiManager.autoConnect("LocoNet WiFi") ) {
 		delay(1000);
         Serial.print("Failed connection");
 		ESP.restart();
-	}*/
+	}
+    */
 
+    /*
     WiFi.begin("MelNet", "melnikov-network");
 
     while (WiFi.status() != WL_CONNECTED) {
@@ -102,25 +101,28 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    lnServer.begin();
+    lbServer.begin();
 
     MDNS.begin("ESP32Server");
 	//MDNS.addService("withrottle","tcp", WTServer_Port);
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName("Loconet Network Interface");
+    */
 
 }
 
 void sendWifi(lnMsg *msg) {
-    if(!lnClient) return;
+    /*
+    if(!lbClient) return;
 
-    lnClient.print("RECEIVE ");
+    lbClient.print("RECEIVE ");
     uint8_t ln = lnPacketSize(msg);
     for(int j=0; j<ln; j++) {
-        lnClient.print(msg->data[j], HEX);
-        lnClient.print(" ");
+        lbClient.print(msg->data[j], HEX);
+        lbClient.print(" ");
     }
-    lnClient.print("\r\n");
+    lbClient.println();
+    */
 }
 
 #define LB_BUF_SIZE 100
@@ -140,14 +142,18 @@ void loop() {
         }
     }
 
+/*
     static char lbStr[LB_BUF_SIZE];
     static int lbPos=0;
     static LocoNetMessageBuffer lbBuf;
 
-    if (!lnClient) lnClient = lnServer.available();
-	if (lnClient) {
-		while(lnClient.available()>0) {
-            char v = lnClient.read();
+    if (!lbClient) {
+        lbClient = lbServer.available();
+        if(lbClient) { lbClient.print("VERSION "); lbClient.println("ESP32 WiFi 0.1"); }
+    }
+	if (lbClient) {
+		while(lbClient.available()>0) {
+            char v = lbClient.read();
             if(v=='\r') continue;
 
             lbStr[lbPos] = v;
@@ -157,11 +163,13 @@ void loop() {
                     for(uint8_t i=5; i<=lbPos; i++) {
                         if(lbStr[i]==' ') {
                             uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                            lnMsg * msg = lbBuf.addByte(val);
+                            lnMsg *msg = lbBuf.addByte(val);
                             if(msg!=nullptr) {
                                 sendWifi(msg); // echo
-                                locoNet.processPacket(msg);
-                                locoNet.send(msg); 
+                                locoNet.parsePacket(msg); // decode callbacks
+                                LN_STATUS ret = locoNet.send(msg); 
+                                if(ret==LN_DONE) lbClient.println("SENT OK"); else
+                                if(ret==LN_RETRY_ERROR) lbClient.println("SENT ERROR LN_RETRY_ERROR");
                             }
                         }
                     }
@@ -178,4 +186,5 @@ void loop() {
 		}
 
 	}
+    */
 }
