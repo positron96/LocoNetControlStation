@@ -7,6 +7,8 @@ Digitrax Inc., Panama City, FL 32404.
 == Preface
 The goal of this document is to create a comprehensive interpretation of LocoNet Personal specification. Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points. The style should also be improved.
 
+:toc:
+
 ## Introduction
 This is the definition of the protocol used by Digitrax products that communicate on the Long distance
 version the LocoNet(R) network. This LocoNet Personal Use Edition 1.0 information is provided solely
@@ -77,30 +79,19 @@ implementation, the 2 LocoNet signals ,+ and -, are paralleled and the RJ11 cabl
 polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
 
 SINGLE ENDED voltage levels and characteristics are:
-a) High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground
-conductors.
-b) Low = 0 = "SPACE" : LOCONET+/- voltage below +4.0 Volts with respect to grounds.
-c) The data should be received with 1.0 volt of HYSTERESIS centered on +4.0 volts.
-d) Maximum LOCONET+/- high voltage is +24V and nominal is +12V
-e) Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5(gnd)
-f) The Transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink
-50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
-g) One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals. Typical
-termination is performed by the packet generating "MASTER" and is a 15milliamp current
-source from +12V.
-h) Loconet devices may draw up to 15 mA from the RAIL_SYNC+ /- lines whenever the voltage
-is greater than 7V. The unloaded voltage is between 12V and 26V max. It is general practice to
-provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttl e jacks
-around the layout. In this case the master "backbone" copy of RAILSYNC +/- is not on the
-Throttle jack.
-i) The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails. The
-signals may be received by a differential receiver and boosted to drive the rails.
-j) A device with a separate power supply isolated from LOCONET, may connect to the
- LOCONET+/-pins 3&4 and SIGNAL GROUND pins 2&5 with a just 2 wires.
-k)To use a 1/4" Stereo 3 pin Plug , the SIGNAL GROUND should be connected to the Sleeve,
-the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. The
-power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be
-limited to 20 milliamps maximum , because the Plug shorts the Tip and Ring when initially
+
+[loweralpha]
+. High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground conductors.
+. Low = 0 = "SPACE" : LOCONET+/- voltage below +4.0 Volts with respect to grounds.
+. The data should be received with 1.0 volt of HYSTERESIS centered on +4.0 volts.
+. Maximum LOCONET+/- high voltage is +24V and nominal is +12V
+. Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5(gnd)
+. The Transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
+. One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals. Typical termination is performed by the packet generating "MASTER" and is a 15milliamp current source from +12V.
+. Loconet devices may draw up to 15 mA from the RAIL_SYNC+ /- lines whenever the voltage is greater than 7V. The unloaded voltage is between 12V and 26V max. It is general practice to provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttl e jacks around the layout. In this case the master "backbone" copy of RAILSYNC +/- is not on the Throttle jack.
+. The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails. The signals may be received by a differential receiver and boosted to drive the rails.
+. A device with a separate power supply isolated from LOCONET, may connect to the LOCONET+/-pins 3&4 and SIGNAL GROUND pins 2&5 with a just 2 wires.
+. To use a 1/4" Stereo 3 pin Plug , the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum , because the Plug shorts the Tip and Ring when initially
 inserted.
 
 #### NETWORK Timing
@@ -245,24 +236,25 @@ the 10 data bytes is not the same as a "normal" slot. See later.
 
 ### Standard Address Selection
 
-To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a
-LOCOMOTIVE address for use,( opcode <BF>,<loco adr hi>,<loco adr lo>, <chk> ). The Master ( or PC
-in a Limited Master environment) responds with a SLOT DATA READ for the SLOT ,( opcode <E7>,,)
+To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a LOCOMOTIVE address for use (opcode <<LOCO_ADR,OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). The Master (or PC
+in a Limited Master environment) responds with a SLOT DATA READ for the SLOT, ( opcode `<E7>...`)
 ,that contains this Locomotive address and all of its state information. If the address is currently not in
-any SLOT, the master will load this NEW locomotive address into a new SLOT ,[speed=0, FWD,
-Lite/Functions OFF and 128 step mode]and return this as a SLOT DATA READ. If no inactive slots are
-free to load the NEW locomotive address, the response will be the Long Acknowledgment ,(opcode
-<B4>,) , with a "fail" code, 0.
-Note that regular "SHORT" 7 bit NMRA addresses are denoted by <loco-adr hi>=0. The Analog , Zero
+any SLOT, the master will load this NEW locomotive address into a new SLOT (speed=0, FWD,
+Lite/Functions OFF and 128 step mode) and return this as a SLOT DATA READ. If no inactive slots are
+free to load the NEW locomotive address, the response will be the Long Acknowledgment (opcode
+`<B4>`) with a "fail" code, 0.
+
+Note that regular "SHORT" 7 bit NMRA addresses are denoted by <loco-adr hi>=0. The Analog, Zero
 stretched, loco is selected when both <loco adr hi>=<loco adr lo>=0. <Loco adr lo> is always a 7 bit
 value. If <loco adr hi> is non-zero then the Master will generate NMRA type 14 bit or "LONG" address
 packets using all 14 bits from <loco adr hi> and <loco adr lo> with Loco adr Hi being the MOST
 significant address bits. Note that a DT200 Master does NOT process 14 bit adr requests and will consider
 the <loco adr hi> to always zero. You can check the <TRK> return bits to see if the Master is a DT200.
 
-*The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* If the STATUS1 byte shows the SLOT to be COMMON, IDLE or NEW the throttle
-may change the SLOT to IN_USE by performing a NULL MOVE instruction ,(opcode
-<BA>,<slotX>,<slotX>,<chk> ) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
+*The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* 
+If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREEfootnote:["NEW" in original] the throttle
+may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<MOVE_CLOTS,OPC_MOVE_SLOTS>>
+`<BA>,<slotX>,<slotX>,<chk>`) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
 
 If the SLOT return information shows the Locomotive requested is IN_USE or UP-CONSISTED (i.e. the SL_CONUP, bit 6 of STATUS1 =1 ) the user should NOT use the SLOT. Any UP_CONSISTED locos must be UNLINKED before usage! Always process the result from the LINK and UNLINK commands, since the Master reserves the right to change the reply slot number and can reject the linking tasks under
 several circumstances. Verify the reply slot # and the Link UP/DN bits in STAT1 are as you expected. The throttle will then be able to update Speed./Direction and Function information. Whenever SLOT
@@ -322,24 +314,24 @@ DRAFT DEFINITIONS October 16, 1997 SUBJECT TO REVISION
 
 4+a| ### 2 Byte MESSAGE opcodes
 
-FORMAT = <OPC>,<CKSUM>
+FORMAT = `<OPC>,<CKSUM>`
 
-|OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
+|[[IDLE]]OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
 
-|OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
+|[[GPON]]OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
 
-|OPC_GPOFF | 0x82 | GLOBAL power OFF req     | NO 
+|[[GPOFF]]OPC_GPOFF | 0x82 | GLOBAL power OFF request   | NO 
 
-|OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
+|[[BUSY]]OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
 
 
 
 4+a| ### 4 byte MESSAGE OPCODES
 
-FORMAT = <OPC>,<ARG1>,<ARG2>,<CKSUM>
+FORMAT = `<OPC>,<ARG1>,<ARG2>,<CKSUM>`
 
-|OPC_LOCO_ADR |0xBF |REQ loco ADR |YES <E7><<SLOT_READ>>
-4+| `<0xBF>,<0>,<ADR>,<CHK>` 
+|[[LOCO_ADR]]OPC_LOCO_ADR |0xBF |REQ loco ADR | <E7><<SL_RD_DATA>>
+| 3+| `<0xBF>,<0>,<ADR>,<CHK>` 
 
 DATA return `<E7>`, is SLOT#,DATA that ADR was found in.
 
@@ -348,8 +340,8 @@ IF ADR not found, MASTER puts ADR in FREE slot and sends DATA/STATUS return `<E7
 IF no FREE slot,Fail LACK,0 is returned [`<B4>,<3F>,<0>,<CHK>`].
 
 
-|OPC_SW_ACK |0xBD |REQ SWITCH WITH acknowledge function (not DT200) |YES LACK
-4+| ;<0xBD>,<SW1>,<SW2>,<CHK> REQ SWITCH function
+|[[SW_ACK]]OPC_SW_ACK |0xBD |REQ SWITCH WITH acknowledge function (not DT200) | <<LACK>>
+| 3+| ;<0xBD>,<SW1>,<SW2>,<CHK> REQ SWITCH function
 <SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
 ,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
@@ -358,16 +350,16 @@ IF no FREE slot,Fail LACK,0 is returned [`<B4>,<3F>,<0>,<CHK>`].
 <0xB4><3D><7F> if DCS100 accepted
 
 
-|OPC_SW_STATE |0xBC |REQ state of SWITCH | YES <<LACK>>
-4+| ;<0xBC>,<SW1>,<SW2>,<CHK> REQ state of SWITCH
+|[[SW_STATE]]OPC_SW_STATE |0xBC |REQ state of SWITCH | <<LACK>>
+| 3+| ;<0xBC>,<SW1>,<SW2>,<CHK> REQ state of SWITCH
 
 
-|OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |YES <E7><<SLOT_READ>>
-4+a| <0xBB>,<SLOT>,<0>,<CHK> Request SLOT DATA/status block
+|[[RQ_SL_DATA]]OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |<E7><<SL_RD_DATA>>
+| 3+a| <0xBB>,<SLOT>,<0>,<CHK> Request SLOT DATA/status block
 
 
-|OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |YES <E7><<SLOT_READ>> or <<LACK>>
-4+a|
+|[[MOVE_SLOTS]]OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |<E7><<SL_RD_DATA>> or <<LACK>>
+| 3+a|
 `<0xBA>,<SRC>,<DEST>,<CHK>` 
 
 If SRC is NOT IN_USE, clr SRC.
@@ -382,33 +374,33 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 (It's) illegal to move to/from slots 120/127.
 
 
-|OPC_LINK_SLOTS |0xB9 |;LINK slot ARG1 to slot ARG2 |YES <E7>SLOT READ
-4+| ;<0xB9>,<SL1>,<SL2>,<CHK> SLAVE slot SL1 to slot SL2
+|[[LINK_SLOTS]]OPC_LINK_SLOTS |0xB9 |;LINK slot ARG1 to slot ARG2 | <E7>SLOT READ
+| 3+| ;<0xB9>,<SL1>,<SL2>,<CHK> SLAVE slot SL1 to slot SL2
  ;Master LINKER sets the SL_CONUP/DN flags appropriately
 ,Reply is return of SLOT Status <0xE7>. Inspect to see result of Link
 ,invalid Link will return Long Ack Fail <B4>,<39>,<0>,<CHK>
 
 
 |OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES <E7>SLOT READ
-4+a| ;<0xB8>,<SL1>,<SL2>,<CHK> UNLINK slot SL1 from SL2
+| 3+a| ;<0xB8>,<SL1>,<SL2>,<CHK> UNLINK slot SL1 from SL2
  ;UNLINKER executes unlink STRATEGY and returns new SLOT#
  ; DATA/STATUS of unlinked LOCO . Inspect data to evaluate UNLINK
 
 
-4+|CODES 0xB8 to 0xBF have responses
+| 3+|CODES 0xB8 to 0xBF have responses
 
 
 |OPC_CONSIST_FUNC |0xB6 |;SET FUNC bits in a CONSIST uplink element |NO
-4+| ;<0xB6>,<SLOT>,<DIRF>,<CHK> UP consist FUNC bits
+| 3+| ;<0xB6>,<SLOT>,<DIRF>,<CHK> UP consist FUNC bits
  ;NOTE this SLOT adr is considered in UPLINKED slot space
 
 
-|OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO
-4+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
+|[[SLOT_STAT1]]OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO
+| 3+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
 
 
 |[[LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO 
-4+a| 
+| 3+a| 
 `<0xB4>,<LOPC>,<ACK1>,<CHK>` 
 
 `<LOPC>` is COPY of OPCODE responding to (msb=0). LOPC=0 (unused OPC) is also VALID fail code.
@@ -417,7 +409,7 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 
 
 |OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO 
-4+|; <0xB2>, <IN1>, <IN2>, <CHK>
+| 3+|; <0xB2>, <IN1>, <IN2>, <CHK>
 <IN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 inputs pairs in a DS54
 <IN2> =<0,X,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
 "I"=0 for DS54 "aux" inputs and 1 for "switch" inputs mapped to 4K SENSOR space.
@@ -427,7 +419,7 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 
 
 |OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
-4+|;<0xB1>,<SN1>,<SN2>,<CHK> SENSOR state REPORT
+| 3+|;<0xB1>,<SN1>,<SN2>,<CHK> SENSOR state REPORT
 <SN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SN2> =<0,1,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
  this <B1> opcode encodes input levels for turnout feedback
@@ -443,7 +435,7 @@ this <B1> opcode encodes current OUTPUT levels
 
 |OPC_SW_REQ |0xB0 |;REQ SWITCH function| NO
 
-4+|;<0xB0>,<SW1>,<SW2>,<CHK> REQ SWITCH function
+| 3+|;<0xB0>,<SW1>,<SW2>,<CHK> REQ SWITCH function
 <SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
 ,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
@@ -452,7 +444,7 @@ this <B1> opcode encodes current OUTPUT levels
 ;"A" CLASS codes
 
 
-4+a| NOTE: CODES 0xA8 to 0xAF have responses
+| 3+a| NOTE: CODES 0xA8 to 0xAF have responses
 
 
 |OPC_LOCO_SND  | 0xA2 |SET SLOT sound functions |NO
@@ -462,7 +454,7 @@ this <B1> opcode encodes current OUTPUT levels
 
 
 |OPC_LOCO_SPD  | 0xA0 |SET SLOT speed  |NO
-4+|e.g. `<A0><SLOT#><SPD><CHK>`
+| 3+|e.g. `<A0><SLOT#><SPD><CHK>`
 
 
 
@@ -470,7 +462,7 @@ this <B1> opcode encodes current OUTPUT levels
 
 FORMAT = `<OPC>,<ARG1>,<ARG2>,<ARG3>,<ARG4>,<CKSUM>`
 
-<reserved>
+4+a| <reserved>
 
 
 
@@ -478,15 +470,15 @@ FORMAT = `<OPC>,<ARG1>,<ARG2>,<ARG3>,<ARG4>,<CKSUM>`
 
 FORMAT: `<OPC>,<COUNT>,<ARG2>,<ARG3>,...,<ARG(COUNT-3)>,<CKSUM>`
 
-|OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes |YES <<LACK>>
-4+| `<0xEF>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK>
+|[[WR_SL_DATA]]OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes | <<LACK>>
+| 3+| `<0xEF>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK>
  <SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
 
  SLOT DATA WRITE, 10 bytes data /14 byte MSG
 
 
-|[[SLOT_READ]]OPC_SL_RD_DATA |0xE7 | SLOT DATA return, 10 bytes |NO
-4+a| `<0xE7>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK><SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
+|[[SL_RD_DATA]]OPC_SL_RD_DATA |0xE7 | SLOT DATA return, 10 bytes |NO
+| 3+a| `<0xE7>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK><SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
 
 SLOT DATA READ, 10 bytes data / 14 byte MSG
 
@@ -504,7 +496,7 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 
 
 |_OPC_PEER_XFER_ |0xE5 |;move 8 bytes PEER to PEER, SRC->DST |NO 
-4+| ;<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
+| 3+| ;<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
  ; <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>
  ;SRC/DST are 7 bit args. DSTL/H=0 is BROADCAST msg
  ; SRC=0 is MASTER
@@ -518,7 +510,7 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  ;XC3-XC5=data type CODE- 0=ANSI TEXT string,balance RESERVED
 
 |_OPC_IMM_PACKET_ |0xED |;SEND n-byte packet immediate |yes LACK
-4+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
+| 3+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
  ;<DHI>=<0,0,1,IM5.7-IM4.7,IM3.7,IM2.7,IM1.7>
  ;in <REPS> D4,5,6=#IM bytes,D3=0(reserved); D2,1,0=repeat CNT
 ;Not limited MASTER then LACK=<B4>,<7D>,<7F>,<chk> if CMD ok
@@ -534,50 +526,61 @@ The SLOT DATA bytes are, in order of TRANSMISSION for <E7> READ or <EF> WRITE
 
 NOTE: SLOT 0 <E7> read will return MASTER config information bytes .
 
-0) SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
+[start=0]
+0. SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
 
-1) SLOT STATUS1:
+1. SLOT STATUS1: 
++
+[horizontal]
+D7 SL_SPURGE::
+1=SLOT purge en, ALSO adrSEL (INTERNAL use only) (not seen on NET!)
+D6 SL_CONUP:: 
++
+--
+CONDN/CONUP: bit encoding-Control double linked Consist List
 
 [horizontal]
-D7-SL_SPURGE:: 1=SLOT purge en, ALSO adrSEL (INTERNAL use only) (not seen on NET!)
-D6-SL_CONUP::
-CONDN/CONUP: bit encoding-Control double linked Consist List + 
-*11*=LOGICAL MID CONSIST , Linked up AND down +
-*10*=LOGICAL CONSIST TOP, Only linked downwards +
-*01*=LOGICAL CONSIST SUB-MEMBER, Only linked upwards +
-*00*=FREE locomotive, no CONSIST indirection/linking +
+11:::: LOGICAL MID CONSIST, Linked up AND down
+10:::: LOGICAL CONSIST TOP, Only linked downwards
+01:::: LOGICAL CONSIST SUB-MEMBER, Only linked upwards
+00:::: FREE locomotive, no CONSIST indirection/linking
+
 ALLOWS "CONSISTS of CONSISTS". Uplinked means that Slot SPD number is now SLOT adr of SPD/DIR and STATUS of consist. i.e. is an Indirect pointer. This Slot has same BUSY/ACTIVE bits as TOP of Consist. TOP is loco with SPD/DIR for whole consist. (top of list). BUSY/ACTIVE: bit encoding for SLOT activity
+--
 
-D5-SL_BUSY::
-D4-SL_ACTIVE:: 
- *11*=IN_USE loco adr in SLOT - REFRESHED +
- *10*=IDLE loco adr in SLOT - NOT refreshed +
- *01*=COMMON loco adr IN SLOT - refreshed +
- *00*=FREE SLOT, no valid DATA - not refreshed
+D5 SL_BUSY::
+D4 SL_ACTIVE::
++
+[horizontal]
+ 11:::: IN_USE loco adr in SLOT - REFRESHED
+ 10:::: IDLE loco adr in SLOT - NOT refreshed
+ 01:::: COMMON loco adr IN SLOT - refreshed
+ 00:::: FREE SLOT, no valid DATA - not refreshed
 
-D3-SL_CONDN:: Shows other SLOT Consist linked INTO this slot, see SL_CONUP
+D3 SL_CONDN:: Shows other SLOT Consist linked INTO this slot, see SL_CONUP
 
-D2-SL_SPDEX::
-D1-SL_SPD14::
-D0-SL_SPD28:: 
-3 BITS for Decoder TYPE encoding for this SLOT: +
-*011*=send 128 speed mode packets +
-*010*=14 step MODE +
-*001*=28 step. + Generate Trinary packets for this Mobile ADR +
-*000*=28 step/ 3 BYTE PKT regular mode +
-*111*=128 Step decoder, Allow Advanced DCC consisting +
-*100*=28 Step decoder ,Allow Advanced DCC consisting
+D2 SL_SPDEX::
+D1 SL_SPD14::
+D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT: 
++
+[horizontal]
+011:::: send 128 speed mode packets 
+010:::: 14 step MODE 
+001:::: 28 step. + Generate Trinary packets for this Mobile ADR 
+000:::: 28 step/ 3 BYTE PKT regular mode 
+111:::: 128 Step decoder, Allow Advanced DCC consisting 
+100:::: 28 Step decoder, Allow Advanced DCC consisting
 
-2) SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF> )
+2. SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
 
-3) SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
+3. SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
 [horizontal]
 0x00:: SPEED 0 STOP inertially
 0x01:: SPEED 0 EMERGENCY stop
 0x02->0x7F:: increasing SPEED, 0x7F=MAX speed
 
-4) SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
-
+4. SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
++
 [horizontal]
 D7-0:: always 0
 D6-SL_XCNT:: reserved, set 0
@@ -588,8 +591,8 @@ D2-SL_F3:: 1=F3 ON
 D1-SL_F2:: 1=F2 ON
 D0-SL_F1:: 1=F1 ON
 
-5) TRK byte: GLOBAL system/track status.
-
+5. TRK byte: GLOBAL system/track status.
++
 [horizontal]
 D7-D4:: Reserved
 D3 GTRK_PROG_BUSY:: 1=Programming TRACK in this Master is BUSY.
@@ -597,24 +600,22 @@ D2 GTRK_MLOK1:: 1=This Master IMPLEMENTS LocoNet 1.1 capability, 0=Master is DT2
 D1 GTRK_IDLE:: 0=TRACK is PAUSED, B'cast EMERG STOP.
 D0 GTRK_POWER:: 1=DCC packets are ON in MASTER, Global POWER up
 
-6) SLOT STATUS2:
+6. SLOT STATUS2:
 [horizontal]
 D3:: 1=expansion IN ID1/2, 0=ENCODED alias
 D2:: 1=Expansion ID1/2 is NOT ID usage
 D0:: 1=this slot has SUPPRESSED ADV consist
 
-7) SLOT LOCO ADR HIGH
-
-Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. If this is not zero then the most significant 6 bits
-of this address are used in the first LONG address byte (matching CV17). The
-second DCC LONG address byte matches CV18 and includes the Adr Low 7
+7. SLOT LOCO ADR HIGH
++
+Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. If this is not zero then the most significant 6 bits of this address are used in the first LONG address byte (matching CV17).The second DCC LONG address byte matches CV18 and includes the Adr Low 7
 bit value with the LS bit of ADR high in the MS postion of this track adr byte.
-
++
 NOTE: a DT200 MASTER will always interpret this as 0.
 
-8) SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
+8. SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
 (byte also sent as ARG2 in SND opcode)
-
++
 [horizontal]
 D7-D4:: reserved
 D3-SL_SND4:: F8
@@ -622,9 +623,9 @@ D2-SL_SND3:: F7
 D1-SL_SND2:: F6
 D0-SL_SND1:: F5 1 = SLOT Sound 1 function 1 active (accessory 2)
 
-9) EXPANSION RESERVED ID1: 7 bit ls ID code written by THROTTLE/PC when STAT2.4=1
+9. EXPANSION RESERVED ID1: 7 bit ls ID code written by THROTTLE/PC when STAT2.4=1
 
-10) EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
+10. EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
 
 ### Stationary Broadcast Command:
 
