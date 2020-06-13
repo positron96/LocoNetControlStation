@@ -315,37 +315,41 @@ LocoNet(R) Personal Use version definitions 1.0
 
 DRAFT DEFINITIONS October 16, 1997 SUBJECT TO REVISION
 
-[cols="2,1,4,1,2"]
+[cols="2,1,4,1"]
 |===
-| | | | FOLLOW ON MSG? | RESPONSE TYPE
+| | | | FOLLOW ON MSG? RESPONSE TYPE
 
-5+a| ### 2 Byte MESSAGE opcodes
+
+4+a| ### 2 Byte MESSAGE opcodes
 
 FORMAT = <OPC>,<CKSUM>
 
-|OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO |
+|OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
 
-|OPC_GPON  | 0x83 | GLOBAL power ON request | NO |
+|OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
 
-|OPC_GPOFF | 0x82 | GLOBAL power OFF req     | NO | 
+|OPC_GPOFF | 0x82 | GLOBAL power OFF req     | NO 
 
-|OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO |
+|OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
 
-5+a| ### 4 byte MESSAGE OPCODES
+
+
+4+a| ### 4 byte MESSAGE OPCODES
 
 FORMAT = <OPC>,<ARG1>,<ARG2>,<CKSUM>
 
-|OPC_LOCO_ADR |0xBF |REQ loco ADR |YES |<E7>SLOT READ
-| 4+| `<0xBF>,<0>,<ADR>,<CHK>` 
+|OPC_LOCO_ADR |0xBF |REQ loco ADR |YES <E7><<SLOT_READ>>
+4+| `<0xBF>,<0>,<ADR>,<CHK>` 
 
-DATA return <E7>, is SLOT#,DATA that ADR was found in.
+DATA return `<E7>`, is SLOT#,DATA that ADR was found in.
 
-IF ADR not found, MASTER puts ADR in FREE slot and sends DATA/STATUS return <E7>......
+IF ADR not found, MASTER puts ADR in FREE slot and sends DATA/STATUS return `<E7>`......
 
 IF no FREE slot,Fail LACK,0 is returned [`<B4>,<3F>,<0>,<CHK>`].
 
-|OPC_SW_ACK |0xBD |REQ SWITCH WITH acknowledge function (not DT200) |YES |LACK
-5+| ;<0xBD>,<SW1>,<SW2>,<CHK> REQ SWITCH function
+
+|OPC_SW_ACK |0xBD |REQ SWITCH WITH acknowledge function (not DT200) |YES LACK
+4+| ;<0xBD>,<SW1>,<SW2>,<CHK> REQ SWITCH function
 <SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
 ,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
@@ -353,14 +357,17 @@ IF no FREE slot,Fail LACK,0 is returned [`<B4>,<3F>,<0>,<CHK>`].
  ;response is <0xB4> <3D><00> if DCS100 FIFO is full,command rejected
 <0xB4><3D><7F> if DCS100 accepted
 
-|OPC_SW_STATE |0xBC |REQ state of SWITCH | YES |LACK
-5+| ;<0xBC>,<SW1>,<SW2>,<CHK> REQ state of SWITCH
 
-|OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |YES |<E7>SLOT READ
-5+a| <0xBB>,<SLOT>,<0>,<CHK> Request SLOT DATA/status block
+|OPC_SW_STATE |0xBC |REQ state of SWITCH | YES <<LACK>>
+4+| ;<0xBC>,<SW1>,<SW2>,<CHK> REQ state of SWITCH
 
-|OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |YES |<E7>SLOT READ or LACK
-| 4+a|
+
+|OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |YES <E7><<SLOT_READ>>
+4+a| <0xBB>,<SLOT>,<0>,<CHK> Request SLOT DATA/status block
+
+
+|OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |YES <E7><<SLOT_READ>> or <<LACK>>
+4+a|
 `<0xBA>,<SRC>,<DEST>,<CHK>` 
 
 If SRC is NOT IN_USE, clr SRC.
@@ -374,37 +381,43 @@ SPECIAL CASES:
 RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`. 
 (It's) illegal to move to/from slots 120/127.
 
-|OPC_LINK_SLOTS |0xB9 |;LINK slot ARG1 to slot ARG2 |YES |<E7>SLOT READ
-5+| ;<0xB9>,<SL1>,<SL2>,<CHK> SLAVE slot SL1 to slot SL2
+
+|OPC_LINK_SLOTS |0xB9 |;LINK slot ARG1 to slot ARG2 |YES <E7>SLOT READ
+4+| ;<0xB9>,<SL1>,<SL2>,<CHK> SLAVE slot SL1 to slot SL2
  ;Master LINKER sets the SL_CONUP/DN flags appropriately
 ,Reply is return of SLOT Status <0xE7>. Inspect to see result of Link
 ,invalid Link will return Long Ack Fail <B4>,<39>,<0>,<CHK>
 
-|OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES |<E7>SLOT READ
-5+a| ;<0xB8>,<SL1>,<SL2>,<CHK> UNLINK slot SL1 from SL2
+
+|OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES <E7>SLOT READ
+4+a| ;<0xB8>,<SL1>,<SL2>,<CHK> UNLINK slot SL1 from SL2
  ;UNLINKER executes unlink STRATEGY and returns new SLOT#
  ; DATA/STATUS of unlinked LOCO . Inspect data to evaluate UNLINK
 
-5+|CODES 0xB8 to 0xBF have responses
 
-|OPC_CONSIST_FUNC |0xB6 |;SET FUNC bits in a CONSIST uplink element |NO|
-5+| ;<0xB6>,<SLOT>,<DIRF>,<CHK> UP consist FUNC bits
+4+|CODES 0xB8 to 0xBF have responses
+
+
+|OPC_CONSIST_FUNC |0xB6 |;SET FUNC bits in a CONSIST uplink element |NO
+4+| ;<0xB6>,<SLOT>,<DIRF>,<CHK> UP consist FUNC bits
  ;NOTE this SLOT adr is considered in UPLINKED slot space
 
-|OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO|
-| 4+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
+
+|OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO
+4+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
 
 
-|OPC_LONG_ACK |0xB4 |Long acknowledge |NO |
-| 4+a| 
+|[[LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO 
+4+a| 
 `<0xB4>,<LOPC>,<ACK1>,<CHK>` 
 
 `<LOPC>` is COPY of OPCODE responding to (msb=0). LOPC=0 (unused OPC) is also VALID fail code.
 
 `<ACK1>` is appropriate response code for the OPCode
 
-|OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO |
-| 4+|; <0xB2>, <IN1>, <IN2>, <CHK>
+
+|OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO 
+4+|; <0xB2>, <IN1>, <IN2>, <CHK>
 <IN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 inputs pairs in a DS54
 <IN2> =<0,X,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
 "I"=0 for DS54 "aux" inputs and 1 for "switch" inputs mapped to 4K SENSOR space.
@@ -412,8 +425,9 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 "L"=0 for input SENSOR now 0V (LO) , 1 for Input sensor >=+6V (HI)
 "X"=1, control bit , 0 is RESERVED for future!
 
-|OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO |
-5+|;<0xB1>,<SN1>,<SN2>,<CHK> SENSOR state REPORT
+
+|OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
+4+|;<0xB1>,<SN1>,<SN2>,<CHK> SENSOR state REPORT
 <SN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SN2> =<0,1,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
  this <B1> opcode encodes input levels for turnout feedback
@@ -426,9 +440,10 @@ this <B1> opcode encodes current OUTPUT levels
 "C"= 0 if "Closed" ouput line is OFF, 1="closed" output line is ON (sink current)
 "T"=0 if "Thrown" output line is OFF, 1="thrown" output line is ON (sink I)
 
-|OPC_SW_REQ |0xB0 |;REQ SWITCH function| NO|
 
-5+|;<0xB0>,<SW1>,<SW2>,<CHK> REQ SWITCH function
+|OPC_SW_REQ |0xB0 |;REQ SWITCH function| NO
+
+4+|;<0xB0>,<SW1>,<SW2>,<CHK> REQ SWITCH function
 <SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
 <SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
 ,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
@@ -436,33 +451,42 @@ this <B1> opcode encodes current OUTPUT levels
  Note-,Immediate response of <0xB4><30><00> if command failed, otherwise no response
 ;"A" CLASS codes
 
-5+a| NOTE: CODES 0xA8 to 0xAF have responses
 
-|OPC_LOCO_SND  | 0xA2 |SET SLOT sound functions |NO|
+4+a| NOTE: CODES 0xA8 to 0xAF have responses
 
-|OPC_LOCO_DIRF | 0xA1 |SET SLOT dir,F0-4 state |NO|
 
-|OPC_LOCO_SPD  | 0xA0 |SET SLOT speed  |NO|
-5+|e.g. `<A0><SLOT#><SPD><CHK>`
+|OPC_LOCO_SND  | 0xA2 |SET SLOT sound functions |NO
 
-5+a| ### 6 Byte MESSAGE OPCODES
+
+|OPC_LOCO_DIRF | 0xA1 |SET SLOT dir,F0-4 state |NO
+
+
+|OPC_LOCO_SPD  | 0xA0 |SET SLOT speed  |NO
+4+|e.g. `<A0><SLOT#><SPD><CHK>`
+
+
+
+4+a| ### 6 Byte MESSAGE OPCODES
 
 FORMAT = `<OPC>,<ARG1>,<ARG2>,<ARG3>,<ARG4>,<CKSUM>`
 
 <reserved>
 
-5+a| ### VARIABLE Byte MESSAGE OPCODES
+
+
+4+a| ### VARIABLE Byte MESSAGE OPCODES
 
 FORMAT: `<OPC>,<COUNT>,<ARG2>,<ARG3>,...,<ARG(COUNT-3)>,<CKSUM>`
 
-|OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes |YES |LACK
-| 4+| `<0xEF>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK>
+|OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes |YES <<LACK>>
+4+| `<0xEF>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK>
  <SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
 
  SLOT DATA WRITE, 10 bytes data /14 byte MSG
 
-|OPC_SL_RD_DATA |0xE7 |;SLOT DATA return, 10 bytes |NO|
-| 4+a| `<0xE7>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK><SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
+
+|[[SLOT_READ]]OPC_SL_RD_DATA |0xE7 | SLOT DATA return, 10 bytes |NO
+4+a| `<0xE7>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK><SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
 
 SLOT DATA READ, 10 bytes data / 14 byte MSG
 
@@ -479,8 +503,8 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  00/04 to 7F/7E:: NORMAL throttle RANGE
 
 
-|_OPC_PEER_XFER_ |0xE5 |;move 8 bytes PEER to PEER, SRC->DST |NO resp|
-5+| ;<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
+|_OPC_PEER_XFER_ |0xE5 |;move 8 bytes PEER to PEER, SRC->DST |NO 
+4+| ;<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
  ; <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>
  ;SRC/DST are 7 bit args. DSTL/H=0 is BROADCAST msg
  ; SRC=0 is MASTER
@@ -493,8 +517,8 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  ;<PXCT2>=<0,XC5,XC4,XC3 - D8.7,D7.7,D6.7,D5.7>
  ;XC3-XC5=data type CODE- 0=ANSI TEXT string,balance RESERVED
 
-|_OPC_IMM_PACKET_ |0xED |;SEND n-byte packet immediate |yes |LACK
-5+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
+|_OPC_IMM_PACKET_ |0xED |;SEND n-byte packet immediate |yes LACK
+4+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
  ;<DHI>=<0,0,1,IM5.7-IM4.7,IM3.7,IM2.7,IM1.7>
  ;in <REPS> D4,5,6=#IM bytes,D3=0(reserved); D2,1,0=repeat CNT
 ;Not limited MASTER then LACK=<B4>,<7D>,<7F>,<chk> if CMD ok
