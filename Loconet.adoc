@@ -1,9 +1,18 @@
 = LocoNet(R) Personal Use Edition 1.0 SPECIFICATION
 Digitrax Inc., Panama City, FL 32404.
 1.0, October 16, 1997. Copyrighted material, all rights reserved.
+
 :doctype: book
 :listdef-labeled.style: horizontal
+:listdef-labeled2.style: horizontal
 :toc:
+ifdef::env-github[]
+:tip-caption: :bulb:
+:note-caption: :information_source:
+:important-caption: :heavy_exclamation_mark:
+:caution-caption: :fire:
+:warning-caption: :warning:
+endif::[]
 
 [preface]
 ## Preface
@@ -514,6 +523,7 @@ if STAT2.2=1, the STAT.3=0 means EX1/EX2 are ALIAS
 
 ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 
+[horizontal]
  00/00:: means NO ID being used
  01/00 to 7F/01:: ID shows PC usage. Lo nibble is TYP PC# (PC can use hi values)
  00/02 to 7F/03:: SYSTEM reserved
@@ -556,6 +566,7 @@ NOTE: SLOT 0 <E7> read will return MASTER config information bytes .
 
 1. SLOT STATUS1: 
 +
+[horizontal]
 D7 SL_SPURGE::
 1=SLOT purge en, ALSO adrSEL (INTERNAL use only) (not seen on NET!)
 D6 SL_CONUP:: 
@@ -563,6 +574,7 @@ D6 SL_CONUP::
 --
 CONDN/CONUP: bit encoding-Control double linked Consist List
 
+[horizontal]
 11:::: LOGICAL MID CONSIST, Linked up AND down
 10:::: LOGICAL CONSIST TOP, Only linked downwards
 01:::: LOGICAL CONSIST SUB-MEMBER, Only linked upwards
@@ -577,6 +589,7 @@ TOP is loco with SPD/DIR for whole consist. (top of list).
 D5 SL_BUSY::
 D4 SL_ACTIVE:: BUSY/ACTIVE: bit encoding for SLOT activity
 +
+ [horizontal]
  11:::: IN_USE loco adr in SLOT - REFRESHED
  10:::: IDLE loco adr in SLOT - NOT refreshed
  01:::: COMMON loco adr IN SLOT - refreshed
@@ -588,6 +601,7 @@ D2 SL_SPDEX::
 D1 SL_SPD14::
 D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT: 
 +
+[horizontal]
 011:::: send 128 speed mode packets 
 010:::: 14 step MODE 
 001:::: 28 step. + Generate Trinary packets for this Mobile ADR 
@@ -598,12 +612,14 @@ D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT:
 2. SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
 
 3. SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
+[horizontal]
 0x00:: SPEED 0 STOP inertially
 0x01:: SPEED 0 EMERGENCY stop
 0x02->0x7F:: increasing SPEED, 0x7F=MAX speed
 
 4. SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
 +
+[horizontal]
 D7-0:: always 0
 D6-SL_XCNT:: reserved, set 0
 D5-SL_DIR:: 1=loco direction FORWARD
@@ -615,6 +631,7 @@ D0-SL_F1:: 1=F1 ON
 
 5. TRK byte: GLOBAL system/track status.
 +
+[horizontal]
 D7-D4:: Reserved
 D3 GTRK_PROG_BUSY:: 1=Programming TRACK in this Master is BUSY.
 D2 GTRK_MLOK1:: 1=This Master IMPLEMENTS LocoNet 1.1 capability, 0=Master is DT200
@@ -638,6 +655,7 @@ NOTE: a DT200 MASTER will always interpret this as 0.
 8. SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
 (byte also sent as ARG2 in SND opcode)
 +
+[horizontal]
 D7-D4:: reserved
 D3-SL_SND4:: F8
 D2-SL_SND3:: F7
@@ -753,6 +771,7 @@ Type codes:
 
 <PSTAT> Programmer Status error flags. Reply codes resulting from completed task in PCMD
 
+[horizontal]
 D7-D4:: reserved
 D3:: *1* = User Aborted this command
 D2:: *1* = Failed to detect READ Compare acknowledge response from decoder
@@ -776,21 +795,15 @@ sub-minute phase counter and invalidate the SYNC update ping generator.
 
 `<0xEF>,<0E>,<7B>,<CLK_RATE>,<FRAC_MINSL>,<FRAC_MINSH>,<256-MINS_60>,<TRK><256-HRS_24>,<DAYS>,<CLK_CNTRL>,<ID1>,<1D2>,<CHK>`
 
+[horizontal]
 <CLK_RATE>:: 0=Freeze clock, 1=normal 1:1 rate, 10=10:1 etc, max VALUE is 128(0x7F) to 1
-
 <FRAC_MINSL>:: FRAC mins hi/lo are a sub-minute counter, depending on the CLOCK generator
-
 <FRAC_MINSH>:: Not for ext. usage. This counter is reset when valid <E6><7B> SYNC msg seen
-
 <256-MINS_60>:: This is FAST clock MINUTES subtracted from 256. Modulo 0-59
-
 <256-HRS_24>:: This is FAST clock HOURS subtracted from 256. Modulo 0-23
-
 <DAYS>:: number of 24 Hr clock rolls, positive count
-
 <CLK_CNTRL>:: Clock Control Byte
-D6- 1=This is valid Clock information, 0=ignore this `<E6><7B>`, SYNC reply
-
+D6 -- 1=This is valid Clock information, 0=ignore this `<E6><7B>`, SYNC reply
 <ID1>,<1D2>:: This is device ID last setting the clock. `<00><00>` shows no set has happened; `<7F><7x>` are reserved for PC access.
 
 +++[END]+++
