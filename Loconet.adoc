@@ -120,7 +120,7 @@ SINGLE ENDED voltage levels and characteristics are:
 . To use a 1/4" Stereo 3 pin Plug , the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum , because the Plug shorts the Tip and Ring when initially
 inserted.
 
-#### NETWORK Timing
+#### Network timing
 
 LocoNet(R) data is sent in normal ASYNCHRONOUS format using 1 START bit, 8 DATA bits
 and 1 STOP bit. The 8 bit data is transmitted LSB first. The bit times are 60.0 uSecs or 16.66 KBaud +/-
@@ -140,7 +140,7 @@ All transmitters are responsible for detecting TRANSMIT COLLISIONS on a 1 bit or
 echo-byte basis. If a TRANSMIT collision is detected the TRANSMITTER will force a line BREAK of 15
 BIT times with a Low or "SPACE" on LocoNet(R), and decrement the Transmit Attempt count. (The
 device can attempt the next acess at the same Priority, or change it by some small amount, depending on
-an internal Phase reference, if the delay from Network free to Siezure is greater than 2uS).
+an internal Phase reference, if the delay from Network free to Siezure is greater than 2{nbsp}uS).
 
 All receivers will process the BREAK as bad data framing and reset Message parsers The network is then
 free to re-arbitrate access. Any message that has format or framing errors , data errors or is a fragment
@@ -148,7 +148,7 @@ caused by noise glitches and does not completely follow the MESSAGE FORMAT will 
 receivers, and a new OPCODE will be scanned for re-synchronization.
 
 
-#### NETWORK Access:
+#### Network access:
 
 To SEIZE access to the LocoNet(R) a device shall wait for the CD BACKOFF time to elapse from
 the last space level seen on LOCONET+/-. The "MASTER" device may at this time seize the network
@@ -180,33 +180,27 @@ broadcast messages to the network in a timely manner.
 To provide the greatest protection against network bandwidth being wasted due to repeated collisions a
 device should _assert the SPACE of the start bit of the message OPCODE within 2 microseconds of determining that its access delays have elapsed [.underline]#and the network is still free#_. This has the effect of improving the COLLISION aperture uncertainty for a transmit collision. If the transmitting device detects a transmit collision either by bad TRANSMIT ECHO or a TRANSMITTED 1 bit being forced to 0 on LOCONET, it will initiate the 15 bit BREAK sequence to flag all devices that data is bad.
 
-#### PC Access
+#### PC access
 
-A simple "COM" port on a PC may access the _[underline]#network#_ by a more direct method. The protocol has been
-encoded so that a PC may watch the LocoNet(R) message dialog and infer that the network is free because
-the last message decoded does not imply a follow-on response, so that the network is immediately free for
-a new message dialog. In this situation, the PC may immediately seize the network before the CD
-BACKOFF time has elapsed. This allows the PC to pre-empt all other devices and completely control the
-LocoNet(R) to the level desired. Note that the message `<81><7e>` is a "time burner" NOP code sent by a
-Master to restart the CD Backoff timers, and hence keep the network busy in a hardware sense. This
-`<81>` opcode should thus be simply stripped and ignored.
+A simple "COM" port on a PC may access the _[.underline]#network#_ by a more direct method. 
+The protocol has been encoded so that a PC may watch the LocoNet(R) message dialog and infer that the network is free because
+the last message decoded does not imply a follow-on response, so that the network is immediately free for a new message dialog. 
+In this situation, the PC may immediately seize the network before the CD BACKOFF time has elapsed. 
+This allows the PC to pre-empt all other devices and completely control the LocoNet(R) to the level desired. Note that the message `<81><7e>` is a "time burner" NOP code sent by a Master to restart the CD Backoff timers, and hence keep the network busy in a hardware sense. 
+This `<81>` opcode should thus be simply stripped and ignored.
 
-Several PC's may share access to LocoNet(R) by subdividing the 20 bit CD BACKOFF delay into priority windows for access. They are responsible for detecting transmit COLLISIONS by checking their TRANSMIT ECHO data and watching a CARRIER DETECT to see if a PC transmit "window" is active already, before attempting to transmit.
+Several PC's may share access to LocoNet(R) by subdividing the 20 bit CD BACKOFF delay into priority windows for access. 
+They are responsible for detecting transmit COLLISIONS by checking their TRANSMIT ECHO data and watching a CARRIER DETECT to see if a PC transmit "window" is active already, before attempting to transmit.
 
-If the LOCONET+/- signal remains at a fixed SPACE (low) level for more than 100 milliseconds, a
-DEVICE will assume a DISCONNECT state is in effect. From this DISCONNECT state or initial start-up
-state a device will wait a 250millisecond STARTUP backoff before attempting to access the network. A
-device will not need to reset its internal state upon DISCONNECT and re-connection ,but if it is
-maintaining a SLOT in the refresh stack it will be required to check the SLOT status matches its internal
-state before re-using any SLOT. If a device diconnects from LocoNet(R) and so does not access or reference
-a slot within the system PURGE time, the master will force the unaccessed SLOT to "COMMON" status
-so other system devices can use the SLOT.
-The typical purge time of a DT200 operating as a Master is about 200 seconds. A good "ping" or Slot
-update activity is about every 100 seconds, i.e. if a user makes no change to a throttle/slot within 100
-seconds, the throttle/device should automatically send another speed update at the current speed to reset
-the Purge timeout for that Slot.
+If the LOCONET+/- signal remains at a fixed SPACE (low) level for more than 100 milliseconds, a DEVICE will assume a DISCONNECT state is in effect. 
+From this DISCONNECT state or initial start-up state a device will wait a 250 millisecond STARTUP backoff before attempting to access the network. 
+A device will not need to reset its internal state upon DISCONNECT and re-connection, but if it is maintaining a SLOT in the refresh stack it will be required to check the SLOT status matches its internal state before re-using any SLOT. 
+If a device diconnects from LocoNet(R) and so does not access or reference a slot within the system PURGE time, the master will force the unaccessed SLOT to "COMMON" status so other system devices can use the SLOT.
+The typical purge time of a DT200 operating as a Master is about 200 seconds. 
+A good "ping" or Slot update activity is about every 100 seconds, i.e. if a user makes no change to a throttle/slot within 100
+seconds, the throttle/device should automatically send another speed update at the current speed to reset the Purge timeout for that Slot.
 
-### MESSAGE Format:
+### Message format
 
 All LocoNet(R) communications are via multi-byte messages. The "MASTER" is defined as the
 device that is maintaining the refresh stack for DCC packet generation and is actively generating the DCC
@@ -251,7 +245,7 @@ The OPCODES may be examined to determine message length and if subsequent respon
 The A,B,C,D,F are bits available to encode 32 OPCODES per message length.
 
 
-## REFRESH SLOTS
+## Refresh slots
 
 The model of the MASTER refresh stack is an array of up to 120 read/write refresh SLOTS. The slot address is a principal component and is generally the second byte or 1st argument of a message to the master. The refresh SLOT contains up to 10 data bytes relating to a Locomotive and also controls a task in the Track DCC refresh stack. Most mobile decoder or Locomotive operations process the SLOT associated
 with the Locomotive to be controlled. The SLOT number is a similar shorthand ID# to a "file handle"
@@ -261,7 +255,7 @@ System and Master control.
 Slot #124 ($7C) is allocated for read/write access to the DCS100 programming track, and the format of
 the 10 data bytes is not the same as a "normal" slot. See later.
 
-### Standard Address Selection
+### Standard address selection
 
 To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a LOCOMOTIVE address for use (opcode <<LOCO_ADR,OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). The Master (or PC
 in a Limited Master environment) responds with a SLOT DATA READ for the SLOT, ( opcode `<E7>...`)
@@ -298,7 +292,7 @@ With this procedure the throttle does not need to have a unique "ID number". SLO
 SLOT address matches the LOCOMOTIVE address within, if the user directly Reads and Writes to
 SLOTs without using the Master to allocate Locomotive addresses
 
-### DISPATCHING
+### Dispatching
 
 Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in the "DISPATCH" mode. 
 In this case a BT2 operating in its normal mode will request a DISPATCH SLOT that has been prepared by a supervisor type device.
@@ -311,23 +305,29 @@ To DISPATCH GET, perform a SLOT MOVE from Slot 0 (no destination needed).
 If there is a DISPATCH marked slot in the system, a SLOT DATA READ (`<E7>,..`) with the SLOT information will be the response. 
 If there is NO DISPATCH slot, the response will be a LONG ACK (opc `<B4>,..`) with the Fail code, 00.
 
-## FUTURE EXPANSION CODES
+## Future expansion codes
+
 (still in definition stage)
 
-Immediate codes may be sent to the Master by a device. These are converted to DCC packets and sent as
-the next packet to the rails. They are not entered into any refresh stack. These are available in a system
-based on the DCS100/"Chief".
+Immediate codes may be sent to the Master by a device. 
+These are converted to DCC packets and sent as the next packet to the rails. 
+They are not entered into any refresh stack. 
+These are available in a system based on the DCS100/"Chief".
 
-Opcodes for access to an auxiliary Service mode Programming Track are included. These requests are not
-entered in the main DCC packet stream .
+Opcodes for access to an auxiliary Service mode Programming Track are included. 
+These requests are not entered in the main DCC packet stream .
 
-Note that several confusing expansions and opcode sequences have been stripped from this LocoNet (R) version. An experimenter who implements this protocol correctly should have no problems running on a LocoNet(R) that has other expanded features. Again, we recommend resisting the temptation to "optimise" or take shortcuts with this protocol since it will lead to guaranteed future problems with your hardware and software.
+Note that several confusing expansions and opcode sequences have been stripped from this LocoNet (R) version. 
+An experimenter who implements this protocol correctly should have no problems running on a LocoNet(R) that has other expanded features. 
+Again, we recommend resisting the temptation to "optimise" or take shortcuts with this protocol since it will lead to guaranteed future problems with your hardware and software.
 
-## LocoNet(R) OPCODE SUMMARY
+## LocoNet(R) opcode summary
+
 All Copyrights and rights reserved, Digitrax 1997.
 
-NOTE: Any OPcodes shown here in _itallics_ are not finalised and are informational only. Do
-not use. All other OPCODES and states are reserved for future expansion.
+NOTE: Any opcodes shown here in _itallics_ are not finalised and are informational only. 
+Do not use. 
+All other OPCODES and states are reserved for future expansion.
 
 LocoNet(R) Personal Use version definitions 1.0
 
@@ -568,11 +568,14 @@ CONDN/CONUP: bit encoding-Control double linked Consist List
 01:::: LOGICAL CONSIST SUB-MEMBER, Only linked upwards
 00:::: FREE locomotive, no CONSIST indirection/linking
 
-ALLOWS "CONSISTS of CONSISTS". Uplinked means that Slot SPD number is now SLOT adr of SPD/DIR and STATUS of consist. i.e. is an Indirect pointer. This Slot has same BUSY/ACTIVE bits as TOP of Consist. TOP is loco with SPD/DIR for whole consist. (top of list). BUSY/ACTIVE: bit encoding for SLOT activity
+ALLOWS "CONSISTS of CONSISTS". 
+Uplinked means that Slot SPD number is now SLOT adr of SPD/DIR and STATUS of consist, i.e. is an Indirect pointer. 
+This Slot has same BUSY/ACTIVE bits as TOP of Consist. 
+TOP is loco with SPD/DIR for whole consist. (top of list).
 --
 
 D5 SL_BUSY::
-D4 SL_ACTIVE::
+D4 SL_ACTIVE:: BUSY/ACTIVE: bit encoding for SLOT activity
 +
  11:::: IN_USE loco adr in SLOT - REFRESHED
  10:::: IDLE loco adr in SLOT - NOT refreshed
@@ -626,8 +629,9 @@ D0:: 1=this slot has SUPPRESSED ADV consist
 
 7. SLOT LOCO ADR HIGH
 +
-Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. If this is not zero then the most significant 6 bits of this address are used in the first LONG address byte (matching CV17).The second DCC LONG address byte matches CV18 and includes the Adr Low 7
-bit value with the LS bit of ADR high in the MS postion of this track adr byte.
+Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. 
+If this is not zero then the most significant 6 bits of this address are used in the first LONG address byte (matching CV17).
+The second DCC LONG address byte matches CV18 and includes the Adr Low 7 bit value with the LS bit of ADR high in the MS postion of this track adr byte.
 +
 NOTE: a DT200 MASTER will always interpret this as 0.
 
@@ -652,7 +656,8 @@ Broadcast LocoNet Switch adr is then `<SW2>=<0,0,a,D-1,1,1,1>`, `<SW1>=<0,1,1,1-
 
 ### Stationary Interrogate Command:
 
-The DCC packet `<sync>,<1011-1111>,<1100-D c b a> <ecb>` is an Interrogation for all DS54's. This causes a 2 LocoNet `<B1>` messages encoding both Output state and Input state, for each sensor adr a/b/c encodes.
+The DCC packet `<sync>,<1011-1111>,<1100-D c b a> <ecb>` is an Interrogation for all DS54's. 
+This causes a 2 LocoNet `<B1>` messages encoding both Output state and Input state, for each sensor adr a/b/c encodes.
 
 Interrogate LocoNet Switch adr is `<SW2>=<0,0,a,1-0,1,1,1>`, `<SW1>= <0,1,1,1-1,0,c,b>`.
 
@@ -660,28 +665,24 @@ This is generated by DCS100 at power ON, and scans all 8 inputs of all DS54's.
 
 ### Programmer track:
 
-The programmer track is accessed as Special slot #124 ( $7C, 0x7C). It is a full asynchronous shared
-system resource.
+The programmer track is accessed as Special slot #124 (0x7C). 
+It is a fully asynchronous shared system resource.
 
-To start Programmer task, write to slot 124. There will be an immediate LACK acknowledge that
-indicates what programming will be allowed. If a valid programming task is started, then at the final
-(asynchronous) programming completion, a Slot read <E7> from slot 124 will be sent. This is the final
-task status reply.
+To start Programmer task, write to slot 124. 
+There will be an immediate LACK acknowledge that indicates what programming will be allowed. 
+If a valid programming task is started, then at the final (asynchronous) programming completion, a Slot read <E7> from slot 124 will be sent. 
+This is the final task status reply.
 
 ### Programmer Task Start:
 
-<0xEF>,<0E>,<7C>,<PCMD>,<0>,<HOPSA>,<LOPSA>,<TRK>;<CVH>,<CVL>,<DATA7>
-,<0>,<0>,<CHK>
+`<0xEF>,<0E>,<7C>,<PCMD>,<0>,<HOPSA>,<LOPSA>,<TRK>;<CVH>,<CVL>,<DATA7>,<0>,<0>,<CHK>`
 
 This OPC leads to immediate LACK codes:
 
-<B4>,<7F>,<7F>,<chk> Function NOT implemented, no reply.
-
-<B4>,<7F>,<0>,<chk> Programmer BUSY , task aborted, no reply.
-
-<B4>,<7F>,<1>,<chk> Task accepted , <E7> reply at completion.
-
-<B4>,<7F>,<0x40>,<chk> Task accepted blind NO <E7> reply at completion.
+* <B4>,<7F>,<7F>,<chk> Function NOT implemented, no reply.
+* <B4>,<7F>,<0>,<chk> Programmer BUSY, task aborted, no reply.
+* <B4>,<7F>,<1>,<chk> Task accepted, <E7> reply at completion.
+* <B4>,<7F>,<0x40>,<chk> Task accepted blind NO <E7> reply at completion.
 
 Note that the <7F> code will occur in Operations Mode Read requests if the System is not configured for
 and has no Advanced Acknowlegement detection installed.. Operations Mode requests can be made and
@@ -696,14 +697,14 @@ A <PCMD> value of <00> will abort current SERVICE mode programming task and will
 
 <PCMD> Programmer Command: Defined 
 
-* D7 -0
-* D6 -Write/Read , 1= Write, 0=Read
-* D5 -Byte Mode , 1= Byte operation, 0=Bit operation (if possible)
-* D4 -TY1 Programming Type select bit
-* D3 -TY0 Prog type select bit
-* D2 -Ops Mode, 1=Ops Mode on Mainlines, 0=Service Mode on Programming Track
-* D1 -0 reserved
-* D0 -0-reserved
+* D7 = 0
+* D6 -- Write/Read, *1* -- Write, *0* -- Read
+* D5 -- Byte Mode, *1* -- Byte operation, *0* -- Bit operation (if possible)
+* D4 -- TY1 Programming Type select bit
+* D3 -- TY0 Prog type select bit
+* D2 -- Ops Mode, *1* -- Ops Mode on Mainlines, *0* -- Service Mode on Programming Track
+* D1 = 0 -- reserved
+* D0 = 0 -- reserved
 
 Type codes:
 
@@ -732,9 +733,9 @@ Type codes:
 
 |===
 
-<HOPSA>Operations Mode Programming- 7 High address bits of Loco to program, 0 if Service Mode
+<HOPSA> Operations Mode Programming -- 7 High address bits of Loco to program, 0 if Service Mode
 
-<LOPSA>Operations Mode Programming- 7 Low address bits of Loco to program, 0 if Service Mode
+<LOPSA> Operations Mode Programming -- 7 Low address bits of Loco to program, 0 if Service Mode
 
 <TRK> Normal Global Track status for this Master, Bit 3 also is 1 WHEN Service Mode track is BUSY
 
@@ -742,22 +743,21 @@ Type codes:
 
 <CVL> Low 7 bits of 10 bit CV address. <0,CV6,CV5,CV4-CV3,CV2,CV1,CV0>
 
-<DATA7>Low 7 BITS OF data to WR or RD COMPARE <0,D6,D5,D4 - D3,D2,D1,D0>
-ms bit is at CVH bit 1 position.
+<DATA7>Low 7 BITS OF data to WR or RD COMPARE <0,D6,D5,D4 - D3,D2,D1,D0> ms bit is at CVH bit 1 position.
 
 ### Programmer Task Final Reply: 
+
 (if saw LACK <B4>,<7F>,<1>,<chk> code reply at task start)
 
-<0xE7>,<0E>,<7C>,<PCMD>,<PSTAT>,<HOPSA>,<LOPSA>,<TRK>;<CVH>,<CVL>,<DATA7>
-,<0>,<0>,<CHK>
+`<0xE7>,<0E>,<7C>,<PCMD>,<PSTAT>,<HOPSA>,<LOPSA>,<TRK>;<CVH>,<CVL>,<DATA7>,<0>,<0>,<CHK>`
 
 <PSTAT> Programmer Status error flags. Reply codes resulting from completed task in PCMD
 
-* D7-D4 -reserved
-* D3 -1=User Aborted this command
-* D2 -1= Failed to detect READ Compare acknowledge response from decoder
-* D1 -1= No Write acknowledge response from decoder
-* D0 -1= Service Mode programming track empty- No decoder detected
+D7-D4:: reserved
+D3:: *1* = User Aborted this command
+D2:: *1* = Failed to detect READ Compare acknowledge response from decoder
+D1:: *1* = No Write acknowledge response from decoder
+D0:: *1* = Service Mode programming track empty -- No decoder detected
 
 This <E7> response is issued whenever a Programming task is completed. It echos most of the request
 information and returns the PSTAT status code to indicate how the task completed. If a READ was
@@ -765,18 +765,17 @@ requested <DATA7> and <CVH> contain the returned data, if the PSTAT indicates a 
 (typically =0). Note that if a Paged Read fails to detect a successful Page write acknowledge when first
 setting the Page register, the read will be aborted, showing no Write acknowledge flag D1=1.
 
-### FAST Clock: 
+## Fast clock: 
 
 The system FAST clock and parameters are implemented in Slot 123 (0x7B).
 Use <<WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information; Request to read slot 0x7B (<<RQ_SLOT_DATA, <BB><7B>..>>), will return current System clock information, and other throttles will update to this SYNC. Note that all attached display devices
 keep a current clock calculation based on this SYNC read value, i.e. devices MUST not continuously poll the clock SLOT to generate time, but use this merely to restore SYNC and follow current RATE etc. This clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds , by a single user, so all attached devices can synchronise any phase drifts. Upon seeing a SYNC read, all devices should reset their local
 sub-minute phase counter and invalidate the SYNC update ping generator.
 
-#### Clock slot format:
+### Clock slot format:
 
 `<0xEF>,<0E>,<7B>,<CLK_RATE>,<FRAC_MINSL>,<FRAC_MINSH>,<256-MINS_60>,<TRK><256-HRS_24>,<DAYS>,<CLK_CNTRL>,<ID1>,<1D2>,<CHK>`
 
-[horizontal]
 <CLK_RATE>:: 0=Freeze clock, 1=normal 1:1 rate, 10=10:1 etc, max VALUE is 128(0x7F) to 1
 
 <FRAC_MINSL>:: FRAC mins hi/lo are a sub-minute counter, depending on the CLOCK generator
