@@ -2,66 +2,92 @@
 Digitrax Inc., Panama City, FL 32404.
 1.0, October 16, 1997. Copyrighted material, all rights reserved.
 :doctype: book
-
-[preface]
-== Preface
-The goal of this document is to create a comprehensive interpretation of LocoNet Personal specification. Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points. The style should also be improved.
-
+:listdef-labeled.style: horizontal
 :toc:
 
+[preface]
+## Preface
+The goal of this document is to create a comprehensive interpretation of LocoNet Personal specification. 
+Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points. 
+The style should also be improved.
+
+
 ## Introduction
-This is the definition of the protocol used by Digitrax products that communicate on the Long distance
-version the LocoNet(R) network. This LocoNet Personal Use Edition 1.0 information is provided solely
-for non-commercial private use by Digitrax customers. No rights are conveyed for the commercial use
-of this information, and Digitrax Inc. is not able to provide technical support for private use. Digitrax
-conveys no warranty for this information and incurs no obligations for its use or incorrect usage.
-Possession of this information signifies acceptance of these conditions of usage. LocoNet is a registered
-trademark of Digitrax Inc.
+
+This is the definition of the protocol used by Digitrax products that communicate on the Long distance version the LocoNet(R) network. 
+This LocoNet Personal Use Edition 1.0 information is provided solely for non-commercial private use by Digitrax customers. 
+No rights are conveyed for the commercial use of this information, and Digitrax Inc. is not able to provide technical support for private use. 
+Digitrax conveys no warranty for this information and incurs no obligations for its use or incorrect usage.
+Possession of this information signifies acceptance of these conditions of usage. 
+LocoNet is a registered trademark of Digitrax Inc.
+
 
 ### Summary and design philosophy
-LocoNet(R) is a "PEER to PEER" distributed network system on which all devices can monitor the network data flow. The network is event driven by different devices in time, and is not polled by a centralized controller in normal operation. LocoNet is a powerful power decentralized and "scalable" distributed system. This is similar to the way the worldwide telephone system works- i.e. there is no worldwide "master control program" and all telephone central offices follow a strict set of "rules" for worldwide access. The Internet operates in a similar "distributed” manner.
 
-The access technology is Carrier Sense Multiple access with Carrier Detect, CSMA/CD. This type of
-network technology is the overwhelming choice for connecting computer LAN's around the world. The
-first implemented 10M bps version of Ethernet has been upgraded to 100M bps and now has even 1,000M
-bps extensions. The CSMA/CD is the basic physical or media access layer that allows multiple devices to interoperate and exchange data efficiently.
+LocoNet(R) is a "PEER to PEER" distributed network system on which all devices can monitor the network data flow. 
+The network is event driven by different devices in time, and is not polled by a centralized controller in normal operation. 
+LocoNet is a powerful power decentralized and "scalable" distributed system. 
+This is similar to the way the worldwide telephone system works -- i.e. there is no worldwide "master control program" and all telephone central offices follow a strict set of "rules" for worldwide access. 
+The Internet operates in a similar "distributed” manner.
 
-LocoNet(R) uses CSMA/CD techniques to arbitrate and control network access. On top of this physical
-layer, LocoNet(R) specifies a higher level of message protocol that gives efficient management of data structures for operations in the model railroad environment. A sensible bit rate was chosen as a good compromise between ease of wiring, with no need for terminations or complex distribution rules, and fast latency or rapid response time. We avoided a simple "specsmanship" of specifying faster bit rates to distinguish us from other system manufacturers' capabilities, and instead chose a fundamentally new system architecture we call LocoNet(R).
+The access technology is Carrier Sense Multiple access with Carrier Detect, CSMA/CD. 
+This type of network technology is the overwhelming choice for connecting computer LAN's around the world. 
+The first implemented 10M bps version of Ethernet has been upgraded to 100M bps and now has even 1,000M bps extensions. 
+The CSMA/CD is the basic physical or media access layer that allows multiple devices to interoperate and exchange data efficiently.
 
-Since LocoNet(R) is a distributed system where each device can determine the urgency of its access, it is not easy to compare in a one-to-one manner with older technology such as polled bus systems. We can compare the explosive growth of commercial computer LAN's, and even the Internet itself, to understand that all new "state-of-the-art" data processing systems are based on network type topology. The old idea of a central "mainframe" and "Main Control Program" was state of the art for the 60's and 70's and has yielded to new technologies and ideas.
+LocoNet(R) uses CSMA/CD techniques to arbitrate and control network access. 
+On top of this physical layer, LocoNet(R) specifies a higher level of message protocol that gives efficient management of data structures for operations in the model railroad environment. 
+A sensible bit rate was chosen as a good compromise between ease of wiring, with no need for terminations or complex distribution rules, and fast latency or rapid response time. 
+We avoided a simple "specsmanship" of specifying faster bit rates to distinguish us from other system manufacturers' capabilities, and instead chose a fundamentally new system architecture we call LocoNet(R).
 
-Comparing "raw" bit rates is not meaningful in this context since the strength of a true network system is in allowing multiple queued access without requiring polling or data flow controlling overheads. The real strengths of a LAN become apparent when a large number of devices need fast data access, or low latency, to transfer requests or state change information. With a LocoNet(R) implementation, a modest bit rate is sufficient on a large railroad layout to give realistic operation. Note that a typical LocoNet(R) implementation allows us to achieve about 98% of network traffic capacity with less than 1% collisions.
+Since LocoNet(R) is a distributed system where each device can determine the urgency of its access, it is not easy to compare in a one-to-one manner with older technology such as polled bus systems. 
+We can compare the explosive growth of commercial computer LAN's, and even the Internet itself, to understand that all new "state-of-the-art" data processing systems are based on network type topology. 
+The old idea of a central "mainframe" and "Main Control Program" was state of the art for the 60's and 70's and has yielded to new technologies and ideas.
 
-Another decisive advantage of an optimally designed LAN is the ability to overlay or add new capabilities and thus "scale" the system in features as well as size. Not having to modify a "master control program" each time we wish to reconfigure or expand system features is a very real advantage.
+Comparing "raw" bit rates is not meaningful in this context since the strength of a true network system is in allowing multiple queued access without requiring polling or data flow controlling overheads. 
+The real strengths of a LAN become apparent when a large number of devices need fast data access, or low latency, to transfer requests or state change information. 
+With a LocoNet(R) implementation, a modest bit rate is sufficient on a large railroad layout to give realistic operation.
+Note that a typical LocoNet(R) implementation allows us to achieve about 98% of network traffic capacity with less than 1% collisions.
 
-An example of this is the way the Digitrax "Big Boy" can be expanded with DT100's and get a network "fast clock", even though the DT200 master did not itself support this. The soon to be released Digitrax Tetherless throttles (both Radio and IR) can take advantage of the network environment to add a number of different types of features among many interfaces on the same LocoNet (R) network. LocoNet(R) is
-configured to allow all types of data traffic to flow on a single wiring scheme. This means you do not have to run separate Throttle, Booster, Feedback and PC wiring for the system. Since LocoNet (R) is based on LAN technology, a large LocoNet(R) layout can use Bridging, Routing and Fault isolation techniques as used on commercial networks to expand to a large physical extent. 
+Another decisive advantage of an optimally designed LAN is the ability to overlay or add new capabilities and thus "scale" the system in features as well as size. 
+Not having to modify a "master control program" each time we wish to reconfigure or expand system features is a very real advantage.
 
-To allow the addition of multiple independently operating PC's around a large physical layout using simple access hardware, the LocoNet(R) was "slowed down" and simplified somewhat over a "raw hardware" driven system capability. This trade off was made to ensure ease of attachment of PC's, and we at Digitrax feel that once the power of "computer assisted modeling" was appreciated, a single PC would rapidly prove inadequate, as task complexity and demands increased. Also, we feel it is important that PC tasks can be independent, modular and spread out among many different PC's around the layout. In particular being able to use slower old "AT" 286's and 386's running DOS and Windows 3.1 etc., was important, since requiring a dedicated new "Wintel PC" costing over US$2,000 seems like a very expensive proposition for what is essentially a hobby!
+An example of this is the way the Digitrax "Big Boy" can be expanded with DT100's and get a network "fast clock", even though the DT200 master did not itself support this. 
+The soon to be released Digitrax Tetherless throttles (both Radio and IR) can take advantage of the network environment to add a number of different types of features among many interfaces on the same LocoNet (R) network. 
+LocoNet(R) is configured to allow all types of data traffic to flow on a single wiring scheme. 
+This means you do not have to run separate Throttle, Booster, Feedback and PC wiring for the system. 
+Since LocoNet (R) is based on LAN technology, a large LocoNet(R) layout can use Bridging, Routing and Fault isolation techniques as used on commercial networks to expand to a large physical extent. 
+
+To allow the addition of multiple independently operating PC's around a large physical layout using simple access hardware, the LocoNet(R) was "slowed down" and simplified somewhat over a "raw hardware" driven system capability. 
+This trade off was made to ensure ease of attachment of PC's, and we at Digitrax feel that once the power of "computer assisted modeling" was appreciated, a single PC would rapidly prove inadequate, as task complexity and demands increased. 
+Also, we feel it is important that PC tasks can be independent, modular and spread out among many different PC's around the layout.
+In particular being able to use slower old "AT" 286's and 386's running DOS and Windows 3.1 etc., was important, since requiring a dedicated new "Wintel PC" costing over US$2,000 seems like a very expensive proposition for what is essentially a hobby!
 
 ## Technical Specification
 
-The normal LocoNet(R) state is IDLE, with no data traffic unless a device has information to send. With no traffic flow, the network is RFI quiet.
+The normal LocoNet(R) state is IDLE, with no data traffic unless a device has information to send. 
+With no traffic flow, the network is RFI quiet.
 
 ### Physical
 
-The full implementation of LocoNet(R) uses a 6 pin USOC RJ12 style TELCO connector. The
-network is designed to operate "daisy chained" on unterminated 26 AWG 3 pair cable or flat 6 conductor
-type 120 ohm impedance ribbon cable. It can be cabled in numerous variations. It is designed to be
-tolerant of cabling environment. It is permissible for the individual wires to loop back on themselves,
-noting that the 2 Rail_sync lines are of opposite phase and cannot be connected. The connections are
-balanced to minimize RFI. The connections may be branched in any combination to yield a "Star" or
-"Bus" or any combination thereof. Only a single LocoNet(R) current termination is needed and is typically
-supplied by the system "Master".
+The full implementation of LocoNet(R) uses a 6 pin USOC RJ12 style TELCO connector. 
+The network is designed to operate "daisy chained" on unterminated 26 AWG 3 pair cable or flat 6 conductor type 120 ohm impedance ribbon cable. 
+It can be cabled in numerous variations. 
+It is designed to be tolerant of cabling environment. 
+It is permissible for the individual wires to loop back on themselves, noting that the 2 Rail_sync lines are of opposite phase and cannot be connected. 
+The connections are balanced to minimize RFI. 
+The connections may be branched in any combination to yield a "Star" or "Bus" or any combination thereof. 
+Only a single LocoNet(R) current termination is needed and is typically supplied by the system "Master".
 
 
 Pinouts for the RJ11/6 connector are:
-1-RAIL_SYNC- white
-2-SIGNAL GROUND
-3-LOCONET4-LOCONET+
-5-SIGNAL GROUND
-6-RAIL_SYNC+ blue
+
+1. RAIL_SYNC- {nbsp}{nbsp}{nbsp}{nbsp} white
+2. SIGNAL GROUND
+3. LOCONET-
+4. LOCONET+
+5. SIGNAL GROUND
+6. RAIL_SYNC+ {nbsp}{nbsp}{nbsp}{nbsp} [blue]#blue#
 
 
 Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2,000', with no point-to-point length exceeding 1000'. This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors. [The capacitance of 2,000' of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000' ].
@@ -123,6 +149,7 @@ receivers, and a new OPCODE will be scanned for re-synchronization.
 
 
 #### NETWORK Access:
+
 To SEIZE access to the LocoNet(R) a device shall wait for the CD BACKOFF time to elapse from
 the last space level seen on LOCONET+/-. The "MASTER" device may at this time seize the network
 immediately upon seeing CD has "released". All other devices add additional time delays before being
@@ -155,14 +182,14 @@ device should _assert the SPACE of the start bit of the message OPCODE within 2 
 
 #### PC Access
 
-A simple "COM" port on a PC may access the _[.underline]#network#_ by a more direct method. The protocol has been
+A simple "COM" port on a PC may access the _[underline]#network#_ by a more direct method. The protocol has been
 encoded so that a PC may watch the LocoNet(R) message dialog and infer that the network is free because
 the last message decoded does not imply a follow-on response, so that the network is immediately free for
 a new message dialog. In this situation, the PC may immediately seize the network before the CD
 BACKOFF time has elapsed. This allows the PC to pre-empt all other devices and completely control the
-LocoNet(R) to the level desired. Note that the message <81><7e> is a "time burner" NOP code sent by a
+LocoNet(R) to the level desired. Note that the message `<81><7e>` is a "time burner" NOP code sent by a
 Master to restart the CD Backoff timers, and hence keep the network busy in a hardware sense. This
-<81> opcode should thus be simply stripped and ignored.
+`<81>` opcode should thus be simply stripped and ignored.
 
 Several PC's may share access to LocoNet(R) by subdividing the 20 bit CD BACKOFF delay into priority windows for access. They are responsible for detecting transmit COLLISIONS by checking their TRANSMIT ECHO data and watching a CARRIER DETECT to see if a PC transmit "window" is active already, before attempting to transmit.
 
@@ -273,17 +300,16 @@ SLOTs without using the Master to allocate Locomotive addresses
 
 ### DISPATCHING
 
-Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in
-the "DISPATCH" mode. In this case a BT2 operating in its normal mode will request a DISPATCH SLOT
-that has been prepared by a supervisor type device. This is included for Club type operations where
-simpler throttles with limited capabilities are given to Engineers (Operators) by the Hostler or Dispatcher.
+Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in the "DISPATCH" mode. 
+In this case a BT2 operating in its normal mode will request a DISPATCH SLOT that has been prepared by a supervisor type device.
+This is included for Club type operations where simpler throttles with limited capabilities are given to Engineers (Operators) by the Hostler or Dispatcher.
 
-To DISPATCH PUT a slot, perform a SLOT MOVE to Slot 0. In this case the Destination Slot 0 is not
-copied to, but the source SLOT number is marked by the system as the DISPATCH slot. This is only a "one deep stack".
+To DISPATCH PUT a slot, perform a SLOT MOVE to Slot 0. In this case the Destination Slot 0 is not copied to, but the source SLOT number is marked by the system as the DISPATCH slot.
+This is only a "one-deep stack".
 
-To DISPATCH GET, perform a SLOT MOVE from Slot 0 (no destination needed). If there is a
-DISPATCH marked slot in the system, a SLOT DATA READ (`<E7>,..`) with the SLOT information will
-be the response. If there is NO DISPATCH slot, the response will be a LONG ACK (opc `<B4>,..`) with the Fail code, 00.
+To DISPATCH GET, perform a SLOT MOVE from Slot 0 (no destination needed). 
+If there is a DISPATCH marked slot in the system, a SLOT DATA READ (`<E7>,..`) with the SLOT information will be the response. 
+If there is NO DISPATCH slot, the response will be a LONG ACK (opc `<B4>,..`) with the Fail code, 00.
 
 ## FUTURE EXPANSION CODES
 (still in definition stage)
@@ -488,7 +514,6 @@ if STAT2.2=1, the STAT.3=0 means EX1/EX2 are ALIAS
 
 ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 
-[horizontal]
  00/00:: means NO ID being used
  01/00 to 7F/01:: ID shows PC usage. Lo nibble is TYP PC# (PC can use hi values)
  00/02 to 7F/03:: SYSTEM reserved
@@ -531,7 +556,6 @@ NOTE: SLOT 0 <E7> read will return MASTER config information bytes .
 
 1. SLOT STATUS1: 
 +
-[horizontal]
 D7 SL_SPURGE::
 1=SLOT purge en, ALSO adrSEL (INTERNAL use only) (not seen on NET!)
 D6 SL_CONUP:: 
@@ -539,7 +563,6 @@ D6 SL_CONUP::
 --
 CONDN/CONUP: bit encoding-Control double linked Consist List
 
-[horizontal]
 11:::: LOGICAL MID CONSIST, Linked up AND down
 10:::: LOGICAL CONSIST TOP, Only linked downwards
 01:::: LOGICAL CONSIST SUB-MEMBER, Only linked upwards
@@ -551,7 +574,6 @@ ALLOWS "CONSISTS of CONSISTS". Uplinked means that Slot SPD number is now SLOT a
 D5 SL_BUSY::
 D4 SL_ACTIVE::
 +
-[horizontal]
  11:::: IN_USE loco adr in SLOT - REFRESHED
  10:::: IDLE loco adr in SLOT - NOT refreshed
  01:::: COMMON loco adr IN SLOT - refreshed
@@ -563,7 +585,6 @@ D2 SL_SPDEX::
 D1 SL_SPD14::
 D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT: 
 +
-[horizontal]
 011:::: send 128 speed mode packets 
 010:::: 14 step MODE 
 001:::: 28 step. + Generate Trinary packets for this Mobile ADR 
@@ -574,14 +595,12 @@ D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT:
 2. SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
 
 3. SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
-[horizontal]
 0x00:: SPEED 0 STOP inertially
 0x01:: SPEED 0 EMERGENCY stop
 0x02->0x7F:: increasing SPEED, 0x7F=MAX speed
 
 4. SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
 +
-[horizontal]
 D7-0:: always 0
 D6-SL_XCNT:: reserved, set 0
 D5-SL_DIR:: 1=loco direction FORWARD
@@ -593,7 +612,6 @@ D0-SL_F1:: 1=F1 ON
 
 5. TRK byte: GLOBAL system/track status.
 +
-[horizontal]
 D7-D4:: Reserved
 D3 GTRK_PROG_BUSY:: 1=Programming TRACK in this Master is BUSY.
 D2 GTRK_MLOK1:: 1=This Master IMPLEMENTS LocoNet 1.1 capability, 0=Master is DT200
@@ -616,7 +634,6 @@ NOTE: a DT200 MASTER will always interpret this as 0.
 8. SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
 (byte also sent as ARG2 in SND opcode)
 +
-[horizontal]
 D7-D4:: reserved
 D3-SL_SND4:: F8
 D2-SL_SND3:: F7
