@@ -1,13 +1,22 @@
 #include <stdio.h>
 #include <Arduino.h>
 
+#define LOCONET_PIN_RX 16
+#define LOCONET_PIN_TX 15
 //#include <LocoNetESP32UART.h>
 //LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
 #include <LocoNetESP32.h>
-LocoNetESP32 locoNet;
+LocoNetESP32 locoNet(LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 
 #include <LocoNetSlotManager.h>
 LocoNetSlotManager slotMan(&locoNet);
+
+#define DCC_PIN 19
+#define DCC_PIN_EN 23
+#define DCC_PIN_SENSE 35
+#include <DCC.h>
+DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
+DCCESP32SignalGenerator dcc(1);
 
 /*
 #include <WiFi.h>
@@ -49,10 +58,17 @@ void setup() {
             Serial.print(' ');
         }
         Serial.print("\r\n");
+
+        switch(rxPacket->data[0]) {
+            case OPC_GPON: break;
+            case OPC_GPOFF: break;
+        }
+
         sendWifi(rxPacket);
     });
 
     slotMan.registerCallbacks();
+    slotMan.setDccMainChannel(&dccMain);
 
     locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         Serial.print("Switch Request: ");
@@ -77,6 +93,8 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
+    dcc.setMainChannel(&dccMain);
+    //dcc.begin();
 
     /*
     WifiManager wifiManager;
