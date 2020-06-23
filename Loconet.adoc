@@ -366,54 +366,80 @@ FORMAT = `<OPC>,<CKSUM>`
 FORMAT = `<OPC>,<ARG1>,<ARG2>,<CKSUM>`
 
 |[[LOCO_ADR]]OPC_LOCO_ADR |0xBF |REQ loco ADR | <E7><<SL_RD_DATA>>
-| 3+| `<0xBF>,<0>,<ADR>,<CHK>` 
+| 3+| `<0xBF>,<loco adr hi>,<loco adr lo>,<CHK>` 
 
 DATA return `<E7>`, is SLOT#,DATA that ADR was found in.
 
-IF ADR not found, MASTER puts ADR in FREE slot and sends DATA/STATUS return `<E7>`......
+If address is not found, master puts address in free slot and sends <<SL_RD_DATA>>`<E7>......`
 
-IF no FREE slot,Fail LACK,0 is returned [`<B4>,<3F>,<0>,<CHK>`].
-
-
-|[[SW_ACK]]OPC_SW_ACK |0xBD |REQ SWITCH WITH acknowledge function (not DT200) | <<LACK>>
-| 3+| ;<0xBD>,<SW1>,<SW2>,<CHK> REQ SWITCH function
-<SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
-<SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
-,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
-,ON=1 for Output ON, =0 FOR output OFF
- ;response is <0xB4> <3D><00> if DCS100 FIFO is full,command rejected
-<0xB4><3D><7F> if DCS100 accepted
+If there is no free slot, <<LACK>> with argument 0 is returned (`<B4>,<3F>,<0>,<CHK>`).
 
 
-|[[SW_STATE]]OPC_SW_STATE |0xBC |REQ state of SWITCH | <<LACK>>
-| 3+| ;<0xBC>,<SW1>,<SW2>,<CHK> REQ state of SWITCH
+|[[SW_ACK]]OPC_SW_ACK | 0xBD | REQ SWITCH WITH acknowledge function (not DT200) | <<LACK>>
+| 3+a| `<0xBD>,<SW1>,<SW2>,<CHK>`
+
+REQ SWITCH function
+
+<SW1> = <0,A6,A5,A4 - A3,A2,A1,A0> - 7 LS bits of address. A1, A0 select 1 of 4 input pairs in a DS54
+
+<SW2> = <0,0,DIR,ON - A10,A9,A8,A7> - control bits and 4 MS bits of address.
+
+DIR=1 for Closed,/GREEN, =0 for Thrown/RED
+
+ON=1 for Output ON, =0 FOR output OFF
+
+Response is:
+
+ * <<LACK, <0xB4><3D><00><CHK> >> if DCS100 FIFO is full, command rejected
+ * <<LACK, <0xB4><3D><7F><CHK> >> if DCS100 accepted
+
+NOTE: JMRI treats this OPCode equally to <<SW_REQ>>
+
+
+|[[SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<LACK>>
+| 3+a| `<0xBC>,<SW1>,<SW2>,<CHK>`
+
+Request a switch to have specific state.
+
+<SW1> and <SW2> are same as in <<SW_ACK, OPC_SW_ACK>>
+
+NOTE: This OPCode seems to be ignored by JMRI
 
 
 |[[RQ_SL_DATA]]OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |<E7><<SL_RD_DATA>>
-| 3+a| <0xBB>,<SLOT>,<0>,<CHK> Request SLOT DATA/status block
+| 3+a| `<0xBB>,<SLOT>,<0>,<CHK>`
+
+Request slot data / status block
 
 
 |[[MOVE_SLOTS]]OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |<E7><<SL_RD_DATA>> or <<LACK>>
 | 3+a|
-`<0xBA>,<SRC>,<DEST>,<CHK>` 
+`<0xBA> <SRC> <DEST> <CHK>` 
 
-If SRC is NOT IN_USE, clr SRC.
+Move SRC to DEST
+
+If <SRC> slot is not in IN_USE state, clear SRC.
 
 SPECIAL CASES:
 
-* If SRC=0 (DISPATCH GET), DEST=dont care, Return SLOT READ DATA of DISPATCH Slot. 
-* IF SRC=DEST (NULL move) then SRC=DEST is set to IN_USE, if legal move. 
-* If DEST=0 (DISPATCH Put), mark SLOT as DISPATCH, RETURN slot status <0xE7> of DESTINATION slot DEST if move legal. 
+* If SRC=0 (DISPATCH Get), return back SLOT READ DATA of DISPATCH Slot. 
+* IF SRC=DEST (NULL move) then SRC(=DEST) is set slot state to IN_USE, if legal move. 
+* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> if move legal. 
 
-RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`. 
-(It's) illegal to move to/from slots 120/127.
+Return Fail <<LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`. 
+It's illegal to move to/from slots 120/127.
 
 
-|[[LINK_SLOTS]]OPC_LINK_SLOTS |0xB9 |;LINK slot ARG1 to slot ARG2 | <E7>SLOT READ
-| 3+| ;<0xB9>,<SL1>,<SL2>,<CHK> SLAVE slot SL1 to slot SL2
- ;Master LINKER sets the SL_CONUP/DN flags appropriately
-,Reply is return of SLOT Status <0xE7>. Inspect to see result of Link
-,invalid Link will return Long Ack Fail <B4>,<39>,<0>,<CHK>
+|[[LINK_SLOTS]]OPC_LINK_SLOTS |0xB9 | LINK slot ARG1 to slot ARG2 | <E7>SLOT READ
+| 3+| `<0xB9> <SL1> <SL2> <CHK>`
+
+Make slot SL1 slave to slot SL2.
+
+Master LINKER sets the SL_CONUP/DN flags appropriately
+
+Reply is return of <<SL_RD_DATA, Slot status>> <0xE7>. 
+
+Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> <0> <CHK>`
 
 
 |OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES <E7>SLOT READ
@@ -438,9 +464,9 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 | 3+a| 
 `<0xB4>,<LOPC>,<ACK1>,<CHK>` 
 
-`<LOPC>` is COPY of OPCODE responding to (msb=0). LOPC=0 (unused OPC) is also VALID fail code.
+`<LOPC>` is copy of OPCode the LACK is responding to (msb=0). LOPC=0 (unused OPC) is also valid fail code.
 
-`<ACK1>` is appropriate response code for the OPCode
+`<ACK1>` is an appropriate response code for the OPCode
 
 
 |OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO 
@@ -454,32 +480,45 @@ RETURN Fail LACK code if illegal move `<B4>,<3A>,<0>,<chk>`.
 
 
 |OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
-| 3+|;<0xB1>,<SN1>,<SN2>,<CHK> SENSOR state REPORT
-<SN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
-<SN2> =<0,1,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
+| 3+|
+`<0xB1>,<SN1>,<SN2>,<CHK>` Report of sensor (turnout) state
+
+<SN1> =<0,A6,A5,A4 - A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
+
+<SN2> =<0,1,I,L - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
  this <B1> opcode encodes input levels for turnout feedback
-"I" =0 for "aux" inputs (normally not feedback), 1 for "switch" input used for turnout
-feedback for DS54 ouput/turnout # encoded by A0-A10
+"I" =0 for "aux" inputs (normally not feedback), 1 for "switch" input used for turnout feedback for DS54 ouput/turnout # encoded by A0-A10
 "L" = 0 for this input 0V (LO), 1= this input > +6V (HI)
-alternately;
-<SN2> =<0,0,C,T- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
-this <B1> opcode encodes current OUTPUT levels
-"C"= 0 if "Closed" ouput line is OFF, 1="closed" output line is ON (sink current)
-"T"=0 if "Thrown" output line is OFF, 1="thrown" output line is ON (sink I)
+
+Alternately:
+
+<SN2> =<0,0,C,T - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
+this <B1> opcode encodes current OUTPUT levels. 
+"C"= 0 if "Closed" ouput line is OFF, 1="closed" output line is ON (sink current). "T"=0 if "Thrown" output line is OFF, 1="thrown" output line is ON (sink I)
 
 
-|OPC_SW_REQ |0xB0 |;REQ SWITCH function| NO
+|OPC_SW_REQ |0xB0 | REQ SWITCH function| NO
 
-| 3+|;<0xB0>,<SW1>,<SW2>,<CHK> REQ SWITCH function
+| 3+a| `<0xB0>,<SW1>,<SW2>,<CHK>` Request switch state
+
 <SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
+
 <SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
-,DIR=1 for Closed,/GREEN, =0 for Thrown/RED
-,ON=1 for Output ON, =0 FOR output OFF
- Note-,Immediate response of <0xB4><30><00> if command failed, otherwise no response
-;"A" CLASS codes
+
+DIR=1 for Closed,/GREEN, = 0 for Thrown/RED
+
+ON=1 for Output ON, = 0 FOR output OFF
+
+Immediate response of <<LACK>> `<0xB4><30><00>` if command failed, otherwise no response.
+
+There are special values for SW2 for <<stationary_broadcast, stationary broadcast>> and <<stationary_interrogation, stationary interrogation>>.
+
+NOTE: JMRI treats this message as equal to <<SW_ACK,OPC_SW_ACK>>
 
 
-| 3+a| NOTE: CODES 0xA8 to 0xAF have responses
+| 3+a| "A" class codes
+
+NOTE: CODES 0xA8 to 0xAF have responses
 
 
 |OPC_LOCO_SND  | 0xA2 |SET SLOT sound functions |NO
@@ -666,13 +705,13 @@ D0-SL_SND1:: F5 1 = SLOT Sound 1 function 1 active (accessory 2)
 
 10. EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
 
-### Stationary Broadcast Command:
+### [[stationary_broadcast]] Stationary Broadcast Command:
 
 Note that a 3 byte DCC track packet configured as `<sync>,<1011-1111>,<1000-D c b a > <ecb>` is a DCC Broadcast Address to Stationary decoders.
 
 Broadcast LocoNet Switch adr is then `<SW2>=<0,0,a,D-1,1,1,1>`, `<SW1>=<0,1,1,1-1,0,c,b>`
 
-### Stationary Interrogate Command:
+### [[stationary_interrogation]] Stationary Interrogate Command:
 
 The DCC packet `<sync>,<1011-1111>,<1100-D c b a> <ecb>` is an Interrogation for all DS54's. 
 This causes a 2 LocoNet `<B1>` messages encoding both Output state and Input state, for each sensor adr a/b/c encodes.
