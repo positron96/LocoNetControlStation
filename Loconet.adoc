@@ -266,7 +266,7 @@ the 10 data bytes is not the same as a "normal" slot. See later.
 
 ### Standard address selection
 
-To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a LOCOMOTIVE address for use (opcode <<LOCO_ADR,OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). The Master (or PC
+To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a LOCOMOTIVE address for use (opcode <<OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). The Master (or PC
 in a Limited Master environment) responds with a SLOT DATA READ for the SLOT, ( opcode `<E7>...`)
 ,that contains this Locomotive address and all of its state information. If the address is currently not in
 any SLOT, the master will load this NEW locomotive address into a new SLOT (speed=0, FWD,
@@ -283,7 +283,7 @@ the <loco adr hi> to always zero. You can check the <TRK> return bits to see if 
 
 *The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* 
 If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREEfootnote:["NEW" in original] the throttle
-may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<MOVE_SLOTS,OPC_MOVE_SLOTS>>
+may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<OPC_MOVE_SLOTS>>
 `<BA>,<slotX>,<slotX>,<chk>`) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
 
 If the SLOT return information shows the Locomotive requested is IN_USE or UP-CONSISTED (i.e. the SL_CONUP, bit 6 of STATUS1 =1 ) the user should NOT use the SLOT. Any UP_CONSISTED locos must be UNLINKED before usage! Always process the result from the LINK and UNLINK commands, since the Master reserves the right to change the reply slot number and can reject the linking tasks under
@@ -351,13 +351,13 @@ DRAFT DEFINITIONS October 16, 1997 SUBJECT TO REVISION
 
 FORMAT = `<OPC>,<CKSUM>`
 
-|[[IDLE]]OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
+|[[OPC_IDLE]]OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
 
-|[[GPON]]OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
+|[[OPC_GPON]]OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
 
-|[[GPOFF]]OPC_GPOFF | 0x82 | GLOBAL power OFF request   | NO 
+|[[OPC_GPOFF]]OPC_GPOFF | 0x82 | GLOBAL power OFF request   | NO 
 
-|[[BUSY]]OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
+|[[OPC_BUSY]]OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
 
 
 
@@ -365,17 +365,17 @@ FORMAT = `<OPC>,<CKSUM>`
 
 FORMAT = `<OPC>,<ARG1>,<ARG2>,<CKSUM>`
 
-|[[LOCO_ADR]]OPC_LOCO_ADR |0xBF |REQ loco ADR | <E7><<SL_RD_DATA>>
+|[[OPC_LOCO_ADR]]OPC_LOCO_ADR |0xBF |REQ loco ADR | <E7><<OPC_SL_RD_DATA>>
 | 3+| `<0xBF>,<loco adr hi>,<loco adr lo>,<CHK>` 
 
 DATA return `<E7>`, is SLOT#,DATA that ADR was found in.
 
-If address is not found, master puts address in free slot and sends <<SL_RD_DATA>>`<E7>......`
+If address is not found, master puts address in free slot and sends <<OPC_SL_RD_DATA>>`<E7>......`
 
-If there is no free slot, <<LACK>> with argument 0 is returned (`<B4>,<3F>,<0>,<CHK>`).
+If there is no free slot, <<OPC_LACK>> with argument 0 is returned (`<B4>,<3F>,<0>,<CHK>`).
 
 
-|[[SW_ACK]]OPC_SW_ACK | 0xBD | REQ SWITCH WITH acknowledge function (not DT200) | <<LACK>>
+|[[OPC_SW_ACK]]OPC_SW_ACK | 0xBD | REQ SWITCH WITH acknowledge function (not DT200) | <<OPC_LACK>>
 | 3+a| `<0xBD>,<SW1>,<SW2>,<CHK>`
 
 REQ SWITCH function
@@ -390,29 +390,29 @@ ON=1 for Output ON, =0 FOR output OFF
 
 Response is:
 
- * <<LACK, <0xB4><3D><00><CHK> >> if DCS100 FIFO is full, command rejected
- * <<LACK, <0xB4><3D><7F><CHK> >> if DCS100 accepted
+ * <<OPC_LACK, <0xB4><3D><00><CHK> >> if DCS100 FIFO is full, command rejected
+ * <<OPC_LACK, <0xB4><3D><7F><CHK> >> if DCS100 accepted
 
-NOTE: JMRI treats this OPCode equally to <<SW_REQ>>
+NOTE: JMRI treats this OPCode equally to <<OPC_SW_REQ>>
 
 
-|[[SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<LACK>>
+|[[OPC_SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<OPC_LACK>>
 | 3+a| `<0xBC>,<SW1>,<SW2>,<CHK>`
 
 Request a switch to have specific state.
 
-<SW1> and <SW2> are same as in <<SW_ACK, OPC_SW_ACK>>
+<SW1> and <SW2> are same as in <<OPC_SW_ACK>>
 
 NOTE: This OPCode seems to be ignored by JMRI
 
 
-|[[RQ_SL_DATA]]OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |<E7><<SL_RD_DATA>>
+|[[OPC_RQ_SL_DATA]]OPC_RQ_SL_DATA |0xBB |Request SLOT DATA/status block |<E7><<OPC_SL_RD_DATA>>
 | 3+a| `<0xBB>,<SLOT>,<0>,<CHK>`
 
 Request slot data / status block
 
 
-|[[MOVE_SLOTS]]OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |<E7><<SL_RD_DATA>> or <<LACK>>
+|[[OPC_MOVE_SLOTS]]OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |<E7><<OPC_SL_RD_DATA>> or <<OPC_LACK>>
 | 3+a|
 `<0xBA> <SRC> <DEST> <CHK>` 
 
@@ -424,25 +424,25 @@ SPECIAL CASES:
 
 * If SRC=0 (DISPATCH Get), return back SLOT READ DATA of DISPATCH Slot. 
 * IF SRC=DEST (NULL move) then SRC(=DEST) is set slot state to IN_USE, if legal move. 
-* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> if move legal. 
+* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<OPC_SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> if move legal. 
 
-Return Fail <<LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`. 
+Return Fail <<OPC_LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`. 
 It's illegal to move to/from slots 120/127.
 
 
-|[[LINK_SLOTS]]OPC_LINK_SLOTS |0xB9 | LINK slot ARG1 to slot ARG2 | <E7>SLOT READ
+|[[OPC_LINK_SLOTS]]OPC_LINK_SLOTS |0xB9 | LINK slot ARG1 to slot ARG2 | <E7>SLOT READ
 | 3+| `<0xB9> <SL1> <SL2> <CHK>`
 
 Make slot SL1 slave to slot SL2.
 
 Master LINKER sets the SL_CONUP/DN flags appropriately
 
-Reply is return of <<SL_RD_DATA, Slot status>> <0xE7>. 
+Reply is return of <<OPC_SL_RD_DATA, Slot status>> <0xE7>. 
 
 Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> <0> <CHK>`
 
 
-|OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES <E7>SLOT READ
+|[[OPC_UNLINK_SLOTS]]OPC_UNLINK_SLOTS |0xB8 |;UNLINK slot ARG1 from slot ARG2 |YES <E7>SLOT READ
 | 3+a| ;<0xB8>,<SL1>,<SL2>,<CHK> UNLINK slot SL1 from SL2
  ;UNLINKER executes unlink STRATEGY and returns new SLOT#
  ; DATA/STATUS of unlinked LOCO . Inspect data to evaluate UNLINK
@@ -456,11 +456,11 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
  ;NOTE this SLOT adr is considered in UPLINKED slot space
 
 
-|[[SLOT_STAT1]]OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO
+|[[OPC_SLOT_STAT1]]OPC_SLOT_STAT1 |0xB5 |WRITE slot stat1 |NO
 | 3+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
 
 
-|[[LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO 
+|[[OPC_LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO 
 | 3+a| 
 `<0xB4>,<LOPC>,<ACK1>,<CHK>` 
 
@@ -479,7 +479,7 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
 "X"=1, control bit , 0 is RESERVED for future!
 
 
-|OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
+|[[OPC_SW_REP]]OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
 | 3+|
 `<0xB1>,<SN1>,<SN2>,<CHK>` Report of sensor (turnout) state
 
@@ -497,7 +497,7 @@ this <B1> opcode encodes current OUTPUT levels.
 "C"= 0 if "Closed" ouput line is OFF, 1="closed" output line is ON (sink current). "T"=0 if "Thrown" output line is OFF, 1="thrown" output line is ON (sink I)
 
 
-|OPC_SW_REQ |0xB0 | REQ SWITCH function| NO
+|[[OPC_SW_REQ]]OPC_SW_REQ |0xB0 | REQ SWITCH function| NO
 
 | 3+a| `<0xB0>,<SW1>,<SW2>,<CHK>` Request switch state
 
@@ -509,11 +509,11 @@ DIR=1 for Closed,/GREEN, = 0 for Thrown/RED
 
 ON=1 for Output ON, = 0 FOR output OFF
 
-Immediate response of <<LACK>> `<0xB4><30><00>` if command failed, otherwise no response.
+Immediate response of <<OPC_LACK>> `<0xB4><30><00>` if command failed, otherwise no response.
 
 There are special values for SW2 for <<stationary_broadcast, stationary broadcast>> and <<stationary_interrogation, stationary interrogation>>.
 
-NOTE: JMRI treats this message as equal to <<SW_ACK,OPC_SW_ACK>>
+NOTE: JMRI treats this message as equal to <<OPC_SW_ACK>>
 
 
 | 3+a| "A" class codes
@@ -544,15 +544,15 @@ FORMAT = `<OPC>,<ARG1>,<ARG2>,<ARG3>,<ARG4>,<CKSUM>`
 
 FORMAT: `<OPC>,<COUNT>,<ARG2>,<ARG3>,...,<ARG(COUNT-3)>,<CKSUM>`
 
-|[[WR_SL_DATA]]OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes | <<LACK>>
+|[[OPC_WR_SL_DATA]]OPC_WR_SL_DATA |0xEF | WRITE SLOT DATA, 10 bytes | <<OPC_LACK>>
 | 3+| `<0xEF>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK>
  <SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
 
  SLOT DATA WRITE, 10 bytes data /14 byte MSG
 
 
-|[[SL_RD_DATA]]OPC_SL_RD_DATA |0xE7 | SLOT DATA return, 10 bytes |NO
-| 3+a| `<0xE7>,<0E>,<SLOT#>,<STAT>,<ADR>,<SPD>,<DIRF>,<TRK><SS2>,<ADR2>,<SND>,<ID1>,<ID2>,<CHK>`
+|[[OPC_SL_RD_DATA]]OPC_SL_RD_DATA |0xE7 | SLOT DATA return, 10 bytes |NO
+| 3+a| `<0xE7> <0E> <SLOT#> <<arg_slot_stat, ++<STAT>++>> <<arg_slot_adr, ++<ADR>++>> <<arg_slot_spd, ++<SPD>++>> <<arg_slot_dirf, ++<DIRF>++>> <<arg_slot_trk, ++<TRK>++>> <<arg_slot_ss2, ++<SS2>++>> <<arg_slot_adr2, ++<ADR2>++>> <<arg_slot_snd, ++<SND>++>> <<arg_slot_id1, ++<ID1>++>> <<arg_slot_id2, ++<ID2>++>> <CHK>`
 
 SLOT DATA READ, 10 bytes data / 14 byte MSG
 
@@ -601,9 +601,9 @@ The SLOT DATA bytes are, in order of TRANSMISSION for <E7> READ or <EF> WRITE
 NOTE: SLOT 0 <E7> read will return MASTER config information bytes .
 
 [start=0]
-0. SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
+0. [[arg_slot_number]]SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
 
-1. SLOT STATUS1: 
+1. [[arg_slot_stat]]SLOT STATUS1: 
 +
 [horizontal]
 D7 SL_SPURGE::
@@ -648,15 +648,15 @@ D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT:
 111:::: 128 Step decoder, Allow Advanced DCC consisting 
 100:::: 28 Step decoder, Allow Advanced DCC consisting
 
-2. SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
+2. [[arg_slot_adr]]SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
 
-3. SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
+3. [[arg_slopt_spd]]SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
 [horizontal]
 0x00:: SPEED 0 STOP inertially
 0x01:: SPEED 0 EMERGENCY stop
 0x02->0x7F:: increasing SPEED, 0x7F=MAX speed
 
-4. SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
+4. [[arg_slot_dirf]]SLOT DIRF byte: (byte also sent as ARG2 in DIRF opcode <A1>)
 +
 [horizontal]
 D7-0:: always 0
@@ -668,7 +668,7 @@ D2-SL_F3:: 1=F3 ON
 D1-SL_F2:: 1=F2 ON
 D0-SL_F1:: 1=F1 ON
 
-5. TRK byte: GLOBAL system/track status.
+5. [[arg_slot_trk]]TRK byte: GLOBAL system/track status.
 +
 [horizontal]
 D7-D4:: Reserved
@@ -677,13 +677,13 @@ D2 GTRK_MLOK1:: 1=This Master IMPLEMENTS LocoNet 1.1 capability, 0=Master is DT2
 D1 GTRK_IDLE:: 0=TRACK is PAUSED, B'cast EMERG STOP.
 D0 GTRK_POWER:: 1=DCC packets are ON in MASTER, Global POWER up
 
-6. SLOT STATUS2:
+6. [[arg_slot_stat2]]SLOT STATUS2:
 [horizontal]
 D3:: 1=expansion IN ID1/2, 0=ENCODED alias
 D2:: 1=Expansion ID1/2 is NOT ID usage
 D0:: 1=this slot has SUPPRESSED ADV consist
 
-7. SLOT LOCO ADR HIGH
+7. [[arg_slot_loco_adr2]]SLOT LOCO ADR HIGH
 +
 Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. 
 If this is not zero then the most significant 6 bits of this address are used in the first LONG address byte (matching CV17).
@@ -691,7 +691,7 @@ The second DCC LONG address byte matches CV18 and includes the Adr Low 7 bit val
 +
 NOTE: a DT200 MASTER will always interpret this as 0.
 
-8. SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
+8. [[arg_slot_snd]]SLOT SOUND: Slot sound/ Accesory Function mode II packets. F5-F8.
 (byte also sent as ARG2 in SND opcode)
 +
 [horizontal]
@@ -701,9 +701,9 @@ D2-SL_SND3:: F7
 D1-SL_SND2:: F6
 D0-SL_SND1:: F5 1 = SLOT Sound 1 function 1 active (accessory 2)
 
-9. EXPANSION RESERVED ID1: 7 bit ls ID code written by THROTTLE/PC when STAT2.4=1
+9. [[arg_slot_id1]]EXPANSION RESERVED ID1: 7 bit ls ID code written by THROTTLE/PC when STAT2.4=1
 
-10. EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
+10. [[arg_slot_id2]]EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
 
 ### [[stationary_broadcast]] Stationary Broadcast Command:
 
@@ -826,7 +826,7 @@ setting the Page register, the read will be aborted, showing no Write acknowledg
 ## Fast clock: 
 
 The system FAST clock and parameters are implemented in Slot 123 (0x7B).
-Use <<WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information; Request to read slot 0x7B (<<RQ_SLOT_DATA, <BB><7B>..>>), will return current System clock information, and other throttles will update to this SYNC. Note that all attached display devices
+Use <<OPC_WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information; Request to read slot 0x7B (<<OPC_RQ_SLOT_DATA, <BB><7B>..>>), will return current System clock information, and other throttles will update to this SYNC. Note that all attached display devices
 keep a current clock calculation based on this SYNC read value, i.e. devices MUST not continuously poll the clock SLOT to generate time, but use this merely to restore SYNC and follow current RATE etc. This clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds , by a single user, so all attached devices can synchronise any phase drifts. Upon seeing a SYNC read, all devices should reset their local
 sub-minute phase counter and invalidate the SYNC update ping generator.
 
