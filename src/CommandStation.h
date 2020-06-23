@@ -14,6 +14,22 @@ enum class TurnoutState {
     CLOSED, THROWN, TOGGLE
 };
 
+class LocoAddress {
+public:
+    LocoAddress() : num(0) {}
+    static LocoAddress shortAddr(uint8_t addr) {  return LocoAddress(addr); }
+    static LocoAddress longAddr(uint16_t addr) {  return LocoAddress(-addr); }
+    bool isShort() const { return num>=0; }
+    bool isLong() const { return num<=0; }
+    uint16_t addr() const { return abs(num); }
+    bool isValid() const { return num!=0; }
+    bool operator < (const LocoAddress& a) const { return (num < a.num); }
+    operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
+private:
+    LocoAddress(int16_t num): num(num) { }
+    int16_t num;
+};
+
 class CommandStation {
 public:
     CommandStation() : dccMain(0, 0, 0) {}
@@ -98,11 +114,11 @@ public:
         return false;
     }
 
-    bool isLocoTaken(uint16_t addr) {
+    bool isLocoTaken(LocoAddress addr) {
         return false;
     }
 
-    uint8_t locateLocoSlot(uint16_t addr) {
+    uint8_t locateLocoSlot(LocoAddress addr) {
         return 0;
     }
 
@@ -117,7 +133,7 @@ public:
     bool getLocoFn(uint8_t slot, uint8_t fn) {
         return false;
     }
-    
+
     void setLocoDir(uint8_t slot, uint8_t dir) {
 
     }
