@@ -18,6 +18,11 @@ LocoNetSlotManager slotMan(&locoNet);
 DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
 DCCESP32SignalGenerator dcc(1);
 
+#include "CommandStation.h"
+
+#include "WiThrottle.h"
+WiThrottleServer withrottleServer;
+
 /*
 #include <WiFi.h>
 #include <ESPmDNS.h>

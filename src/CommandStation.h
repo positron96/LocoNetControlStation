@@ -1,3 +1,4 @@
+#pragma once
 /**
  * Contains all the stuff related to command station.
  * I.e. high-level DCC generation, turnout list and their respective 
@@ -15,9 +16,13 @@ enum class TurnoutState {
 
 class CommandStation {
 public:
+    CommandStation() : dccMain(0, 0, 0) {}
+
     void turnPower(bool v) {
 
     }
+
+    bool getPowerState() const { return false; }
 
 
     /* Define turnout object structures */
@@ -26,10 +31,29 @@ public:
         uint8_t subAddr;
         uint16_t id;
         TurnoutState tStatus;
-    } ;
-    const int MAX_TURNOUTS = 100;
+    };
+
+    const static int MAX_TURNOUTS = 100;
     TurnoutData turnoutData[MAX_TURNOUTS];
+
+    uint16_t getTurnoutCount() { return 0; }
     
+    void loadTurnouts() {
+        /*sendDCCppCmd("T");
+        waitForDCCpp();
+        int t = 0;
+        while(Serial.available()>0) {
+            char data[maxCommandLength];
+            sprintf(data, "%s", readResponse().c_str() );
+            if (strlen(data)==0) break;
+            int addr, sub, stat, id;
+            int ret = sscanf(data, "%*c %d %d %d %d", &id, &addr, &sub, &stat );
+            turnoutData[t] = { ((addr-1)*4+1) + (sub&0x3) , id, stat==0 ? 2 : 4};
+            t++;
+        }*/
+    }
+
+    const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
 
     TurnoutState turnoutAction(uint16_t aAddr, bool namedTurnout, TurnoutState newStat) {
 
@@ -44,7 +68,7 @@ public:
                         newStat = turnoutData[t].tStatus==TurnoutState::CLOSED ? TurnoutState::THROWN : TurnoutState::CLOSED;
                     
                     //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
-                    dccMain.setAccessory(tunoutData[t].addr, turnoutData[t].subAddr, newStat==TurnoutState::THROWN ? 1 : 0);
+                    dccMain.setAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat==TurnoutState::THROWN ? 1 : 0);
                     turnoutData[t].tStatus = newStat;
 
                     //DEBUGS(String("parsed new status ")+newStat );
@@ -55,7 +79,7 @@ public:
             }
 
         } else {
-            
+
             if(newStat==TurnoutState::TOGGLE) 
                 newStat=TurnoutState::THROWN;
             // accessory command    
@@ -68,6 +92,46 @@ public:
 
         return newStat;
 
+    }
+
+    bool isSlotTaken(uint8_t slot) {
+        return false;
+    }
+
+    bool isLocoTaken(uint16_t addr) {
+        return false;
+    }
+
+    uint8_t locateLocoSlot(uint16_t addr) {
+        return 0;
+    }
+
+    void releaseLocoSlot(uint8_t slot) {
+
+    }
+
+    void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
+
+    }
+
+    bool getLocoFn(uint8_t slot, uint8_t fn) {
+        return false;
+    }
+    
+    void setLocoDir(uint8_t slot, uint8_t dir) {
+
+    }
+
+    uint8_t getLocoDir(uint8_t slot) { 
+        return 0; 
+    }
+
+    void setLocoSpeed(uint8_t slot, uint8_t spd) {
+
+    }
+
+    uint8_t getLocoSpeed(uint8_t slot) {
+        return 0;
     }
 
     //const LocoNetSlotManager slotMan;
