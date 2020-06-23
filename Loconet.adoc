@@ -594,11 +594,11 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 (NOT IMPLEMENTED IN DT200)
 |===
 
-### Notes:
+### Slot data
 
-The SLOT DATA bytes are, in order of TRANSMISSION for <E7> READ or <EF> WRITE
+Values returned by <E7> <<OPC_SL_RD_DATA,READ>> or <EF> <<OPC_SL_WR_DATA,WRITE>>
 
-NOTE: SLOT 0 <E7> read will return MASTER config information bytes .
+NOTE: <E7> for slot 0 read return master config information.
 
 [start=0]
 0. [[arg_slot_number]]SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
