@@ -596,7 +596,7 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 
 ### Slot data
 
-Values returned by <E7> <<OPC_SL_RD_DATA,READ>> or <EF> <<OPC_SL_WR_DATA,WRITE>>
+Values returned by <E7> <<OPC_SL_RD_DATA,READ>> or <EF> <<OPC_WR_SL_DATA,WRITE>>
 
 NOTE: <E7> for slot 0 read return master config information.
 
@@ -628,11 +628,11 @@ TOP is loco with SPD/DIR for whole consist. (top of list).
 D5 SL_BUSY::
 D4 SL_ACTIVE:: BUSY/ACTIVE: bit encoding for SLOT activity
 +
- [horizontal]
- 11:::: IN_USE loco adr in SLOT - REFRESHED
- 10:::: IDLE loco adr in SLOT - NOT refreshed
- 01:::: COMMON loco adr IN SLOT - refreshed
- 00:::: FREE SLOT, no valid DATA - not refreshed
+[horizontal]
+11:::: IN_USE loco adr in SLOT - REFRESHED
+10:::: IDLE loco adr in SLOT - NOT refreshed
+01:::: COMMON loco adr IN SLOT - refreshed
+00:::: FREE SLOT, no valid DATA - not refreshed
 
 D3 SL_CONDN:: Shows other SLOT Consist linked INTO this slot, see SL_CONUP
 
@@ -730,7 +730,7 @@ There will be an immediate LACK acknowledge that indicates what programming will
 If a valid programming task is started, then at the final (asynchronous) programming completion, a Slot read <E7> from slot 124 will be sent. 
 This is the final task status reply.
 
-### Programmer Task Start:
+### Programmer task start:
 
 `<0xEF>,<0E>,<7C>,<PCMD>,<0>,<HOPSA>,<LOPSA>,<TRK>;<CVH>,<CVL>,<DATA7>,<0>,<0>,<CHK>`
 
@@ -752,7 +752,7 @@ Any Slot RD from the master will also contain the Programmer Busy status in bit 
 A <PCMD> value of <00> will abort current SERVICE mode programming task and will echo with an
 <E6> RD the command string that was aborted.
 
-<PCMD> Programmer Command: Defined 
+<PCMD> Programmer command: defined 
 
 * D7 = 0
 * D6 -- Write/Read, *1* -- Write, *0* -- Read
@@ -802,7 +802,7 @@ Type codes:
 
 <DATA7>Low 7 BITS OF data to WR or RD COMPARE <0,D6,D5,D4 - D3,D2,D1,D0> ms bit is at CVH bit 1 position.
 
-### Programmer Task Final Reply: 
+### Programmer task final reply: 
 
 (if saw LACK <B4>,<7F>,<1>,<chk> code reply at task start)
 
