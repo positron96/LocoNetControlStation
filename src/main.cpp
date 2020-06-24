@@ -111,7 +111,8 @@ void setup() {
 	}
     */
 
-    /*
+
+    
     WiFi.begin("MelNet", "melnikov-network");
 
     while (WiFi.status() != WL_CONNECTED) {
@@ -124,13 +125,14 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    lbServer.begin();
+    //lbServer.begin();
 
     MDNS.begin("ESP32Server");
-	//MDNS.addService("withrottle","tcp", WTServer_Port);
 	//MDNS.addService("http","tcp", DCCppServer_Port);
-	MDNS.setInstanceName("Loconet Network Interface");
-    */
+	MDNS.setInstanceName("OpenCommandStation");
+
+    withrottleServer.begin();
+    
 
 }
 
@@ -152,7 +154,9 @@ void sendWifi(lnMsg *msg) {
 #define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
 
 void loop() {
-    if(millis()>nextInRead) {
+    withrottleServer.loop();
+
+/*    if(millis()>nextInRead) {
         int v = digitalRead(IN_PIN);
         if(v!=inState) {
             Serial.printf( "reporting sensor %d\n", v==LOW) ;
@@ -163,7 +167,7 @@ void loop() {
             nextInRead = millis()+10;
             delay(1);
         }
-    }
+    }*/
 
 /*
     static char lbStr[LB_BUF_SIZE];

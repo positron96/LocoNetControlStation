@@ -1,5 +1,7 @@
-/*
+/**
  * Based on https://github.com/positron96/withrottle
+ * 
+ * Also, see JMRI sources, start at java\src\jmri\jmrit\withrottle\DeviceServer.java
  */
 
 #include <WiFi.h>
@@ -9,12 +11,15 @@
 #include <etl/utility.h>
 
 #include "CommandStation.h"
-#include "debug.h"
+//#include "debug.h"
+
+#undef DEBUGS
+#define DEBUGS(s) Serial.println(s);
 
 /* Maximum WiFi clients that can be connected to WiThrottle */
 #define MAX_CLIENTS 3
 
-#define LOG_WIFI 0
+#define LOG_WIFI 1
 
 /* Network parameters */
 #define TURNOUT_PREF "LT"
@@ -28,7 +33,7 @@ public:
 
     void begin() {
 
-        DEBUGS("Connected");
+        DEBUGS("WiThrottleServer::begin");
 
         server.begin();
 
@@ -38,74 +43,7 @@ public:
 
     }
 
-    void loop() {
-        
-        for (int iClient=0; iClient<MAX_CLIENTS; iClient++) {
-            WiFiClient& cli = clients[iClient];
-            ClientData& cc = clientData[iClient];
-            if (!cli) {
-                if(cc.connected) throttleStop(iClient);
-                cli = server.available();
-                if(cli) throttleStart(iClient);
-            } 
-            if (cli) { // connected client
-                while(cli.available()>0) { 
-                    String dataStr = cli.readStringUntil('\n'); 
-                    if (LOG_WIFI) DEBUGS("WF>> "+dataStr);
-
-                    if (dataStr.startsWith("*")) {
-                        if(dataStr.length()==1) 
-                            cc.lastHeartbeat = millis();
-                        else {
-                            switch(dataStr.charAt(1) ) {
-                                case '+' : cc.heartbeatEnabled = true; break;
-                                case '-' : cc.heartbeatEnabled = false; break;
-                            } 
-                        }                       
-                    } else if (dataStr.startsWith("PPA") ) {
-                        turnPower(dataStr.charAt(3) );
-                        //notifyPowerChange();
-                    } else if (dataStr.startsWith("PTA")) {
-                        char aStatus = dataStr.charAt(3);
-                        int aAddr;
-                        bool named;
-                        if(dataStr.substring(4,6)==TURNOUT_PREF) {
-                            // named turnout
-                            aAddr = dataStr.substring(6).toInt();
-                            named = true;
-                        } else {
-                            aAddr = dataStr.substring(4).toInt();
-                            named = false;
-                        }
-                        accessoryToggle(aAddr, aStatus, named);
-                    } else if (dataStr.startsWith("N") ) {
-                        wifiPrintln(iClient, "*" + String(cc.heartbeatTimeout));
-                    } else if (dataStr.startsWith("M") ) {
-                        char th = dataStr.charAt(1);
-                        char action = dataStr.charAt(2);
-                        String actionData = dataStr.substring(3);
-                        int delimiter = actionData.indexOf(";");
-                        String actionKey = actionData.substring(0, delimiter-1);
-                        String actionVal = actionData.substring(delimiter+2);
-                        if (action == '+') {
-                            locoAdd(th, actionKey, iClient);
-                        } else if (action == '-') {
-                            locoRelease(th, actionKey, iClient);
-                        } else if (action == 'A') {
-                            locoAction(th, actionKey, actionVal, iClient);
-                        }
-                        clientData[iClient].lastHeartbeat = millis();
-                        
-                    }
-                }
-
-                if (cc.heartbeatEnabled) {
-                    checkHeartbeat(iClient);
-                }
-            }
-            
-        }
-    }
+    void loop();
 
 private:
 
@@ -119,9 +57,9 @@ private:
 
     struct ClientData {
         bool connected;
-        uint16_t heartbeatTimeout = 10;
+        uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
-        uint16_t lastHeartbeat;
+        uint32_t lastHeartbeat;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
         etl::map< char, etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>, MAX_THROTTLES_PER_CLIENT> slots;
         uint8_t slot(char thr, LocoAddress addr) { 
@@ -136,7 +74,7 @@ private:
 
     ClientData clientData[MAX_CLIENTS];
 
-    char powerStatus;
+    char powerStatus = '0';
 
     void notifyPowerStatus() {
         bool v = CS.getPowerState();
@@ -169,8 +107,10 @@ private:
     void locoAdd(char th, String sLocoAddr, int iClient);
 
     void locoRelease(char th, String sLocoAddr, int iClient);
+    void locoRelease(char th, LocoAddress addr, int iClient);
 
     void locoAction(char th, String sLocoAddr, String actionVal, int iClient);
+    void locoAction(char th, LocoAddress addr, String actionVal, int iClient);
 
     void checkHeartbeat(int iClient);
 
