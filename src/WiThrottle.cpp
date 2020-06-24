@@ -1,6 +1,14 @@
 #include "WiThrottle.h"
 
 #include <etl/vector.h>
+
+#undef DEBUGS
+#define DEBUGS(s) Serial.println(s);
+
+/* Network parameters */
+#define TURNOUT_PREF "LT"
+#define TURNOUT_CLOSED 2
+#define TURNOUT_THROWN 4
     
 /*
 StringSumHelper & operator +(const StringSumHelper &lhs, const LocoAddress a) {
@@ -157,7 +165,7 @@ void WiThrottleServer::locoAdd(char th, String sLocoAddr, int iClient) {
     wifiPrintln(iClient, String("M")+th+"A"+sLocoAddr+"<;>R1");
     wifiPrintln(iClient, String("M")+th+"A"+sLocoAddr+"<;>s1"); // TODO: this is speed steps 128 -> 1, 28->2 14->8
 
-    DEBUGS("loco add thr="+String(th)+"; addr"+String(sLocoAddr) );
+    //DEBUGS("loco add thr="+String(th)+"; addr"+String(sLocoAddr) );
 
     uint8_t slot = CS.locateLocoSlot(addr);
     clientData[iClient].slots[th][addr] = slot;
@@ -184,7 +192,7 @@ void WiThrottleServer::locoRelease(char th, String sLocoAddr, int iClient) {
 
 void WiThrottleServer::locoRelease(char th, LocoAddress addr, int iClient) {
     wifiPrintln(iClient, String("M")+th+"-"+addr2str(addr)+"<;>");
-    DEBUGS("loco release thr="+String(th)+"; addr "+String(addr) );
+    //DEBUGS("loco release thr="+String(th)+"; addr "+String(addr) );
 
     ClientData &client = clientData[iClient];
     CS.releaseLocoSlot( client.slots[th][addr] );
@@ -193,7 +201,7 @@ void WiThrottleServer::locoRelease(char th, LocoAddress addr, int iClient) {
 
 
 void WiThrottleServer::locoAction(char th, String sLocoAddr, String actionVal, int iClient) {
-    DEBUGS("loco action thr="+String(th)+"; action="+actionVal+"; addr "+sLocoAddr );
+    //DEBUGS("loco action thr="+String(th)+"; action="+actionVal+"; addr "+sLocoAddr );
     ClientData &client = clientData[iClient];
 
     if(sLocoAddr=="*") { 
@@ -211,7 +219,7 @@ void WiThrottleServer::locoAction(char th, LocoAddress iLocoAddr, String actionV
 
     uint8_t slot = client.slots[th][iLocoAddr];
 
-    DEBUGS("loco action thr="+String(th)+"; action="+actionVal+"; DCC "+iLocoAddr );
+    //DEBUGS("loco action thr="+String(th)+"; action="+actionVal+"; DCC "+iLocoAddr );
     if (actionVal.startsWith("F1")) {
         int fKey = actionVal.substring(2).toInt();
         bool newVal = ! CS.getLocoFn(slot, fKey);

@@ -13,18 +13,7 @@
 #include "CommandStation.h"
 //#include "debug.h"
 
-#undef DEBUGS
-#define DEBUGS(s) Serial.println(s);
-
-/* Maximum WiFi clients that can be connected to WiThrottle */
-#define MAX_CLIENTS 3
-
-#define LOG_WIFI 1
-
-/* Network parameters */
-#define TURNOUT_PREF "LT"
-#define TURNOUT_CLOSED 2
-#define TURNOUT_THROWN 4
+#define LOG_WIFI 0
 
 class WiThrottleServer {
 public:
@@ -43,17 +32,22 @@ public:
 
     }
 
+    void end() {
+        server.end();
+    }
+
     void loop();
 
 private:
 
     const uint16_t port;
 
-    WiFiServer server;
-    WiFiClient clients[MAX_CLIENTS];
-
+    const static int MAX_CLIENTS = 3;
     const static int MAX_THROTTLES_PER_CLIENT = 6;
     const static int MAX_LOCOS_PER_THROTTLE = 2;
+
+    WiFiServer server;
+    WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
         bool connected;
