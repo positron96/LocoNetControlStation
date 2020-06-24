@@ -55,7 +55,7 @@ void DCCESP32Channel::RegisterList::loadPacket(int nReg, uint8_t *b, uint8_t nBy
         
     buf[0] = 0xFF;                        // first 8 bits of 22-bit preamble
     buf[1] = 0xFF;                        // second 8 bits of 22-bit preamble
-    buf[2] = 0xFC + bitRead(b[0],7);      // last 8 bytes of 22-bbit preamble + data start bit + b[0], bit 7
+    buf[2] = 0xFC | bitRead(b[0],7);      // last 8 bits of 22-bit preamble + data start bit + b[0], bit 7
     buf[3] = b[0]<<1;                     // b[0], bits 6-0 + data start bit
     buf[4] = b[1];                        // b[1], all bits
     buf[5] = b[2]>>1;                     // b[2], bits 7-1
@@ -138,5 +138,6 @@ void DCCESP32Channel::timerFunc() {
 	if(R.timerPeriodsLeft == 0) {                  
 		digitalWrite(_outputPin, 1-digitalRead(_outputPin) );
 		nextBit();                           
-	}   
+	}
+    //current = readCurrent(); 
 }

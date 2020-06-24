@@ -27,6 +27,13 @@ public:
         pinMode(_enPin, INPUT);
     }
 
+    void setPower(bool v) {
+        digitalWrite(_enPin, v ? HIGH : LOW);
+    }
+
+    bool getPower() {
+        return digitalRead(_enPin) == HIGH;
+    }
 
     struct Packet {
         uint8_t buf[10];
@@ -65,31 +72,49 @@ public:
 
     };
 
+    void unload(uint8_t nReg) {
+        //for()
+    }
 
-    void setThrottle(int nReg, int addr, int tSpeed, int tDirection) {
+
+    void setThrottle(int nReg, int addr, uint8_t tSpeed, uint8_t tDirection) {
         uint8_t b[5];                         // save space for checksum byte
         uint8_t nB = 0;
 
         if (addr>127)
-            b[nB++] = highByte(addr) | 0xC0;   // convert train number into a two-byte address
+            b[nB++] = highByte(addr) | 0xC0;  // convert train number into a two-byte address
 
         b[nB++] = lowByte(addr);
-        b[nB++] = 0x3F;                       // 128-step speed control byte
-        if (tSpeed >= 0)
-            b[nB++] = tSpeed + (tSpeed>0) + tDirection * 128;   // max speed is 126, but speed codes range from 2-127 (0=stop, 1=emergency stop)
-        else {
-            b[nB++] = 1;
-            tSpeed = 0;
-        }
+        b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
+        b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
         #ifdef DCC_DEBUG
-            Serial.printf("setThrottle %d speed=%d %c\n", addr, tSpeed, tDirection==0?'F':'B');
+            Serial.printf("setThrottle %d speed=%d %c\n", addr, tSpeed, tDirection==1?'F':'B');
         #endif
         R.loadPacket(nReg, b, nB, 0);
 
     } 
 
-    void setFunction(int nReg, int addr, uint8_t fByte, int eByte=-1)  {
-        uint8_t b[5];                        // save space for checksum byte
+    void setFunctionGroup1(int nReg, int addr, uint32_t fn) {
+        setFunction(nReg, addr,  B10000000 | (fn & 0x1F) );
+    }
+    void setFunctionGroup2(int nReg, int addr, uint32_t fn) {
+        fn >>= 5;
+        setFunction(nReg, addr,  B10100000 | (fn & 0x1F) );
+    }
+    void setFunctionGroup3(int nReg, int addr, uint32_t fn) {
+        fn >>= 13; 
+        setFunction(nReg, addr, B11011110, (uint8_t)fn );
+    }
+    void setFunctionGroup4(int nReg, int addr, uint32_t fn) {
+        fn >>= 21; 
+        setFunction(nReg, addr, B11011111, (uint8_t)fn );
+    }
+
+
+
+    void setFunction(int nReg, int addr, uint8_t fByte, uint8_t eByte=0)  {
+        // save space for checksum byte
+        uint8_t b[5]; 
         uint8_t nB = 0;
 
         if (addr>127)
@@ -97,7 +122,7 @@ public:
 
         b[nB++] = lowByte(addr);
 
-        if (eByte < 0) {                     // this is a request for functions FL,F1-F12  
+        if ( (fByte & B11000000) == B10000000) {// this is a request for functions FL,F1-F12  
             b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
         } else {                             // this is a request for functions F13-F28
             b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
@@ -133,11 +158,17 @@ public:
 
     } 
 
+    uint16_t readCurrent() {
+        return analogRead(_sensePin);
+    }
+
 private:
 
     uint8_t _outputPin;    
     uint8_t _enPin;
     uint8_t _sensePin;
+
+    uint16_t current;
 
     RegisterList R;
 

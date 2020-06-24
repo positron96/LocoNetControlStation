@@ -20,8 +20,10 @@ DCCESP32SignalGenerator dcc(1);
 
 #include "CommandStation.h"
 
+/*
 #include "WiThrottle.h"
 WiThrottleServer withrottleServer;
+*/
 
 /*
 #include <WiFi.h>
@@ -36,6 +38,7 @@ void sendWifi(lnMsg *msg);
 #define IN_PIN 25
 int inState = HIGH;
 unsigned long nextInRead = 0;
+unsigned long nextDccMeter = 0;
 
 void send(lnMsg *msg) {
     locoNet.send(msg);
@@ -98,8 +101,13 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
+    CS.setDccMain(&dccMain);
+
     dcc.setMainChannel(&dccMain);
-    //dcc.begin();
+    
+    dcc.begin();
+
+    dccMain.setPower(true);
 
     /*
     WifiManager wifiManager;
@@ -111,7 +119,7 @@ void setup() {
 	}
     */
 
-
+/*
     
     WiFi.begin("MelNet", "melnikov-network");
 
@@ -132,7 +140,7 @@ void setup() {
 	MDNS.setInstanceName("OpenCommandStation");
 
     withrottleServer.begin();
-    
+    */
 
 }
 
@@ -154,9 +162,16 @@ void sendWifi(lnMsg *msg) {
 #define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
 
 void loop() {
-    withrottleServer.loop();
+    //withrottleServer.loop();
 
-/*    if(millis()>nextInRead) {
+    
+    if(millis()>nextDccMeter) {
+        uint16_t v = dccMain.readCurrent() ;
+        if(v > 15) dccMain.setPower(false);
+        nextDccMeter = millis()+20;
+    }
+/*
+    if(millis()>nextInRead) {
         int v = digitalRead(IN_PIN);
         if(v!=inState) {
             Serial.printf( "reporting sensor %d\n", v==LOW) ;

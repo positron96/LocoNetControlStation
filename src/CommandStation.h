@@ -6,6 +6,7 @@
  */
 
 #include <etl/map.h>
+#include <etl/bitset.h>
 
 #include "LocoNetSlotManager.h"
 #include "DCC.h"
@@ -36,11 +37,13 @@ class CommandStation {
 public:
     CommandStation() { loadTurnouts();  }//: dccMain(0, 0, 0) {}
 
-    void turnPower(bool v) {
+    void setDccMain(DCCESP32Channel * ch) { dccMain = ch; }
 
+    void turnPower(bool v) {
+        dccMain->setPower(v);
     }
 
-    bool getPowerState() const { return false; }
+    bool getPowerState() const { return dccMain->getPower(); }
 
 
     /* Define turnout object structures */
@@ -116,6 +119,7 @@ public:
         uint8_t i = slot-1;        
         locoSlot.erase( slots[i].addr );
         slots[i].deallocate();
+        dccMain->unload(slot);
     }
 
     void setlocoRefresh(uint8_t slot, bool refresh) {
@@ -125,18 +129,30 @@ public:
     }
 
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
+        LocoData &dd = getSlot(slot);
         if(val) 
-            getSlot(slot).fnMask |= (1<<fn);
+            dd.fn |= (1<<fn);
         else
-            getSlot(slot).fnMask &= ~ (1<<fn);
+            dd.fn &= ~ (1<<fn);
+
+        if(fn<5)       dccMain->setFunctionGroup1(slot, dd.addr.addr(), fn);
+        else if(fn<13) dccMain->setFunctionGroup2(slot, dd.addr.addr(), fn);
+        else if(fn<21) dccMain->setFunctionGroup3(slot, dd.addr.addr(), fn);
+        else           dccMain->setFunctionGroup4(slot, dd.addr.addr(), fn);        
     }
 
     bool getLocoFn(uint8_t slot, uint8_t fn) {
-        return (getSlot(slot).fnMask & (1<<fn) ) != 0;
+        return (getSlot(slot).fn & (1<<fn) ) != 0;
     }
 
+    /**
+     *  @param speed DCC speed (0=sop, 1=EMGR stop)
+     *  @param dir 1 - FWD, 0 - REW
+     * */
     void setLocoDir(uint8_t slot, uint8_t dir) {
-        getSlot(slot).dir = dir;
+        LocoData &dd = getSlot(slot);
+        dd.dir = dir;
+        dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) { 
@@ -145,7 +161,9 @@ public:
 
     /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
     void setLocoSpeed(uint8_t slot, uint8_t spd) {
-        getSlot(slot).speed = spd;
+        LocoData &dd = getSlot(slot);
+        dd.speed = spd;
+        dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
     }
 
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
@@ -155,7 +173,7 @@ public:
 
     //const LocoNetSlotManager slotMan;
 private:
-    //DCCESP32Channel dccMain;
+    DCCESP32Channel * dccMain;
 
     struct LocoData {
         LocoAddress addr;
@@ -163,7 +181,7 @@ private:
         enum class SpeedMode { S14, S28, S128 };
         SpeedMode speedMode;
         int8_t dir;
-        uint32_t fnMask;
+        uint32_t fn;
         bool refreshing;
         bool allocated() { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
