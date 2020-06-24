@@ -1,4 +1,6 @@
-This is a Command station for model railroad. 
+**This is a Command station for model railroad**
+
+It is based on ESP32 chip. Development is done with Arduino core for ESP32 on PlatformIO.
 
 Planned features are:
 
@@ -14,12 +16,13 @@ Planned features are:
 ** [x] Loconet LBServer via WiFi
 
 
-It is based on ESP32 chip. Development is done with Arduino core for ESP32 on PlatformIO.
-
 The implementation is based on these libraries:
 
  * https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks.
+
  * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified.
- * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle support. Mostly rewritten.
+
+ * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten with the help of https://www.jmri.org/[JMRI] sources.
+
  * https://www.etlcpp.com/[Embedded Template Library]
 
