@@ -6,10 +6,11 @@
 
 #include "LocoNetBus.h"
 
+#define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
 
-class LbServer: public Consumer<lnMsg> {
+class LbServer: public LocoNetConsumer {
 
-    LbServer(const uint16_t port) {
+    LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus) {
         server = WiFiServer(port);
     }
 
@@ -23,9 +24,6 @@ class LbServer: public Consumer<lnMsg> {
 
 
     void loop() {
-        static char lbStr[LB_BUF_SIZE];
-        static int lbPos = 0;
-        static LocoNetMessageBuffer lbBuf;
 
         if (!cli) {
             cli = server.available();
@@ -45,9 +43,11 @@ class LbServer: public Consumer<lnMsg> {
                                 uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
                                 lnMsg *msg = lbBuf.addByte(val);
                                 if(msg!=nullptr) {
-                                    sendWifi(msg); // echo
-                                    locoNet.parsePacket(msg); // decode callbacks
-                                    LN_STATUS ret = locoNet.send(msg); 
+                                    
+                                    onMessage(*msg); // echo
+                                    
+                                    LN_STATUS ret = bus->receive(*msg);                                    
+
                                     if(ret==LN_DONE) cli.println("SENT OK"); else
                                     if(ret==LN_RETRY_ERROR) cli.println("SENT ERROR LN_RETRY_ERROR");
                                 }
@@ -68,7 +68,7 @@ class LbServer: public Consumer<lnMsg> {
         }
     }
 
-    virtual void onMessage(const lnMsg& msg) {
+    virtual LN_STATUS onMessage(const lnMsg& msg) {
         if(!cli) return;
 
         cli.print("RECEIVE ");
@@ -78,11 +78,20 @@ class LbServer: public Consumer<lnMsg> {
             cli.print(" ");
         }
         cli.println();
+
+        return LN_DONE;
     }
 
 private:
 
+    LocoNetBus *bus;
+
     WiFiServer server;
     WiFiClient cli;
+
+    LocoNetMessageBuffer lbBuf;
+    const static int LB_BUF_SIZE = 100;
+    char lbStr[LB_BUF_SIZE];
+    int lbPos = 0;
 
 };

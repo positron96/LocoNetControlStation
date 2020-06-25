@@ -8,21 +8,27 @@
 
 #include <etl/vector.h>
 
+#include <LocoNet.h>
 
-template < class Msg >
+template < class Msg, class Ret >
 class Consumer {
-    virtual void onMessage(const Msg& msg) = 0;
+    virtual Ret onMessage(const Msg& msg) = 0;
 };
 
-template <class Msg, const size_t MAX_CONSUMERS>
-class LocoNetBus {
+template <class Msg, class Ret, Ret okVal, const size_t MAX_CONSUMERS>
+class Bus {
 public:
     using MsgConsumer = Consumer<Msg>;
 
-    void receive(const Msg &msg, MsgConsumer* sender = nullptr) {
+    Ret receive(const Msg &msg, MsgConsumer* sender = nullptr) {
+        Ret ret = okVal;
         for(const auto & c: consumers) {
-            if(c!=sender) c->onMessage(msg);
+            if(c!=sender) {
+                Ret v = c->onMessage(msg);
+                if(v!=okVal) ret = v;
+            }
         }
+        return ret;
     }
 
     void addConsumer(MsgConsumer * c) {
@@ -36,3 +42,8 @@ public:
 private:
     etl::vector<MsgConsumer*, MAX_CONSUMERS> consumers;
 };
+
+
+using LocoNetBus = Bus<lnMsg, LN_STATUS, LN_STATUS::LN_DONE, 5>;
+
+using LocoNetConsumer = Consumer<lnMsg, LN_STATUS>;

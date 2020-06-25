@@ -5,10 +5,10 @@
 #include <LocoNet.h>
 #include <Stream.h>
 
-class LocoNetSerial: public Consumer<lnMsg> {
+class LocoNetSerial: public LocoNetConsumer {
 
 public:
-    LocoNetSerial(Stream * const str) : stream(str) {}
+    LocoNetSerial(Stream * const str, LocoNetBus * const bus) : stream(str), bus(bus) {}
 
     void begin() {}
 
@@ -19,23 +19,23 @@ public:
             uint8_t inByte = stream->read();
             lnMsg *msg = buf.addByte(inByte);
             if(msg != nullptr) {
-                // broadcast msg
+                bus->receive(*msg);
             }
         }
     }
 
-    virtual void onMessage(const lnMsg& msg) {
+    virtual LN_STATUS onMessage(const lnMsg& msg) {
         uint8_t ln = lnPacketSize(&msg);
         for(int j=0; j<ln; j++) {
             stream->write(msg.data[j]);
         }
+        return LN_DONE;
     }
 
 private:
     Stream *stream;
+    LocoNetBus * bus;
 
     LocoNetMessageBuffer buf;
-
-    
 
 };
