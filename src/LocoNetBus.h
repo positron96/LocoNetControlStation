@@ -4,9 +4,10 @@
  * Loconet over USB-Serial and LbServer.
  * */
 
+#pragma once
+
 #include <etl/vector.h>
 
-#include <ln_opc.h>
 
 template < class Msg >
 class Consumer {
