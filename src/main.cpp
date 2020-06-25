@@ -20,6 +20,8 @@ DCCESP32SignalGenerator dcc(1);
 
 #include "CommandStation.h"
 
+#include "LocoNetBus.h"
+
 /*
 #include "WiThrottle.h"
 WiThrottleServer withrottleServer;
