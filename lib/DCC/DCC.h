@@ -5,6 +5,10 @@
 
 #define DCC_DEBUG
 
+enum class DCCFnGroup {
+    F0_4, F5_8, F9_12, F13_20, F21_28
+};
+
 class DCCESP32Channel {
 public:
 
@@ -94,22 +98,29 @@ public:
 
     } 
 
-    void setFunctionGroup1(int nReg, int addr, uint32_t fn) {
-        setFunction(nReg, addr,  B10000000 | (fn & 0x1F) );
+    void setFunctionGroup(int nReg, int addr, DCCFnGroup group, uint32_t fn) {
+        switch(group) {
+            case DCCFnGroup::F0_4: 
+                setFunction(nReg, addr,  B10000000 | (fn & B00011111) );
+                break;
+            case DCCFnGroup::F5_8:
+                fn >>= 5;
+                setFunction(nReg, addr,  B10110000 | (fn & B00001111) );
+                break;
+            case DCCFnGroup::F9_12:
+                fn >>= 9;
+                setFunction(nReg, addr,  B10100000 | (fn & B00001111) );
+                break;
+            case DCCFnGroup::F13_20:
+                fn >>= 13; 
+                setFunction(nReg, addr, B11011110, (uint8_t)fn );
+                break;
+            case DCCFnGroup::F21_28:
+                fn >>= 21; 
+                setFunction(nReg, addr, B11011111, (uint8_t)fn );
+                break;
+        }        
     }
-    void setFunctionGroup2(int nReg, int addr, uint32_t fn) {
-        fn >>= 5;
-        setFunction(nReg, addr,  B10100000 | (fn & 0x1F) );
-    }
-    void setFunctionGroup3(int nReg, int addr, uint32_t fn) {
-        fn >>= 13; 
-        setFunction(nReg, addr, B11011110, (uint8_t)fn );
-    }
-    void setFunctionGroup4(int nReg, int addr, uint32_t fn) {
-        fn >>= 21; 
-        setFunction(nReg, addr, B11011111, (uint8_t)fn );
-    }
-
 
 
     void setFunction(int nReg, int addr, uint8_t fByte, uint8_t eByte=0)  {

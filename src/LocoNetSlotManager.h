@@ -6,7 +6,6 @@
 
 #include "CommandStation.h"
 
-
 class LocoNetSlotManager {
 
 public:
@@ -62,9 +61,20 @@ public:
                     rwSlotDataMsg & slot = _slots[msg->sm.src];
                     Serial.printf("OPC_MOVE_SLOTS NULL MOVE for slot %d\n", slot.slot );
                     slot.stat |= LOCO_IN_USE;
-                    notifyDcc(slot.slot);
+                    CS.setLocoRefresh(slot.slot, true);
                     sendSlotData(slot.slot);
                 }
+                break;
+            }
+            case OPC_SLOT_STAT1: {
+                uint8_t slot = msg->ss.slot;
+                Serial.printf("OPC_SLOT_STAT1 slot %d stat1 %02x\n", slot, msg->ss.stat);
+
+                if( (_slots[slot].stat & LOCOSTAT_MASK) != (msg->ss.stat&LOCOSTAT_MASK) ) {
+                    Serial.println("Changing active+busy");
+                    CS.setLocoRefresh(slot, (msg->ss.stat & STAT1_SL_ACTIVE) != 0);
+                }
+                _slots[slot].stat = msg->ss.stat;
                 break;
             }
             case OPC_LOCO_SND: {
@@ -72,15 +82,17 @@ public:
                 if( !slotValid(slot) ) { lnMsg lack = makeLongAck(OPC_LOCO_SND, 0); _ln->send(&lack); break;} 
                 _slots[slot].snd = msg->ls.snd;
                 Serial.printf("OPC_LOCO_SND slot %d snd %02x\n", slot, msg->ls.snd);
-                notifyDcc(slot, NOTIFY_SND);
+                CS.setLocoFnGroup(slot, 0x1E0, msg->ls.snd << 5 );
                 break;
             }
             case OPC_LOCO_DIRF: {
                 uint8_t slot = msg->ldf.slot;
                 if( !slotValid(slot) ) { lnMsg lack = makeLongAck(OPC_LOCO_DIRF, 0); _ln->send(&lack); break;} 
-                _slots[slot].dirf = msg->ldf.dirf;
-                Serial.printf("OPC_LOCO_DIRF slot %d dirf %02x\n", slot, msg->ldf.dirf);
-                notifyDcc(slot, NOTIFY_DIRF);
+                uint8_t v = msg->ldf.dirf;
+                _slots[slot].dirf = v;
+                Serial.printf("OPC_LOCO_DIRF slot %d dirf %02x\n", slot, v);
+                CS.setLocoDir(slot, v);
+                CS.setLocoFnGroup(slot, 0x1F, (v & 0xF)<<1 | (v & 0x10)>>4 );
                 break;
             }
             case OPC_LOCO_SPD : {
@@ -88,7 +100,7 @@ public:
                 if( !slotValid(slot) ) { lnMsg lack = makeLongAck(OPC_LOCO_SPD, 0); _ln->send(&lack); break;} 
                 _slots[slot].spd = msg->lsp.spd;
                 Serial.printf("OPC_LOCO_SPD slot %d spd %02x\n", slot, msg->lsp.spd);
-                notifyDcc(slot, NOTIFY_SPD);
+                CS.setLocoSpeed(slot, msg->lsp.spd);
                 break;
             }
             case OPC_WR_SL_DATA: {
@@ -96,7 +108,7 @@ public:
                 if( !slotValid(slot) ) { lnMsg lack = makeLongAck(OPC_WR_SL_DATA, 0); _ln->send(&lack); break;} 
                 _slots[slot] = msg->sd;
                 Serial.printf("OPC_WR_SL_DATA slot %d\n", slot);
-                notifyDcc(slot);
+                //notifyDcc(slot);
                 break;
             }
             case OPC_RQ_SL_DATA: {
@@ -105,33 +117,21 @@ public:
                 Serial.printf("OPC_RQ_SL_DATA slot %d\n", slot);
                 sendSlotData(slot);
             }
-            case OPC_SLOT_STAT1: {
-                uint8_t slot = msg->ss.slot;
-                if( (_slots[slot].stat & LOCOSTAT_MASK) != (msg->ss.stat&LOCOSTAT_MASK) )
-                    Serial.println("Changing active+busy");
-                _slots[slot].stat = msg->ss.stat;
-                Serial.printf("OPC_SLOT_STAT1 slot %d stat1 %02x\n", slot, msg->ss.stat);
-                notifyDcc(slot, NOTIFY_STAT);
-                break;
-            }
         }
         
     } 
 
-    void setDccMainChannel(DCCESP32Channel * dcc) { _dccMain = dcc; }
 
 private:
 
     LocoNet * const _ln;
 
-    DCCESP32Channel * _dccMain;
-
-    static constexpr uint8_t MAX_SLOTS = 10;
+    static const int MAX_SLOTS = CommandStation::MAX_SLOTS;
 
     rwSlotDataMsg _slots[MAX_SLOTS];
 
     bool slotValid(uint8_t slot) {
-        return (slot>=1) && (slot<MAX_SLOTS);
+        return (slot>=1) && (slot < MAX_SLOTS);
     }
 
     static void setMasked(uint8_t &val, uint8_t mask, uint8_t v) {
@@ -155,30 +155,6 @@ private:
             return firstFreeSlot;
         }
         return -1;
-    }
-
-    static const uint8_t NOTIFY_DIRF = 0x1;
-    static const uint8_t NOTIFY_SND  = 0x2;
-    static const uint8_t NOTIFY_SS2  = 0x4;
-    static const uint8_t NOTIFY_SPD  = 0x8;
-    static const uint8_t NOTIFY_STAT = 0x10;
-
-    void notifyDcc(uint8_t nslot, uint8_t changeMask=0xFF) {
-        rwSlotDataMsg * slot = & _slots[nslot];
-        if(_dccMain!=nullptr) {
-            uint16_t addr = ADDR(slot->adr2, slot->adr);
-            if( changeMask & NOTIFY_STAT) {
-                if(slot->stat & STAT1_SL_ACTIVE) {
-                    // add this loco
-                } else {
-                    // remove this loco
-                }
-            }
-            if( (slot->stat & STAT1_SL_ACTIVE) == 0) return; // do not refresh
-            if( changeMask & (NOTIFY_DIRF|NOTIFY_SPD) ) _dccMain->setThrottle(slot->slot, addr, slot->spd, bitRead(slot->dirf, 5)  );
-            if( changeMask & NOTIFY_DIRF) _dccMain->setFunction(slot->slot, addr, 128 | (slot->dirf & B00011111) );
-            if( changeMask & NOTIFY_SND ) _dccMain->setFunction(slot->slot, addr, 176 | (slot->snd & B00001111) );
-        }
     }
 
     void sendSlotData(uint8_t slot) {

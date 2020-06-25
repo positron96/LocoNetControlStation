@@ -8,7 +8,6 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 
-#include "LocoNetSlotManager.h"
 #include "DCC.h"
 #include "debug.h"
 
@@ -35,6 +34,9 @@ private:
 
 class CommandStation {
 public:
+
+    static const uint8_t MAX_SLOTS = 10;
+    
     CommandStation() { loadTurnouts();  }//: dccMain(0, 0, 0) {}
 
     void setDccMain(DCCESP32Channel * ch) { dccMain = ch; }
@@ -122,7 +124,7 @@ public:
         dccMain->unload(slot);
     }
 
-    void setlocoRefresh(uint8_t slot, bool refresh) {
+    void setLocoRefresh(uint8_t slot, bool refresh) {
         if(slot==0) { DEBUGS("CommandStation::releaseSlot: invalid slot"); return; }
 
         getSlot(slot).refreshing = refresh;
@@ -131,12 +133,27 @@ public:
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
         dd.fn[fn] = val;
+        DCCFnGroup fg;
         
         uint32_t ifn = dd.fn.value<uint32_t>();
-        if(fn<5)       dccMain->setFunctionGroup1(slot, dd.addr.addr(), ifn);
-        else if(fn<13) dccMain->setFunctionGroup2(slot, dd.addr.addr(), ifn);
-        else if(fn<21) dccMain->setFunctionGroup3(slot, dd.addr.addr(), ifn);
-        else           dccMain->setFunctionGroup4(slot, dd.addr.addr(), ifn);        
+        if(fn<5)       fg = DCCFnGroup::F0_4;
+        else if(fn<9)  fg = DCCFnGroup::F5_8;
+        else if(fn<13) fg = DCCFnGroup::F9_12;
+        else if(fn<21) fg = DCCFnGroup::F13_20;
+        else           fg = DCCFnGroup::F21_28;
+        dccMain->setFunctionGroup(slot, dd.addr.addr(), fg, ifn);
+    }
+
+    void setLocoFnGroup(uint8_t slot, uint32_t m, uint32_t f ) {
+        LocoData &dd = getSlot(slot);
+        uint32_t v = dd.fn.value<uint32_t>();
+
+        if((m & 0x1F) != 0)       { v= (v & 0xFFFFFFE0) | (f & m & 0x1F);      dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F0_4, v ); }  
+        if((m & 0x1E0) != 0)      { v= (v & 0xFFFFFE1F) | (f & m & 0x1E0);     dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F5_8, v ); }
+        if((m & 0x1E00) != 0)     { v= (v & 0xFFFFE1FF) | (f & m & 0x1E00);    dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F9_12, v ); }
+        if((m & 0x1FE000) != 0)   { v= (v & 0xFFE01FFF) | (f & m & 0x1FE000);  dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F13_20, v ); }
+        if((m & 0x1FE00000) != 0) { v= (v & 0xE01FFFFF) | (f & m & 0x1FE00000);dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F21_28, v ); }
+        dd.fn = LocoData::Fns( v );
     }
 
     bool getLocoFn(uint8_t slot, uint8_t fn) {
@@ -169,23 +186,22 @@ public:
         return getSlot(slot).speed;
     }
 
-    //const LocoNetSlotManager slotMan;
+
 private:
     DCCESP32Channel * dccMain;
 
     struct LocoData {
+        using Fns = etl::bitset<29>;
         LocoAddress addr;
         uint8_t speed;
         enum class SpeedMode { S14, S28, S128 };
         SpeedMode speedMode;
         int8_t dir;
-        etl::bitset<29> fn;
+        Fns fn;
         bool refreshing;
         bool allocated() { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
     };
-
-    static const uint8_t MAX_SLOTS = 10;
 
     etl::map<LocoAddress, uint8_t, MAX_SLOTS> locoSlot;
 
@@ -219,8 +235,9 @@ private:
             if(newStat==-1) 
                 newStat=(int)TurnoutState::THROWN;
             // accessory command
-            int addr = ((aAddr-1) >> 2) + 1; 
-            int sub  = (aAddr-1) & 0x3; 
+            //int addr = ((aAddr-1) >> 2) + 1; 
+            //int sub  = (aAddr-1) & 0x3; 
+
             //dccMain.setAccessory(addr, sub, newStat);
             //sendDCCppCmd("a "+String(addr)+" "+sub+" "+int(newStat) );
             

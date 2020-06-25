@@ -90,7 +90,6 @@ void setup() {
     });*/
 
     slotMan.registerCallbacks();
-    slotMan.setDccMainChannel(&dccMain);
 
 /*
     locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
