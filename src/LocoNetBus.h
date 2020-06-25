@@ -12,13 +12,14 @@
 
 template < class Msg, class Ret >
 class Consumer {
+public:
     virtual Ret onMessage(const Msg& msg) = 0;
 };
 
 template <class Msg, class Ret, Ret okVal, const size_t MAX_CONSUMERS>
 class Bus {
 public:
-    using MsgConsumer = Consumer<Msg>;
+    using MsgConsumer = Consumer<Msg, Ret>;
 
     Ret receive(const Msg &msg, MsgConsumer* sender = nullptr) {
         Ret ret = okVal;

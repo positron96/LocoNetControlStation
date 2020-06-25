@@ -22,6 +22,18 @@ DCCESP32SignalGenerator dcc(1);
 
 #include "LocoNetBus.h"
 
+#include "LocoNetWrapper.h"
+#include "LocoNetSerial.h"
+#include "LbServer.h"
+
+LocoNetBus bus;
+LocoNetWrapper lnw(&locoNet, &bus);
+
+#define LBSERVER_TCP_PORT  1234
+LbServer lbServer(1234, &bus);
+
+LocoNetSerial lSerial(&Serial, &bus);
+
 /*
 #include "WiThrottle.h"
 WiThrottleServer withrottleServer;
@@ -31,9 +43,8 @@ WiThrottleServer withrottleServer;
 #include <WiFi.h>
 #include <ESPmDNS.h>
 
-#define LBSERVER_TCP_PORT  1234
-WiFiServer lbServer(LBSERVER_TCP_PORT);
-WiFiClient lbClient;
+
+
 */
 void sendWifi(lnMsg *msg);
 
@@ -42,10 +53,6 @@ int inState = HIGH;
 unsigned long nextInRead = 0;
 unsigned long nextDccMeter = 0;
 
-void send(lnMsg *msg) {
-    locoNet.send(msg);
-    sendWifi(msg);
-}
 
 void setup() {
   
@@ -56,7 +63,12 @@ void setup() {
     Serial.println("LocoNet");
 
     // First initialize the LocoNet interface
-    locoNet.begin();
+    //locoNet.begin();
+
+    lnw.begin();
+    lSerial.begin();
+
+/*
     locoNet.onPacket(CALLBACK_FOR_ALL_OPCODES, [](lnMsg *rxPacket) {
         Serial.print("rx'd ");
         for(uint8_t x = 0; x < 4; x++) {
@@ -75,11 +87,12 @@ void setup() {
         }
 
         sendWifi(rxPacket);
-    });
+    });*/
 
     slotMan.registerCallbacks();
     slotMan.setDccMainChannel(&dccMain);
 
+/*
     locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         Serial.print("Switch Request: ");
         Serial.print(address, DEC);
@@ -101,7 +114,7 @@ void setup() {
         Serial.print(address, DEC);
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
-    });
+    });*/
 
     CS.setDccMain(&dccMain);
 
@@ -135,7 +148,7 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    //lbServer.begin();
+    lbServer.begin();
 
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
@@ -146,26 +159,11 @@ void setup() {
 
 }
 
-void sendWifi(lnMsg *msg) {
-    /*
-    if(!lbClient) return;
-
-    lbClient.print("RECEIVE ");
-    uint8_t ln = lnPacketSize(msg);
-    for(int j=0; j<ln; j++) {
-        lbClient.print(msg->data[j], HEX);
-        lbClient.print(" ");
-    }
-    lbClient.println();
-    */
-}
-
-#define LB_BUF_SIZE 100
-#define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
 
 void loop() {
-    //withrottleServer.loop();
 
+    lbServer.loop();
+    lSerial.loop();
     
     if(millis()>nextDccMeter) {
         uint16_t v = dccMain.readCurrent() ;
@@ -186,49 +184,4 @@ void loop() {
         }
     }*/
 
-/*
-    static char lbStr[LB_BUF_SIZE];
-    static int lbPos=0;
-    static LocoNetMessageBuffer lbBuf;
-
-    if (!lbClient) {
-        lbClient = lbServer.available();
-        if(lbClient) { lbClient.print("VERSION "); lbClient.println("ESP32 WiFi 0.1"); }
-    }
-	if (lbClient) {
-		while(lbClient.available()>0) {
-            char v = lbClient.read();
-            if(v=='\r') continue;
-
-            lbStr[lbPos] = v;
-            if(v=='\n') {
-                lbStr[lbPos] = ' '; lbStr[lbPos+1]=0;
-                if(strncmp("SEND ", lbStr, 5)==0) {
-                    for(uint8_t i=5; i<=lbPos; i++) {
-                        if(lbStr[i]==' ') {
-                            uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                            lnMsg *msg = lbBuf.addByte(val);
-                            if(msg!=nullptr) {
-                                sendWifi(msg); // echo
-                                locoNet.parsePacket(msg); // decode callbacks
-                                LN_STATUS ret = locoNet.send(msg); 
-                                if(ret==LN_DONE) lbClient.println("SENT OK"); else
-                                if(ret==LN_RETRY_ERROR) lbClient.println("SENT ERROR LN_RETRY_ERROR");
-                            }
-                        }
-                    }
-                } else {
-                    Serial.println("got line but it's not SEND:");
-                    for(int i=0; i<lbPos; i++) { Serial.print(lbStr[i], HEX); Serial.print(" "); }
-                    Serial.println();
-                }
-                lbPos=0;
-            } else {
-                lbPos++;
-            }
-
-		}
-
-	}
-    */
 }

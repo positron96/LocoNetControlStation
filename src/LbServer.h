@@ -10,6 +10,8 @@
 
 class LbServer: public LocoNetConsumer {
 
+public:
+
     LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus) {
         server = WiFiServer(port);
     }
@@ -46,7 +48,7 @@ class LbServer: public LocoNetConsumer {
                                     
                                     onMessage(*msg); // echo
                                     
-                                    LN_STATUS ret = bus->receive(*msg);                                    
+                                    LN_STATUS ret = bus->receive(*msg, this);
 
                                     if(ret==LN_DONE) cli.println("SENT OK"); else
                                     if(ret==LN_RETRY_ERROR) cli.println("SENT ERROR LN_RETRY_ERROR");
@@ -69,7 +71,7 @@ class LbServer: public LocoNetConsumer {
     }
 
     virtual LN_STATUS onMessage(const lnMsg& msg) {
-        if(!cli) return;
+        if(!cli) return LN_DONE;
 
         cli.print("RECEIVE ");
         uint8_t ln = lnPacketSize(&msg);
