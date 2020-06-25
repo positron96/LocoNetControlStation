@@ -4,7 +4,7 @@
 
 #include <LocoNet.h>
 
-#include "DCC.h"
+#include "CommandStation.h"
 
 
 class LocoNetSlotManager {
@@ -41,7 +41,7 @@ public:
 
         switch(msg->data[0]) {
             case OPC_LOCO_ADR: {
-
+                //int slot = CS.locate
                 int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
                 if(slot<0) {
                     lnMsg lack = makeLongAck(OPC_LOCO_ADR, 0);
