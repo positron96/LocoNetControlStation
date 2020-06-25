@@ -130,19 +130,17 @@ public:
 
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
-        if(val) 
-            dd.fn |= (1<<fn);
-        else
-            dd.fn &= ~ (1<<fn);
-
-        if(fn<5)       dccMain->setFunctionGroup1(slot, dd.addr.addr(), fn);
-        else if(fn<13) dccMain->setFunctionGroup2(slot, dd.addr.addr(), fn);
-        else if(fn<21) dccMain->setFunctionGroup3(slot, dd.addr.addr(), fn);
-        else           dccMain->setFunctionGroup4(slot, dd.addr.addr(), fn);        
+        dd.fn[fn] = val;
+        
+        uint32_t ifn = dd.fn.value<uint32_t>();
+        if(fn<5)       dccMain->setFunctionGroup1(slot, dd.addr.addr(), ifn);
+        else if(fn<13) dccMain->setFunctionGroup2(slot, dd.addr.addr(), ifn);
+        else if(fn<21) dccMain->setFunctionGroup3(slot, dd.addr.addr(), ifn);
+        else           dccMain->setFunctionGroup4(slot, dd.addr.addr(), ifn);        
     }
 
     bool getLocoFn(uint8_t slot, uint8_t fn) {
-        return (getSlot(slot).fn & (1<<fn) ) != 0;
+        return  getSlot(slot).fn[fn] != 0;
     }
 
     /**
@@ -181,7 +179,7 @@ private:
         enum class SpeedMode { S14, S28, S128 };
         SpeedMode speedMode;
         int8_t dir;
-        uint32_t fn;
+        etl::bitset<29> fn;
         bool refreshing;
         bool allocated() { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
