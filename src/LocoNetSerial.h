@@ -25,7 +25,7 @@ public:
     }
 
     virtual LN_STATUS onMessage(const lnMsg& msg) {
-        uint8_t ln = lnPacketSize(&msg);
+        uint8_t ln = msg.length();
         for(int j=0; j<ln; j++) {
             stream->write(msg.data[j]);
         }

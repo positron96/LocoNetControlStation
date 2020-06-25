@@ -4,6 +4,8 @@
  * Also, see JMRI sources, start at java\src\jmri\jmrit\withrottle\DeviceServer.java
  */
 
+#pragma once
+
 #include <WiFi.h>
 #include <WiFiServer.h>
 #include <ESPmDNS.h>

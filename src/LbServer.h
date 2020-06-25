@@ -74,7 +74,7 @@ public:
         if(!cli) return LN_DONE;
 
         cli.print("RECEIVE ");
-        uint8_t ln = lnPacketSize(&msg);
+        uint8_t ln = msg.length();
         for(int j=0; j<ln; j++) {
             cli.print(msg.data[j], HEX);
             cli.print(" ");
