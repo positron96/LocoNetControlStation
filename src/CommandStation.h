@@ -88,32 +88,59 @@ public:
         return turnoutAction(aAddr, namedTurnout, (int)newStat);
     }
 
-    bool isSlotTaken(uint8_t slot) {
+    bool isSlotAllocated(uint8_t slot) {
         if(slot<1 || slot>MAX_SLOTS) return true;
-        return slots[slot-1].addr.isValid();
+        return slots[slot-1].allocated();
     }
 
-    bool isLocoTaken(LocoAddress addr) {
+    bool isLocoAllocated(LocoAddress addr) {
         return locoSlot.find(addr) != locoSlot.end();
     }
 
-    uint8_t locateLocoSlot(LocoAddress addr) {
-
+    uint8_t findLocoSlot(LocoAddress addr) {
         auto it = locoSlot.find(addr);
         if(it != locoSlot.end() ) {
             return it->second;
         }
+        return 0;
+    }
+
+    uint8_t locateFreeSlot() {
+        /*auto it = locoSlot.find(addr);
+        if(it != locoSlot.end() ) {
+            return it->second;
+        }*/
         if(locoSlot.size() < MAX_SLOTS) {
             for(int i=0; i<MAX_SLOTS; i++) {
                 if(!slots[i].allocated() ) {
-                    slots[i].addr = addr;
+                    /*slots[i].addr = addr;
                     uint8_t slot = i+1;
-                    locoSlot[addr] = slot;
-                    return slot;
+                    locoSlot[addr] = slot;*/
+                    return i+1;
                 }
             }
         }
         return 0;
+    }
+
+    void allocateLocoSlot(uint8_t slot, LocoAddress addr) {
+        LocoData &_slot = getSlot(slot);
+        _slot.addr = addr;
+        _slot.dir = 1;
+        _slot.fn = LocoData::Fns();
+        _slot.refreshing = false;
+        _slot.speed = 0;
+        _slot.speedMode = LocoData::SpeedMode::S128;
+        locoSlot[addr] = slot;
+    }
+
+    uint8_t findOrAllocateLocoSlot(LocoAddress addr) {
+        uint8_t slot = findLocoSlot(addr);
+        if(slot==0) {
+            slot = locateFreeSlot();
+            if(slot!=0) allocateLocoSlot(slot, addr);
+        }
+        return slot;
     }
 
     void releaseLocoSlot(uint8_t slot) {

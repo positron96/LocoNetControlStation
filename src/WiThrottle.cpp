@@ -167,9 +167,8 @@ void WiThrottleServer::locoAdd(char th, String sLocoAddr, int iClient) {
 
     //DEBUGS("loco add thr="+String(th)+"; addr"+String(sLocoAddr) );
 
-    uint8_t slot = CS.locateLocoSlot(addr);
+    uint8_t slot = CS.findOrAllocateLocoSlot(addr);
     clientData[iClient].slots[th][addr] = slot;
-
 }
 
 void WiThrottleServer::locoRelease(char th, String sLocoAddr, int iClient) {
