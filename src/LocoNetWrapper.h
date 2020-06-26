@@ -9,7 +9,7 @@ public:
     LocoNetWrapper(LocoNet * const ln, LocoNetBus * const bus) : ln(ln), bus(bus) {
 
         ln->onPacket(CALLBACK_FOR_ALL_OPCODES, [this](lnMsg *rxPacket) {
-            this->bus->receive(*rxPacket, this);
+            this->bus->send(*rxPacket, this);
         } );
 
     }

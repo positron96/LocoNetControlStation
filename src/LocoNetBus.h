@@ -21,7 +21,7 @@ class Bus {
 public:
     using MsgConsumer = Consumer<Msg, Ret>;
 
-    Ret receive(const Msg &msg, MsgConsumer* sender = nullptr) {
+    Ret send(const Msg &msg, MsgConsumer* sender = nullptr) {
         Ret ret = okVal;
         for(const auto & c: consumers) {
             if(c!=sender) {
@@ -45,6 +45,6 @@ private:
 };
 
 
-using LocoNetBus = Bus<lnMsg, LN_STATUS, LN_STATUS::LN_DONE, 5>;
+using LocoNetBus = Bus<lnMsg, LN_STATUS, LN_STATUS::LN_DONE, 10>;
 
 using LocoNetConsumer = Consumer<lnMsg, LN_STATUS>;

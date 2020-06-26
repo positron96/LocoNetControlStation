@@ -3,16 +3,18 @@
 #include <Arduino.h>
 
 #include <LocoNet.h>
-
+#include "LocoNetBus.h"
 #include "CommandStation.h"
 
-class LocoNetSlotManager {
+class LocoNetSlotManager : public LocoNetConsumer {
 
 public:
-    LocoNetSlotManager(LocoNet * const ln): _ln(ln) {
+    LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
         for(int i=0; i<MAX_SLOTS; i++) {
             initSlot(i);
         }
+
+        ln->addConsumer(this);
     }
 
     void initSlot(uint8_t i, uint8_t addrHi=0, uint8_t addrLo=0) {
@@ -32,11 +34,12 @@ public:
         sd.id2 = 0;
     }
 
-    void registerCallbacks() {
-        _ln->onPacket(CALLBACK_FOR_ALL_OPCODES, [this](lnMsg* msg) { processMessage(msg); } );
+    virtual LN_STATUS onMessage(const lnMsg& msg) {
+        processMessage(&msg);
+        return LN_DONE;
     }
 
-    void processMessage(lnMsg* msg) {
+    void processMessage(const lnMsg* msg) {
 
         switch(msg->data[0]) {
             case OPC_LOCO_ADR: {
@@ -88,7 +91,7 @@ public:
                 break;
             }
             case OPC_WR_SL_DATA: {
-                rwSlotDataMsg & m = msg->sd;
+                const rwSlotDataMsg & m = msg->sd;
                 uint8_t slot = m.slot;
                 if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; } 
                 rwSlotDataMsg &_slot = _slots[slot];
@@ -111,7 +114,7 @@ public:
             }
             case OPC_RQ_SL_DATA: {
                 uint8_t slot = msg->sr.slot;
-                if( !slotValid(slot) ) { lnMsg lack = makeLongAck(OPC_RQ_SL_DATA, 0); _ln->send(&lack); break;} 
+                if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;} 
                 Serial.printf("OPC_RQ_SL_DATA slot %d\n", slot);
                 sendSlotData(slot);
             }
@@ -122,7 +125,7 @@ public:
 
 private:
 
-    LocoNet * const _ln;
+    LocoNetBus * const _ln;
 
     static const int MAX_SLOTS = CommandStation::MAX_SLOTS;
 
@@ -142,7 +145,7 @@ private:
     }
 
     void sendSlotData(uint8_t slot) {        
-        lnMsg ret;
+        LnMsg ret;
         ret.sd = _slots[slot];
         Serial.print("tx'd");
         for(uint8_t i=0; i<lnPacketSize(&ret); i++) {
@@ -150,12 +153,14 @@ private:
         }
         Serial.println("");
 
-        _ln->send(&ret);
+        //_ln->send(&ret);
+        _ln->send(&ret, this);
     }
 
     void sendLack(uint8_t cmd, uint8_t arg=0) {
-        lnMsg lack = makeLongAck(cmd, arg); 
-        _ln->send(&lack); 
+        LnMsg lack = makeLongAck(cmd, arg); 
+        //_ln->send(&lack); 
+        _ln->send(&lack, this);
     }
 
     void processDirf(uint8_t slot, uint v) {
@@ -168,7 +173,7 @@ private:
     void processSnd(uint8_t slot, uint8_t snd) {
         _slots[slot].snd = snd;
         Serial.printf("OPC_LOCO_SND slot %d snd %02x\n", slot, snd);
-        CS.setLocoFnGroup(slot, 0x1E0, msg->ls.snd << 5 );
+        CS.setLocoFnGroup(slot, 0x1E0, snd << 5 );
     }
 
     void processStat1(uint8_t slot, uint8_t stat) {

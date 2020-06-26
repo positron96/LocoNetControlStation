@@ -1,30 +1,29 @@
 #include <stdio.h>
 #include <Arduino.h>
 
-#define LOCONET_PIN_RX 16
-#define LOCONET_PIN_TX 15
-//#include <LocoNetESP32UART.h>
-//LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
-#include <LocoNetESP32.h>
-LocoNetESP32 locoNet(LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
-
-#include <LocoNetSlotManager.h>
-LocoNetSlotManager slotMan(&locoNet);
-
-#define DCC_PIN 19
-#define DCC_PIN_EN 23
-#define DCC_PIN_SENSE 35
 #include <DCC.h>
-DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
-DCCESP32SignalGenerator dcc(1);
 
 #include "CommandStation.h"
 
+#include <LocoNetESP32.h>
 #include "LocoNetBus.h"
+#include "LocoNetSlotManager.h"
 
 #include "LocoNetWrapper.h"
 #include "LocoNetSerial.h"
 #include "LbServer.h"
+
+//#include "WiThrottle.h"
+
+#define LOCONET_PIN_RX 16
+#define LOCONET_PIN_TX 15
+//#include <LocoNetESP32UART.h>
+//LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
+LocoNetESP32 locoNet(LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+
+#define DCC_PIN 19
+#define DCC_PIN_EN 23
+#define DCC_PIN_SENSE 35
 
 LocoNetBus bus;
 LocoNetWrapper lnw(&locoNet, &bus);
@@ -34,19 +33,19 @@ LbServer lbServer(1234, &bus);
 
 LocoNetSerial lSerial(&Serial, &bus);
 
-/*
-#include "WiThrottle.h"
-WiThrottleServer withrottleServer;
-*/
+LocoNetSlotManager slotMan(&bus);
+
+DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
+DCCESP32SignalGenerator dcc(1); //timer1
+
+//WiThrottleServer withrottleServer;
 
 /*
 #include <WiFi.h>
 #include <ESPmDNS.h>
 
 
-
 */
-void sendWifi(lnMsg *msg);
 
 #define IN_PIN 25
 int inState = HIGH;
@@ -61,9 +60,6 @@ void setup() {
 
     Serial.begin(115200);
     Serial.println("LocoNet");
-
-    // First initialize the LocoNet interface
-    //locoNet.begin();
 
     lnw.begin();
     lSerial.begin();
@@ -88,8 +84,6 @@ void setup() {
 
         sendWifi(rxPacket);
     });*/
-
-    slotMan.registerCallbacks();
 
 /*
     locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
