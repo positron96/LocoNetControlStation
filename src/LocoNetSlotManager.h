@@ -154,13 +154,13 @@ private:
         Serial.println("");
 
         //_ln->send(&ret);
-        _ln->send(&ret, this);
+        _ln->broadcast(ret, this);
     }
 
     void sendLack(uint8_t cmd, uint8_t arg=0) {
         LnMsg lack = makeLongAck(cmd, arg); 
         //_ln->send(&lack); 
-        _ln->send(&lack, this);
+        _ln->broadcast(lack, this);
     }
 
     void processDirf(uint8_t slot, uint v) {

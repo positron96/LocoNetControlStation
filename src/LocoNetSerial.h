@@ -19,7 +19,7 @@ public:
             uint8_t inByte = stream->read();
             lnMsg *msg = buf.addByte(inByte);
             if(msg != nullptr) {
-                bus->send(*msg, this);
+                bus->broadcast(*msg, this);
             }
         }
     }

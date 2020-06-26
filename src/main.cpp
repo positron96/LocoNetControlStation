@@ -9,24 +9,23 @@
 #include "LocoNetBus.h"
 #include "LocoNetSlotManager.h"
 
-#include "LocoNetWrapper.h"
 #include "LocoNetSerial.h"
 #include "LbServer.h"
 
 //#include "WiThrottle.h"
 
+LocoNetBus bus;
+
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 15
 //#include <LocoNetESP32UART.h>
 //LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
-LocoNetESP32 locoNet(LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 
 #define DCC_PIN 19
 #define DCC_PIN_EN 23
 #define DCC_PIN_SENSE 35
 
-LocoNetBus bus;
-LocoNetWrapper lnw(&locoNet, &bus);
 
 #define LBSERVER_TCP_PORT  1234
 LbServer lbServer(1234, &bus);
@@ -61,7 +60,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println("LocoNet");
 
-    lnw.begin();
+    locoNet.begin();
     lSerial.begin();
 
 /*

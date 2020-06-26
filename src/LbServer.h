@@ -48,7 +48,7 @@ public:
                                     
                                     onMessage(*msg); // echo
                                     
-                                    LN_STATUS ret = bus->send(*msg, this);
+                                    LN_STATUS ret = bus->broadcast(*msg, this);
 
                                     if(ret==LN_DONE) cli.println("SENT OK"); else
                                     if(ret==LN_RETRY_ERROR) cli.println("SENT ERROR LN_RETRY_ERROR");
