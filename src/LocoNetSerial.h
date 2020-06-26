@@ -1,7 +1,5 @@
 #pragma once
 
-#include "LocoNetBus.h"
-
 #include <LocoNet.h>
 #include <Stream.h>
 

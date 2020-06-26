@@ -3,7 +3,6 @@
 #include <Arduino.h>
 
 #include <LocoNet.h>
-#include "LocoNetBus.h"
 #include "CommandStation.h"
 
 class LocoNetSlotManager : public LocoNetConsumer {

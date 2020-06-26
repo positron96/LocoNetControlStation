@@ -6,7 +6,6 @@
 #include "CommandStation.h"
 
 #include <LocoNetESP32.h>
-#include "LocoNetBus.h"
 #include "LocoNetSlotManager.h"
 
 #include "LocoNetSerial.h"
@@ -21,6 +20,7 @@ LocoNetBus bus;
 //#include <LocoNetESP32UART.h>
 //LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
 LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+LocoNetDispatcher parser(&bus);
 
 #define DCC_PIN 19
 #define DCC_PIN_EN 23
@@ -63,8 +63,8 @@ void setup() {
     locoNet.begin();
     lSerial.begin();
 
-/*
-    locoNet.onPacket(CALLBACK_FOR_ALL_OPCODES, [](lnMsg *rxPacket) {
+
+    parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
         Serial.print("rx'd ");
         for(uint8_t x = 0; x < 4; x++) {
             uint8_t val = rxPacket->data[x];
@@ -80,12 +80,10 @@ void setup() {
             case OPC_GPON: break;
             case OPC_GPOFF: break;
         }
+    });
 
-        sendWifi(rxPacket);
-    });*/
 
-/*
-    locoNet.onSwitchRequest([](uint16_t address, bool output, bool direction) {
+    parser.onSwitchRequest([](uint16_t address, bool output, bool direction) {
         Serial.print("Switch Request: ");
         Serial.print(address, DEC);
         Serial.print(':');
@@ -93,7 +91,7 @@ void setup() {
         Serial.print(" - ");
         Serial.println(output ? "On" : "Off");
     });
-    locoNet.onSwitchReport([](uint16_t address, bool state, bool sensor) {
+    parser.onSwitchReport([](uint16_t address, bool state, bool sensor) {
         Serial.print("Switch/Sensor Report: ");
         Serial.print(address, DEC);
         Serial.print(':');
@@ -101,12 +99,12 @@ void setup() {
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
     });
-    locoNet.onSensorChange([](uint16_t address, bool state) {
+    parser.onSensorChange([](uint16_t address, bool state) {
         Serial.print("Sensor: ");
         Serial.print(address, DEC);
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
-    });*/
+    });
 
     CS.setDccMain(&dccMain);
 

@@ -4,7 +4,6 @@
 #include <ln_opc.h>
 #include <LocoNet.h>
 
-#include "LocoNetBus.h"
 
 #define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
 

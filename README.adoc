@@ -18,11 +18,23 @@ Planned features are:
 
 The implementation is based on these libraries:
 
- * https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks.
+ * https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks. 
+ One major difference between this project and original Loconet2 library is that this one is redesigned with several LocoNet buses in mind. Since the project is an Ultimate Command Station, it accepts Loconet messages from different sources: LocoNet bus itself, USB-Serial, LbServer. All messages are transparently routed to between all connected buses. It means that:
 
- * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified.
+ ** There must be a routing mechanism for broadcasting messages from one source to others.
+ ** Existing frontend classes (e.g. Throttle) must be separated from hardware backend and conncted to other sources. When command station itself generates a message (e.g. a reply to throttle), it must be broadcasted to all sources.
+ ** Result of sending a message to the bus is only taken into account for real LocoNet bus; it is assumed that USB and WiFi always send packets successfully.
+
+ This required separating LocoNet class into hardware backend, a message parser, and a routing bus between them. 
+ Other sources of messages are connected to this bus.
+ Frontend classes (Throttle, FastClock, SystemVariable etc) are connected to this bus instead of hardware class and so can handle messages from all sources.
+
+ * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified. 
 
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten with the help of https://www.jmri.org/[JMRI] sources.
 
- * https://www.etlcpp.com/[Embedded Template Library]
+ * https://www.etlcpp.com/[Embedded Template Library] statically-sized containers are used.
+
+
+
 
