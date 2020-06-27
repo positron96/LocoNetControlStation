@@ -4,17 +4,15 @@ It is based on ESP32 chip. Development is done with Arduino core for ESP32 on Pl
 
 Planned features are:
 
-* [ ] Running locos on main track via DCC
+* [x] Running locos on main track via DCC (broken now)
 * [ ] OPS mode programming via DCC
-* [x] Loconet interface
+* Loconet interface with routing from severa lsources:
+** [x] Physical LocoNet bus (RX timings broken now)
+** [x] LbServer (LocoNetOverTCP) over WiFi
+** [x] USB-Serial interface (not tested)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
 * [ ] Stored turnout roster
-* [ ] PC Connection
-** [ ] DCC++ interface via USB-UART **OR:**
-** [ ] Loconet serial via USB-UART
-** [ ] DCC++ interface via WiFi 
-** [x] Loconet LBServer via WiFi
-
+* [ ] DCC++ interface via USB-Serial or WiFi
 
 The implementation is based on these libraries:
 
