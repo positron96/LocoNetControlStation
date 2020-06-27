@@ -13,9 +13,18 @@
 #include <etl/utility.h>
 
 #include "CommandStation.h"
-//#include "debug.h"
 
-#define LOG_WIFI 0
+#define WT_DEBUG
+
+#ifdef WT_DEBUG
+#include <Arduino.h>
+#define WT_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#else
+#define WT_DEBUGF(...)
+#endif
+
+#define LOG_WIFI  
+//#define LOG_WIFI(v)   { Serial.println(v); }
 
 class WiThrottleServer {
 public:
@@ -24,7 +33,7 @@ public:
 
     void begin() {
 
-        DEBUGS("WiThrottleServer::begin");
+        WT_DEBUGF("WiThrottleServer::begin");
 
         server.begin();
 
@@ -83,17 +92,17 @@ private:
     }
 
     void turnPower(char v) {
-        CS.turnPower(v=='1');
+        CS.setPowerState(v=='1');
     }
 
 
     void wifiPrintln(int iClient, String v) {
         clients[iClient].println(v);
-        if (LOG_WIFI) DEBUGS("WF<< "+v);
+        LOG_WIFI("WF<< "+v);
     }
     void wifiPrint(int iClient, String v) {
         clients[iClient].print(v);
-        if (LOG_WIFI) DEBUGS("WF<< "+v);
+        LOG_WIFI("WF<< "+v);
     }
 
     void throttleStart(int iClient) ;

@@ -5,6 +5,12 @@
 
 #define DCC_DEBUG
 
+#ifdef DCC_DEBUG
+#define DCC_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#else
+#define DCC_DEBUGF(...)
+#endif
+
 enum class DCCFnGroup {
     F0_4, F5_8, F9_12, F13_20, F21_28
 };
@@ -32,6 +38,7 @@ public:
     }
 
     void setPower(bool v) {
+        DCC_DEBUGF("DCC::setPower(%d)\n", v);
         digitalWrite(_enPin, v ? HIGH : LOW);
     }
 
@@ -44,7 +51,7 @@ public:
         uint8_t nBits;
     };
 
-    struct Register{
+    struct Register {
         Packet packet[2];
         Packet *activePacket;
         Packet *updatePacket;
@@ -91,14 +98,15 @@ public:
         b[nB++] = lowByte(addr);
         b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
         b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
-        #ifdef DCC_DEBUG
-            Serial.printf("setThrottle %d speed=%d %c\n", addr, tSpeed, tDirection==1?'F':'B');
-        #endif
+        
+        DCC_DEBUGF("DCC::setThrottle slot %d, addr %d, speed=%d %c\n", addr, addr, tSpeed, tDirection==1?'F':'B');
+        
         R.loadPacket(nReg, b, nB, 0);
 
     } 
 
     void setFunctionGroup(int nReg, int addr, DCCFnGroup group, uint32_t fn) {
+        DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x\n", nReg, addr, (uint8_t)group, fn);
         switch(group) {
             case DCCFnGroup::F0_4: 
                 setFunction(nReg, addr,  B10000000 | (fn & B00011111) );
@@ -140,9 +148,7 @@ public:
             b[nB++] = eByte;
         }
 
-        #ifdef DCC_DEBUG
-            Serial.printf("setFunction %d fByte=%d eByte=%d\n", addr, fByte, eByte);
-        #endif
+        DCC_DEBUGF("DCC::setFunction slot %d, addr %d, fByte=%02x eByte=%02x\n", nReg, addr, fByte, eByte);
 
         /* 
         NMRA DCC norm ask for two DCC packets instead of only one:
@@ -155,10 +161,7 @@ public:
 
     void setAccessory(int aAdd, int aNum, int activate) {
 
-        #ifdef DCCPP_DEBUG
-            Serial.print("{RL::setAccessory addr="); Serial.print(aAdd);Serial.print("; ch=");
-            Serial.print(aNum);Serial.print("; state=");Serial.print(activate);Serial.println("}");
-        #endif
+        DCC_DEBUGF("DCC::setAccessory addr=%d; ch=%d; state=%d\n", aAdd, aNum, activate);
 
         uint8_t b[3];                      // save space for checksum byte
 
@@ -194,9 +197,7 @@ private:
 class DCCESP32SignalGenerator {
 
 public:
-    DCCESP32SignalGenerator(uint8_t timerNum = 1) : _timerNum(timerNum) {
-        _inst = this;
-    }
+    DCCESP32SignalGenerator(uint8_t timerNum = 1);
 
     void setProgChannel(DCCESP32Channel * ch) { prog = ch;}
     void setMainChannel(DCCESP32Channel * ch) { main = ch;}
@@ -206,42 +207,17 @@ public:
      * To get 58us tick we need divisor of 58us/0.0125us(80mhz) = 4640,
      * separate this into 464 prescaler and 10 timer alarm.
      */
-    void begin() {
-        if (main!=nullptr) main->begin();
-        if (prog!=nullptr) prog->begin();
+    void begin();
 
-        _timer = timerBegin(_timerNum, 464, true);
-        timerAttachInterrupt(_timer, timerCallback, true);
-        timerAlarmWrite(_timer, 10, true);
-        timerAlarmEnable(_timer);
-        timerStart(_timer);
-    }
-
-    void end() {
-        if(_timer!=nullptr) {
-            if(timerStarted(_timer) ) timerStop(_timer);
-            timerEnd(_timer);
-            _timer = nullptr;
-        }
-        if (main!=nullptr) main->end();
-        if (prog!=nullptr) prog->end();
-    }
-
-
+    void end();
 
 private:
     hw_timer_t * _timer;
-    uint8_t _timerNum;
-    DCCESP32Channel *prog;
-    DCCESP32Channel *main;
+    volatile uint8_t _timerNum;
+    DCCESP32Channel *main = nullptr;
+    DCCESP32Channel *prog = nullptr;
 
-    static DCCESP32SignalGenerator * _inst;
-    static void timerCallback() {
-        _inst->timerFunc();
-    }
+    friend void timerCallback();
 
-    void IRAM_ATTR timerFunc() {
-        if (main!=nullptr) main->timerFunc();
-        if (prog!=nullptr) prog->timerFunc();
-    }
+    void IRAM_ATTR timerFunc();
 };

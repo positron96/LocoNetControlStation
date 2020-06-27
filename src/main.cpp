@@ -11,6 +11,10 @@
 #include "LocoNetSerial.h"
 #include "LbServer.h"
 
+
+#include <WiFi.h>
+#include <ESPmDNS.h>
+
 //#include "WiThrottle.h"
 
 LocoNetBus bus;
@@ -22,29 +26,24 @@ LocoNetBus bus;
 LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 LocoNetDispatcher parser(&bus);
 
-#define DCC_PIN 19
-#define DCC_PIN_EN 23
-#define DCC_PIN_SENSE 35
-
 
 #define LBSERVER_TCP_PORT  1234
 LbServer lbServer(1234, &bus);
 
-LocoNetSerial lSerial(&Serial, &bus);
+//LocoNetSerial lSerial(&Serial, &bus);
 
-LocoNetSlotManager slotMan(&bus);
 
+
+
+#define DCC_PIN 19
+#define DCC_PIN_EN 23
+#define DCC_PIN_SENSE 35
 DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
 DCCESP32SignalGenerator dcc(1); //timer1
+LocoNetSlotManager slotMan(&bus);
 
 //WiThrottleServer withrottleServer;
 
-/*
-#include <WiFi.h>
-#include <ESPmDNS.h>
-
-
-*/
 
 #define IN_PIN 25
 int inState = HIGH;
@@ -53,16 +52,15 @@ unsigned long nextDccMeter = 0;
 
 
 void setup() {
-  
+
+    Serial.begin(115200);
+    Serial.println("Ultimate LocoNet Command Station");
+
     pinMode(IN_PIN, INPUT_PULLUP);
     pinMode(LED_BUILTIN, OUTPUT);
 
-    Serial.begin(115200);
-    Serial.println("LocoNet");
-
     locoNet.begin();
-    lSerial.begin();
-
+    //lSerial.begin();
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
         Serial.print("rx'd ");
@@ -76,10 +74,6 @@ void setup() {
         }
         Serial.print("\r\n");
 
-        switch(rxPacket->data[0]) {
-            case OPC_GPON: break;
-            case OPC_GPOFF: break;
-        }
     });
 
 
@@ -124,7 +118,6 @@ void setup() {
 	}
     */
 
-/*
     
     WiFi.begin("MelNet", "melnikov-network");
 
@@ -138,14 +131,12 @@ void setup() {
     Serial.println("IP address: ");
     Serial.println(WiFi.localIP());
 
-    lbServer.begin();
-
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName("OpenCommandStation");
 
-    withrottleServer.begin();
-    */
+    lbServer.begin();
+    //withrottleServer.begin(); 
 
 }
 
@@ -153,25 +144,26 @@ void setup() {
 void loop() {
 
     lbServer.loop();
-    lSerial.loop();
+    //lSerial.loop();
     
+    /*
     if(millis()>nextDccMeter) {
         uint16_t v = dccMain.readCurrent() ;
         if(v > 15) dccMain.setPower(false);
         nextDccMeter = millis()+20;
-    }
-/*
+    }*/
+
     if(millis()>nextInRead) {
         int v = digitalRead(IN_PIN);
         if(v!=inState) {
             Serial.printf( "reporting sensor %d\n", v==LOW) ;
-            locoNet.reportSensor(10, v==LOW);// it's pulled up when idle.
+            reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
             
             inState = v;
             Serial.printf("errs: rx:%d,  tx:%d\n", locoNet.getRxStats()->rxErrors, locoNet.getTxStats()->txErrors );
             nextInRead = millis()+10;
             delay(1);
         }
-    }*/
+    }
 
 }

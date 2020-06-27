@@ -9,7 +9,16 @@
 #include <etl/bitset.h>
 
 #include "DCC.h"
-#include "debug.h"
+
+
+#define CS_DEBUG
+
+#ifdef CS_DEBUG
+#include <Arduino.h>
+#define CS_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#else
+#define CS_DEBUGF
+#endif
 
 
 enum class TurnoutState {
@@ -41,7 +50,7 @@ public:
 
     void setDccMain(DCCESP32Channel * ch) { dccMain = ch; }
 
-    void turnPower(bool v) {
+    void setPowerState(bool v) {
         dccMain->setPower(v);
     }
 
@@ -106,16 +115,9 @@ public:
     }
 
     uint8_t locateFreeSlot() {
-        /*auto it = locoSlot.find(addr);
-        if(it != locoSlot.end() ) {
-            return it->second;
-        }*/
         if(locoSlot.size() < MAX_SLOTS) {
             for(int i=0; i<MAX_SLOTS; i++) {
                 if(!slots[i].allocated() ) {
-                    /*slots[i].addr = addr;
-                    uint8_t slot = i+1;
-                    locoSlot[addr] = slot;*/
                     return i+1;
                 }
             }
@@ -123,7 +125,7 @@ public:
         return 0;
     }
 
-    void allocateLocoSlot(uint8_t slot, LocoAddress addr) {
+    void initLocoSlot(uint8_t slot, LocoAddress addr) {
         LocoData &_slot = getSlot(slot);
         _slot.addr = addr;
         _slot.dir = 1;
@@ -138,32 +140,42 @@ public:
         uint8_t slot = findLocoSlot(addr);
         if(slot==0) {
             slot = locateFreeSlot();
-            if(slot!=0) allocateLocoSlot(slot, addr);
+            if(slot!=0) initLocoSlot(slot, addr);
         }
         return slot;
     }
 
     void releaseLocoSlot(uint8_t slot) {
-        if(slot==0) { DEBUGS("CommandStation::releaseSlot: invalid slot"); return; }
-        uint8_t i = slot-1;        
-        locoSlot.erase( slots[i].addr );
+        if(slot==0) { CS_DEBUGF("CommandStation::releaseSlot: invalid slot\n"); return; }
+        uint8_t i = slot-1;
+        CS_DEBUGF("CommandStation::releaseSlot: releasing slot %d\n", slot); 
+        setLocoRefresh(slot, false);
+        locoSlot.erase( slots[i].addr );        
         slots[i].deallocate();
-        dccMain->unload(slot);
     }
 
     void setLocoRefresh(uint8_t slot, bool refresh) {
-        if(slot==0) { DEBUGS("CommandStation::releaseSlot: invalid slot"); return; }
-
-        getSlot(slot).refreshing = refresh;
+        if(slot==0) { CS_DEBUGF("CommandStation::releaseSlot: invalid slot\n"); return; }
+        LocoData &dd = getSlot(slot);
+        if(dd.refreshing == refresh) return;
+        CS_DEBUGF("CommandStation::setLocoRefresh: slot %d refresh %d\n", slot, refresh); 
+        dd.refreshing = refresh;
+        if(refresh) {
+            
+        } else {
+            dccMain->unload(slot);
+        }
     }
 
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
+        if(dd.fn[fn] == val) return;
+
         dd.fn[fn] = val;
         DCCFnGroup fg;
         
         uint32_t ifn = dd.fn.value<uint32_t>();
-        if(fn<5)       fg = DCCFnGroup::F0_4;
+        if     (fn<5)  fg = DCCFnGroup::F0_4;
         else if(fn<9)  fg = DCCFnGroup::F5_8;
         else if(fn<13) fg = DCCFnGroup::F9_12;
         else if(fn<21) fg = DCCFnGroup::F13_20;
@@ -171,15 +183,19 @@ public:
         dccMain->setFunctionGroup(slot, dd.addr.addr(), fg, ifn);
     }
 
-    void setLocoFnGroup(uint8_t slot, uint32_t m, uint32_t f ) {
+    void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
         LocoData &dd = getSlot(slot);
         uint32_t v = dd.fn.value<uint32_t>();
+        // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current
+        // update bits (v=) and set function group
+        #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
+            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->setFunctionGroup(slot, dd.addr.addr(), FG, v ); }  
 
-        if((m & 0x1F) != 0)       { v= (v & 0xFFFFFFE0) | (f & m & 0x1F);      dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F0_4, v ); }  
-        if((m & 0x1E0) != 0)      { v= (v & 0xFFFFFE1F) | (f & m & 0x1E0);     dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F5_8, v ); }
-        if((m & 0x1E00) != 0)     { v= (v & 0xFFFFE1FF) | (f & m & 0x1E00);    dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F9_12, v ); }
-        if((m & 0x1FE000) != 0)   { v= (v & 0xFFE01FFF) | (f & m & 0x1FE000);  dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F13_20, v ); }
-        if((m & 0x1FE00000) != 0) { v= (v & 0xE01FFFFF) | (f & m & 0x1FE00000);dccMain->setFunctionGroup(slot, dd.addr.addr(), DCCFnGroup::F21_28, v ); }
+        CHECK_SEND(     0x1F, DCCFnGroup::F0_4);
+        CHECK_SEND(    0x1E0, DCCFnGroup::F5_8);
+        CHECK_SEND(   0x1E00, DCCFnGroup::F9_12);
+        CHECK_SEND( 0x1FE000, DCCFnGroup::F13_20);
+        CHECK_SEND(0x1FE0000, DCCFnGroup::F21_28);
         dd.fn = LocoData::Fns( v );
     }
 
@@ -193,6 +209,7 @@ public:
      * */
     void setLocoDir(uint8_t slot, uint8_t dir) {
         LocoData &dd = getSlot(slot);
+        if(dd.dir==dir) return; 
         dd.dir = dir;
         dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
     }
@@ -204,6 +221,7 @@ public:
     /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
     void setLocoSpeed(uint8_t slot, uint8_t spd) {
         LocoData &dd = getSlot(slot);
+        if(dd.speed == spd) return;
         dd.speed = spd;
         dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
     }
@@ -236,7 +254,7 @@ private:
     LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
 
     TurnoutState turnoutAction(uint16_t aAddr, bool namedTurnout, int8_t newStat) {
-        DEBUGS(String("turnout action, addr=")+aAddr+"; named:"+namedTurnout );
+        CS_DEBUGF("CommandStation::turnoutAction addr=%d named=%d new state=%d\n", aAddr, namedTurnout, newStat );
 
         if(namedTurnout) {
             

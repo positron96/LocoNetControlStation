@@ -6,7 +6,9 @@
 class LocoNetSerial: public LocoNetConsumer {
 
 public:
-    LocoNetSerial(Stream * const str, LocoNetBus * const bus) : stream(str), bus(bus) {}
+    LocoNetSerial(Stream * const str, LocoNetBus * const bus) : stream(str), bus(bus) {
+        bus->addConsumer(this);
+    }
 
     void begin() {}
 

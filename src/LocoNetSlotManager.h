@@ -1,9 +1,16 @@
 #pragma once
 
 #include <Arduino.h>
-
 #include <LocoNet.h>
 #include "CommandStation.h"
+
+#define LNSM_DEBUG
+
+#ifdef LNSM_DEBUG
+#define LNSM_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#else
+#define LNSM_DEBUGF(...)
+#endif
 
 class LocoNetSlotManager : public LocoNetConsumer {
 
@@ -24,8 +31,8 @@ public:
         sd.stat = DEC_MODE_128 | LOCO_FREE;
         sd.adr = addrLo; 
         sd.spd = 0; 
-        sd.dirf = 0;
-        sd.trk = GTRK_POWER & GTRK_MLOK1; // POWER ON & Loconet 1.1 by default; 
+        sd.dirf = DIRF_DIR;  // FWD
+        sd.trk = GTRK_IDLE | GTRK_POWER | GTRK_MLOK1; // POWER ON & Loconet 1.1 by default; 
         sd.ss2 = 0; 
         sd.adr2 = addrHi; 
         sd.snd = 0; 
@@ -41,6 +48,12 @@ public:
     void processMessage(const lnMsg* msg) {
 
         switch(msg->data[0]) {
+            case OPC_GPON:
+                CS.setPowerState(true);
+                break;
+            case OPC_GPOFF:
+                CS.setPowerState(false);
+                break;
             case OPC_LOCO_ADR: {
                 int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
                 if(slot<=0) {
@@ -50,7 +63,7 @@ public:
                 }
                 
                 sendSlotData(slot);
-                Serial.printf("OPC_LOCO_ADR for addr %d, slot is %d\n", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                LNSM_DEBUGF("OPC_LOCO_ADR for addr %d, slot is %d\n", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
                 break;
             }
             case OPC_MOVE_SLOTS: {
@@ -58,7 +71,7 @@ public:
                     sendLack(OPC_MOVE_SLOTS);
                 } else {
                     uint8_t slot = msg->ss.slot;
-                    Serial.printf("OPC_MOVE_SLOTS NULL MOVE for slot %d\n", slot );
+                    LNSM_DEBUGF("OPC_MOVE_SLOTS NULL MOVE for slot %d\n", slot );
                     _slots[slot].stat |= LOCO_IN_USE;
                     CS.setLocoRefresh(slot, true);
                     sendSlotData(slot);
@@ -94,9 +107,11 @@ public:
                 uint8_t slot = m.slot;
                 if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; } 
                 rwSlotDataMsg &_slot = _slots[slot];
+
+                if(_slot.stat != m.stat) processStat1(slot, m.stat);
+                if( !CS.isSlotAllocated(slot) ) return; // stat1 sets slot to inactive, do not continue
                 if(_slot.spd != m.spd) processSpd(slot, m.spd);
                 if(_slot.dirf != m.dirf) processDirf(slot, m.dirf);
-                if(_slot.stat != m.stat) processStat1(slot, m.stat);
                 if(_slot.snd != m.snd) processSnd(slot, m.snd);
                 
                 _slot.adr = m.adr;
@@ -108,13 +123,13 @@ public:
 
                 //_slot = msg->sd;
 
-                Serial.printf("OPC_WR_SL_DATA slot %d\n", slot);
+                LNSM_DEBUGF("OPC_WR_SL_DATA slot %d\n", slot);
                 break;
             }
             case OPC_RQ_SL_DATA: {
                 uint8_t slot = msg->sr.slot;
                 if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;} 
-                Serial.printf("OPC_RQ_SL_DATA slot %d\n", slot);
+                LNSM_DEBUGF("OPC_RQ_SL_DATA slot %d\n", slot);
                 sendSlotData(slot);
             }
         }
@@ -134,61 +149,73 @@ private:
         return (slot>=1) && (slot < MAX_SLOTS);
     }
 
-    static void setMasked(uint8_t &val, uint8_t mask, uint8_t v) {
-        val = ( val & ~mask) | v;
-    }
-
     int locateSlot(uint8_t hi, uint8_t lo) {
         LocoAddress addr = hi==0 ? LocoAddress::shortAddr(lo) : LocoAddress::longAddr(ADDR(hi,lo));
-        return CS.findOrAllocateLocoSlot(addr);
+        uint8_t slot = CS.findLocoSlot(addr);
+        if(slot==0) {
+            slot = CS.locateFreeSlot();
+            if(slot==0) return 0;
+            CS.initLocoSlot(slot, addr);
+            initSlot(slot, hi, lo);
+        }
+        return slot;
+    }
+
+    void releaseSlot(uint8_t slot) {
+        CS.releaseLocoSlot(slot);
+        _slots[slot].stat &= ~STAT1_SL_BUSY;
     }
 
     void sendSlotData(uint8_t slot) {        
         LnMsg ret;
         ret.sd = _slots[slot];
-        Serial.print("tx'd");
-        for(uint8_t i=0; i<lnPacketSize(&ret); i++) {
-            Serial.printf(" %02X", ret.data[i]);
+        LNSM_DEBUGF("LocoNetSlotManager::sendSlotData: sending ");
+        for(uint8_t i=0; i<ret.length(); i++) {
+            LNSM_DEBUGF(" %02X", ret.data[i]);
         }
-        Serial.println("");
+        LNSM_DEBUGF("\n");
 
-        //_ln->send(&ret);
         _ln->broadcast(ret, this);
     }
 
     void sendLack(uint8_t cmd, uint8_t arg=0) {
         LnMsg lack = makeLongAck(cmd, arg); 
-        //_ln->send(&lack); 
         _ln->broadcast(lack, this);
     }
 
     void processDirf(uint8_t slot, uint v) {
-        Serial.printf("OPC_LOCO_DIRF slot %d dirf %02x\n", slot, v);
+        LNSM_DEBUGF("OPC_LOCO_DIRF slot %d dirf %02x\n", slot, v);
         _slots[slot].dirf = v;
-        CS.setLocoDir(slot, v);
-        CS.setLocoFnGroup(slot, 0x1F, (v & 0xF)<<1 | (v & 0x10)>>4 );// fn order in this byte is 04321
+        uint8_t dir = (v & DIRF_DIR) == DIRF_DIR ? 1 : 0;
+        CS.setLocoDir(slot, dir);
+        CS.setLocoFns(slot, 0x1F, (v & B00001111)<<1 | (v & B00010000)>>4 );  // fn order in this byte is 04321
     }
 
     void processSnd(uint8_t slot, uint8_t snd) {
+        LNSM_DEBUGF("OPC_LOCO_SND slot %d snd %02x\n", slot, snd);
+        CS.setLocoFns(slot, 0x1E0, snd << 5 );
         _slots[slot].snd = snd;
-        Serial.printf("OPC_LOCO_SND slot %d snd %02x\n", slot, snd);
-        CS.setLocoFnGroup(slot, 0x1E0, snd << 5 );
     }
 
     void processStat1(uint8_t slot, uint8_t stat) {
-        Serial.printf("OPC_SLOT_STAT1 slot %d stat1 %02x\n", slot, stat);
+        LNSM_DEBUGF("OPC_SLOT_STAT1 slot %d stat1 %02x\n", slot, stat);
 
         if( (_slots[slot].stat & LOCOSTAT_MASK) != (stat&LOCOSTAT_MASK) ) {
-            Serial.println("Changing active+busy");
+            LNSM_DEBUGF("Changing active+busy: %02x\n", stat&LOCOSTAT_MASK);
+            if( (stat & STAT1_SL_BUSY) == 0) { 
+                releaseSlot(slot);
+                return;
+            }
+
             CS.setLocoRefresh(slot, (stat & STAT1_SL_ACTIVE) != 0);
         }
         _slots[slot].stat = stat;
     }
 
     void processSpd(uint8_t slot, uint8_t spd) {
-        _slots[slot].spd = spd;
-        Serial.printf("OPC_LOCO_SPD slot %d spd %02x\n", slot, spd);
+        LNSM_DEBUGF("OPC_LOCO_SPD slot %d spd %d\n", slot, spd);
         CS.setLocoSpeed(slot, spd);
+        _slots[slot].spd = spd;
     }
 
 };

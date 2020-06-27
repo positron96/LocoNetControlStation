@@ -45,7 +45,7 @@ void WiThrottleServer::loop() {
         if (cli) { // connected client
             while(cli.available()>0) { 
                 String dataStr = cli.readStringUntil('\n'); 
-                if (LOG_WIFI) DEBUGS("WT>> "+dataStr);
+                LOG_WIFI("WT>> "+dataStr);
                 if(cc.heartbeatEnabled) { 
                     cc.lastHeartbeat = millis();
                 }

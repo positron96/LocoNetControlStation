@@ -1,7 +1,5 @@
 #include "DCC.h"
 
-DCCESP32SignalGenerator * DCCESP32SignalGenerator::_inst = nullptr;
-
 uint8_t DCCESP32Channel::RegisterList::idlePacket[3] = {0xFF, 0x00, 0}; 
 uint8_t DCCESP32Channel::RegisterList::resetPacket[3] = {0x00, 0x00, 0};
 
@@ -29,8 +27,11 @@ DCCESP32Channel::RegisterList::~RegisterList() {
 }
 
 void DCCESP32Channel::RegisterList::loadPacket(int nReg, uint8_t *b, uint8_t nBytes, int nRepeat) {
+
+    DCC_DEBUGF("DCCESP32Channel::loadPacket %d len=%d, repeat=%d\n", nReg, nBytes, nRepeat);
+
     // force nReg to be between 0 and maxNumRegs, inclusive
-    nReg = nReg % (maxNumRegs+1);        
+    nReg = nReg % (maxNumRegs+1);
 
     // pause while there is a Register already waiting to be updated -- nextReg will be reset to NULL by timer when prior Register updated fully processed
     while(nextReg != nullptr) delay(1);             
@@ -39,13 +40,13 @@ void DCCESP32Channel::RegisterList::loadPacket(int nReg, uint8_t *b, uint8_t nBy
     // set Register Pointer for this Register Number to next available Register
     if(regMap[nReg] == nullptr) {        
         regMap[nReg] = maxLoadedReg + 1;   
-        Serial.printf("loadPacket:: Allocating new reg %d\n", nReg);
+        DCC_DEBUGF("loadPacket:: Allocating new reg %d\n", nReg);
     }
     
     Register *r = regMap[nReg];
     Packet *p = r->updatePacket;
     uint8_t *buf = p->buf;
-            
+
     // copy first byte into what will become the checksum byte 
     // XOR remaining bytes into checksum byte 
     b[nBytes] = b[0];                        
@@ -84,11 +85,12 @@ void DCCESP32Channel::RegisterList::loadPacket(int nReg, uint8_t *b, uint8_t nBy
     nextReg = r;
     this->nRepeat = nRepeat;
     maxLoadedReg = max(maxLoadedReg, nextReg);
+
 }
 
 
 void DCCESP32Channel::nextBit() {
-    const uint8_t bitMask[] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+    //const uint8_t bitMask[] = {  0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01  };
 
     // IF no more bits in this DCC Packet, reset current bit pointer and determine which Register and Packet to process next  
 	if(R.currentBit==R.currentReg->activePacket->nBits) {
@@ -116,7 +118,7 @@ void DCCESP32Channel::nextBit() {
         }                                        
 	} // currentReg, activePacket, and currentBit should now be properly set to point to next DCC bit
 
-	if(R.currentReg->activePacket->buf[R.currentBit/8] & bitMask[R.currentBit%8] ) {  
+	if(R.currentReg->activePacket->buf[R.currentBit/8] & (1<<(R.currentBit%8)) ) {  
 		/* For "1" bit, we need 1 periods of 58us timer ticks for each signal level */ 
 		R.timerPeriods = 1; 
 		R.timerPeriodsLeft = 2; 
@@ -133,11 +135,55 @@ void DCCESP32Channel::nextBit() {
 void DCCESP32Channel::timerFunc() {
     R.timerPeriodsLeft--;                          
 	if(R.timerPeriodsLeft == R.timerPeriods) {
-        digitalWrite(_outputPin, 1-digitalRead(_outputPin) );
+        digitalWrite(_outputPin, HIGH );
 	}                                              
 	if(R.timerPeriodsLeft == 0) {                  
-		digitalWrite(_outputPin, 1-digitalRead(_outputPin) );
+		digitalWrite(_outputPin, LOW );
 		nextBit();                           
 	}
+
     //current = readCurrent(); 
+}
+
+
+
+static DCCESP32SignalGenerator * _inst = nullptr;
+
+
+void IRAM_ATTR timerCallback() {
+    _inst->timerFunc();
+}
+
+DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum) 
+    : _timerNum(timerNum) 
+{
+    _inst = this;
+}
+
+void DCCESP32SignalGenerator::begin() {
+    if (main!=nullptr) main->begin();
+    if (prog!=nullptr) prog->begin();
+
+    _timer = timerBegin(_timerNum, 464, true);
+    timerAttachInterrupt(_timer, timerCallback, true);
+    timerAlarmWrite(_timer, 10, true);
+    timerAlarmEnable(_timer);
+    timerStart(_timer);
+}
+
+void DCCESP32SignalGenerator::end() {
+    if(_timer!=nullptr) {
+        if(timerStarted(_timer) ) timerStop(_timer);
+        timerEnd(_timer);
+        _timer = nullptr;
+    }
+    if (main!=nullptr) main->end();
+    if (prog!=nullptr) prog->end();
+}
+
+void DCCESP32SignalGenerator::timerFunc() {
+    
+    if (main!=nullptr) main->timerFunc();
+    if (prog!=nullptr) prog->timerFunc();
+
 }
