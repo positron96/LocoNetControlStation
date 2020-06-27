@@ -1,11 +1,9 @@
-= LocoNet(R) Personal Use Edition 1.0 SPECIFICATION
-Digitrax Inc., Panama City, FL 32404.
-1.0, October 16, 1997. Copyrighted material, all rights reserved.
+= Comprehensive LocoNet(R) Personal Use Edition 1.0 Specification With Comments
+Based on **LocoNet(R) Personal Use Edition 1.0 Specification** by Digitrax Inc., Panama City, FL 32404. 1.0, October 16, 1997, all rights reserved.
 
 :doctype: book
-:listdef-labeled.style: horizontal
-:listdef-labeled2.style: horizontal
 :toc:
+
 ifdef::env-github[]
 :tip-caption: :bulb:
 :note-caption: :information_source:
@@ -266,23 +264,19 @@ the 10 data bytes is not the same as a "normal" slot. See later.
 
 ### Standard address selection
 
-To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a LOCOMOTIVE address for use (opcode <<OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). The Master (or PC
-in a Limited Master environment) responds with a SLOT DATA READ for the SLOT, ( opcode `<E7>...`)
-,that contains this Locomotive address and all of its state information. If the address is currently not in
-any SLOT, the master will load this NEW locomotive address into a new SLOT (speed=0, FWD,
-Lite/Functions OFF and 128 step mode) and return this as a SLOT DATA READ. If no inactive slots are
-free to load the NEW locomotive address, the response will be the Long Acknowledgment (opcode
-`<B4>`) with a "fail" code, 0.
+To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a locomotive address for use (opcode <<OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). 
+The Master (or PC in a Limited Master environment) responds with a <<OPC_SLOT_RD_DATA, SLOT DATA READ>> for the SLOT, (opcode `<E7>...`)>, that contains this locomotive address and all of its state information.
+If the address is currently not in any SLOT, the master will load this NEW locomotive address into a new SLOT (speed=0, FWD, Light/Functions OFF and 128 step mode) and return this as a SLOT DATA READ.
+If no inactive slots are free to load the NEW locomotive address, the response will be the <<OPC_LACK, Long Acknowledgment>> (opcode `<B4>`) with a "fail" code, 0.
 
-Note that regular "SHORT" 7 bit NMRA addresses are denoted by <loco-adr hi>=0. The Analog, Zero
-stretched, loco is selected when both <loco adr hi>=<loco adr lo>=0. <Loco adr lo> is always a 7 bit
-value. If <loco adr hi> is non-zero then the Master will generate NMRA type 14 bit or "LONG" address
-packets using all 14 bits from <loco adr hi> and <loco adr lo> with Loco adr Hi being the MOST
-significant address bits. Note that a DT200 Master does NOT process 14 bit adr requests and will consider
-the <loco adr hi> to always zero. You can check the <TRK> return bits to see if the Master is a DT200.
+Note that regular "SHORT" 7 bit NMRA addresses are denoted by `<loco adr hi>=0`.
+The Analog, Zero stretched, loco is selected when both `<loco adr hi>=<loco adr lo>=0`. `<loco adr lo>` is always a 7 bit value.
+If `<loco adr hi>` is non-zero then the Master will generate NMRA type 14 bit or "LONG" address packets using all 14 bits from `<loco adr hi>` and `<loco adr lo>` with `<loco adr hi>` being the most significant address bits.
+Note that a DT200 Master **does not** process 14 bit address requests and will consider the <loco adr hi> to always be zero.
+You can check the <<arg_slot_trk,`<TRK>`>> return bits to see if the Master is a DT200.
 
 *The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* 
-If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREEfootnote:["NEW" in original] the throttle
+[[status1]]If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREE ("NEW" in original spec) the throttle
 may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<OPC_MOVE_SLOTS>>
 `<BA>,<slotX>,<slotX>,<chk>`) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
 
@@ -626,13 +620,13 @@ TOP is loco with SPD/DIR for whole consist. (top of list).
 --
 
 D5 SL_BUSY::
-D4 SL_ACTIVE:: BUSY/ACTIVE: bit encoding for SLOT activity
+D4 SL_ACTIVE:: BUSY(slot is allocaed by some throttle)/ACTIVE(slot data is sent to track): bit encoding for SLOT activity
 +
 [horizontal]
-11:::: IN_USE loco adr in SLOT - REFRESHED
-10:::: IDLE loco adr in SLOT - NOT refreshed
-01:::: COMMON loco adr IN SLOT - refreshed
-00:::: FREE SLOT, no valid DATA - not refreshed
+11:::: IN_USE - **refreshed**
+10:::: IDLE - not refreshed, allocated but can be given to new throttle, see <<status1, this section>>
+01:::: COMMON - **refreshed**, can be given to new throttle
+00:::: FREE - not refreshed, can be given to new throttle
 
 D3 SL_CONDN:: Shows other SLOT Consist linked INTO this slot, see SL_CONUP
 
@@ -650,7 +644,7 @@ D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT:
 
 2. [[arg_slot_adr]]SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
 
-3. [[arg_slopt_spd]]SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
+3. [[arg_slot_spd]]SLOT SPEED (byte also sent as ARG2 in SPD opcode <A0> )
 [horizontal]
 0x00:: SPEED 0 STOP inertially
 0x01:: SPEED 0 EMERGENCY stop
@@ -672,10 +666,10 @@ D0-SL_F1:: 1=F1 ON
 +
 [horizontal]
 D7-D4:: Reserved
-D3 GTRK_PROG_BUSY:: 1=Programming TRACK in this Master is BUSY.
-D2 GTRK_MLOK1:: 1=This Master IMPLEMENTS LocoNet 1.1 capability, 0=Master is DT200
-D1 GTRK_IDLE:: 0=TRACK is PAUSED, B'cast EMERG STOP.
-D0 GTRK_POWER:: 1=DCC packets are ON in MASTER, Global POWER up
+D3 GTRK_PROG_BUSY:: 1=Programming track in this Master is BUSY.
+D2 GTRK_MLOK1:: 1=This Master implements LocoNet 1.1 capability, 0=Master is DT200
+D1 GTRK_IDLE:: 0=track is paused, B'cast EMERG STOP.
+D0 GTRK_POWER:: 1=DCC packets are on in master, global power up
 
 6. [[arg_slot_stat2]]SLOT STATUS2:
 [horizontal]
