@@ -72,7 +72,7 @@ public:
     
     void loadTurnouts() {
         turnoutData[0] = { 10, 1, 100, TurnoutState::CLOSED };
-        turnoutData[1] = { 20, 2, 200, TurnoutState::CLOSED };
+        turnoutData[1] = { 20, 2, 200, TurnoutState::THROWN };
         /*sendDCCppCmd("T");
         waitForDCCpp();
         int t = 0;

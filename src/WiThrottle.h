@@ -23,8 +23,8 @@
 #define WT_DEBUGF(...)
 #endif
 
-#define LOG_WIFI  
-//#define LOG_WIFI(v)   { Serial.println(v); }
+//#define LOG_WIFI  
+#define LOG_WIFI(v)   { Serial.println(v); }
 
 class WiThrottleServer {
 public:
@@ -33,13 +33,16 @@ public:
 
     void begin() {
 
-        WT_DEBUGF("WiThrottleServer::begin");
+        WT_DEBUGF("WiThrottleServer::begin\n");
 
         server.begin();
 
         //MDNS.begin(hostString);
         MDNS.addService("withrottle","tcp", port);
         //MDNS.setInstanceName("DCC++ Network Interface");
+
+        notifyPowerStatus();
+
 
     }
 
@@ -81,18 +84,19 @@ private:
 
     char powerStatus = '0';
 
-    void notifyPowerStatus() {
+    void notifyPowerStatus(int8_t iClient=-1) {
         bool v = CS.getPowerState();
         powerStatus = v ? '1' : '0';
-        for (int p=0; p<MAX_CLIENTS; p++) {
-            if (clientData[p].connected) {
-                clients[p].println("PPA"+powerStatus);
+        if(iClient==-1) {
+            for (int p=0; p<MAX_CLIENTS; p++) {
+                if (clients[p]) wifiPrintln(p, String("PPA")+powerStatus);
             }
-        }
+        } else if(clients[iClient]) wifiPrintln(iClient, String("PPA")+powerStatus);
     }
 
     void turnPower(char v) {
         CS.setPowerState(v=='1');
+        notifyPowerStatus();
     }
 
 
@@ -105,9 +109,9 @@ private:
         LOG_WIFI("WF<< "+v);
     }
 
-    void throttleStart(int iClient) ;
+    void clientStart(int iClient) ;
 
-    void throttleStop(int iClient);
+    void clientStop(int iClient);
 
     void locoAdd(char th, String sLocoAddr, int iClient);
 

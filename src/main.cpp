@@ -15,7 +15,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 
-//#include "WiThrottle.h"
+#include "WiThrottle.h"
 
 LocoNetBus bus;
 
@@ -34,7 +34,6 @@ LbServer lbServer(1234, &bus);
 
 
 
-
 #define DCC_PIN 19
 #define DCC_PIN_EN 23
 #define DCC_PIN_SENSE 35
@@ -42,7 +41,7 @@ DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
 DCCESP32SignalGenerator dcc(1); //timer1
 LocoNetSlotManager slotMan(&bus);
 
-//WiThrottleServer withrottleServer;
+WiThrottleServer withrottleServer;
 
 
 #define IN_PIN 25
@@ -136,7 +135,7 @@ void setup() {
 	MDNS.setInstanceName("OpenCommandStation");
 
     lbServer.begin();
-    //withrottleServer.begin(); 
+    withrottleServer.begin(); 
 
 }
 
@@ -144,6 +143,7 @@ void setup() {
 void loop() {
 
     lbServer.loop();
+    withrottleServer.loop();
     //lSerial.loop();
     
     /*

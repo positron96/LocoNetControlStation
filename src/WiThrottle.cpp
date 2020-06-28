@@ -7,8 +7,8 @@
 
 /* Network parameters */
 #define TURNOUT_PREF "LT"
-#define TURNOUT_CLOSED 2
-#define TURNOUT_THROWN 4
+#define TURNOUT_CLOSED '2'
+#define TURNOUT_THROWN '4'
     
 /*
 StringSumHelper & operator +(const StringSumHelper &lhs, const LocoAddress a) {
@@ -38,9 +38,9 @@ void WiThrottleServer::loop() {
         WiFiClient& cli = clients[iClient];
         ClientData& cc = clientData[iClient];
         if (!cli) {
-            if(cc.connected) throttleStop(iClient);
+            if(cc.connected) clientStop(iClient);
             cli = server.available();
-            if(cli) throttleStart(iClient);
+            if(cli) clientStart(iClient);
         } 
         if (cli) { // connected client
             while(cli.available()>0) { 
@@ -116,7 +116,7 @@ void WiThrottleServer::loop() {
     }
 }
 
-void WiThrottleServer::throttleStart(int iClient) {
+void WiThrottleServer::clientStart(int iClient) {
     clients[iClient].flush();
     clients[iClient].setTimeout(500);
     DEBUGS( "New client " );
@@ -137,7 +137,7 @@ void WiThrottleServer::throttleStart(int iClient) {
     cc.connected = true;
 }
 
-void WiThrottleServer::throttleStop(int iClient) {
+void WiThrottleServer::clientStop(int iClient) {
     clients[iClient].stop();
     DEBUGS("Client lost");
     //alreadyConnected[iClient] = false;
@@ -280,27 +280,29 @@ void WiThrottleServer::accessoryToggle(int aAddr, char aStatus, bool namedTurnou
 
     TurnoutState newStat;
     switch(aStatus) {
+        case TURNOUT_THROWN:
         case 'T': 
             newStat = CS.turnoutAction(aAddr, namedTurnout, TurnoutState::THROWN);
             break;
+        case TURNOUT_CLOSED:
         case 'C': 
             newStat = CS.turnoutAction(aAddr, namedTurnout, TurnoutState::CLOSED);
             break;
-        case '2': 
+        case '3': 
             newStat = CS.turnoutToggle(aAddr, namedTurnout);
             break;
         default: return;
     }
 
 
-    int wStat = 3; // unknown
+    char cStat = '3'; // unknown
     switch(newStat) {
-        case TurnoutState::THROWN: wStat = TURNOUT_THROWN; break;
-        case TurnoutState::CLOSED: wStat = TURNOUT_CLOSED; break;
+        case TurnoutState::THROWN: cStat = TURNOUT_THROWN; break;
+        case TurnoutState::CLOSED: cStat = TURNOUT_CLOSED; break;
     }
 
     for (int i=0; i<MAX_CLIENTS; i++) {
-        if(clients[i]) wifiPrintln(i, String("PTA")+wStat+(namedTurnout?TURNOUT_PREF:"")+aAddr);
+        if(clients[i]) wifiPrintln(i, String("PTA")+cStat+(namedTurnout?TURNOUT_PREF:"")+aAddr);
     }
 
 }
