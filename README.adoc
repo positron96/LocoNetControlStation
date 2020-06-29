@@ -83,3 +83,18 @@ The implementation is based on these libraries:
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
 
+## Pins
+
+Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+
+* LocoNet
+** TX - UART OUT  - 25
+** RX - UART IN   - 26
+* DCC Main
+** Data - OUT     - 16  OK
+** Enable - OUT   - 17  OK
+** Sense - Analog IN   - 36  in only
+* DCC Prog
+** Data - OUT     - 18  OK
+** Enable - OUT   - 23  OK
+** Sense - Analog In   - 39  in only
