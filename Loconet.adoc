@@ -97,19 +97,20 @@ Pinouts for the RJ11/6 connector are:
 6. RAIL_SYNC+ {nbsp}{nbsp}{nbsp}{nbsp} [blue]#blue#
 
 
-Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2,000', with no point-to-point length exceeding 1000'. This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors. [The capacitance of 2,000' of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000' ].
+Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2,000', with no point-to-point length exceeding 1000'. 
+This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors. 
+[The capacitance of 2,000' of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000' ].
 
 The maximum amount of parallel cable is limited by the requirement that the minimum RISE
-TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. The minimum FALL TIME
-in the same region should be greater than 0.75 Volts per microsecond
+TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. 
+The minimum FALL TIME in the same region should be greater than 0.75 Volts per microsecond
 
 
 ### Electrical
 
 LocoNet(R) is a "Wired-Or" multiple access linear network using CSMA/CD techniques.
-Repeaters, network buffers and isolators can be implemented. For the current SINGLE ENDED
-implementation, the 2 LocoNet signals ,+ and -, are paralleled and the RJ11 cable connections become
-polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
+Repeaters, network buffers and isolators can be implemented. 
+For the current SINGLE ENDED implementation, the 2 LocoNet signals, + and -, are paralleled and the RJ11 cable connections become polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
 
 SINGLE ENDED voltage levels and characteristics are:
 
@@ -117,15 +118,23 @@ SINGLE ENDED voltage levels and characteristics are:
 . High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground conductors.
 . Low = 0 = "SPACE" : LOCONET+/- voltage below +4.0 Volts with respect to grounds.
 . The data should be received with 1.0 volt of HYSTERESIS centered on +4.0 volts.
-. Maximum LOCONET+/- high voltage is +24V and nominal is +12V
+. Maximum LOCONET+/- high voltage is +24V and nominal is +12V.
 . Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5(gnd)
 . The Transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
-. One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals. Typical termination is performed by the packet generating "MASTER" and is a 15milliamp current source from +12V.
-. Loconet devices may draw up to 15 mA from the RAIL_SYNC+ /- lines whenever the voltage is greater than 7V. The unloaded voltage is between 12V and 26V max. It is general practice to provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttl e jacks around the layout. In this case the master "backbone" copy of RAILSYNC +/- is not on the Throttle jack.
-. The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails. The signals may be received by a differential receiver and boosted to drive the rails.
-. A device with a separate power supply isolated from LOCONET, may connect to the LOCONET+/-pins 3&4 and SIGNAL GROUND pins 2&5 with a just 2 wires.
-. To use a 1/4" Stereo 3 pin Plug , the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum , because the Plug shorts the Tip and Ring when initially
+. One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals.
+Typical termination is performed by the packet generating "MASTER" and is a 15 milliamp current source from +12V.
+. Loconet devices may draw up to 15 mA from the RAIL_SYNC +/- lines whenever the voltage is greater than 7V. 
+The unloaded voltage is between 12V and 26V max. 
+It is general practice to provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttle jacks around the layout. 
+In this case the master "backbone" copy of RAILSYNC +/- is not on the Throttle jack.
+. The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails. 
+The signals may be received by a differential receiver and boosted to drive the rails.
+. A device with a separate power supply isolated from Loconet may connect to the LOCONET+/- pins 3&4 and SIGNAL GROUND pins 2&5 with a just 2 wires.
+. To use a 1/4" (6.3 mm) stereo 3-pin plug, the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. 
+The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum, because the Plug shorts the Tip and Ring when initially
 inserted.
+
+NOTE: There must be a typo, Sleeve is mentioned twice, but Rind is not mentioned.
 
 #### Network timing
 
