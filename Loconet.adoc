@@ -387,7 +387,7 @@ Response is:
  * <<OPC_LACK, <0xB4><3D><00><CHK> >> if DCS100 FIFO is full, command rejected
  * <<OPC_LACK, <0xB4><3D><7F><CHK> >> if DCS100 accepted
 
-NOTE: JMRI treats this OPCode equally to <<OPC_SW_REQ>>
+NOTE: JMRI sends this message to command turnout in case "Bypass bush bit" flag is set. Upon receiving, JMRI treats this OPCode equally to <<OPC_SW_REQ>>.
 
 
 |[[OPC_SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<OPC_LACK>>
@@ -474,43 +474,57 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
 
 
 |[[OPC_SW_REP]]OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
-| 3+|
+| 3+a|
 `<0xB1>,<SN1>,<SN2>,<CHK>` Report of sensor (turnout) state
 
-<SN1> =<0,A6,A5,A4 - A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
+<SN1> =<0,A6,A5,A4 - A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54.
 
-<SN2> =<0,1,I,L - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
- this <B1> opcode encodes input levels for turnout feedback
-"I" =0 for "aux" inputs (normally not feedback), 1 for "switch" input used for turnout feedback for DS54 ouput/turnout # encoded by A0-A10
-"L" = 0 for this input 0V (LO), 1= this input > +6V (HI)
+<SN2> =<0,**1**,I,L - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
+This <B1> opcode encodes input levels for turnout feedback.
+
+I=0 - "aux" inputs (normally not feedback), =1 - "switch" input used for turnout feedback for DS54 ouput/turnout address (encoded by A0-A10).
+
+L=0 - input level is 0V (LO), =1 - input level > +6V (HI).
 
 Alternately:
 
-<SN2> =<0,0,C,T - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
-this <B1> opcode encodes current OUTPUT levels. 
-"C"= 0 if "Closed" ouput line is OFF, 1="closed" output line is ON (sink current). "T"=0 if "Thrown" output line is OFF, 1="thrown" output line is ON (sink I)
+<SN2> =<0,**0**,C,T - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
+This <B1> opcode encodes current OUTPUT levels. 
 
+C=0 - "Closed" output line is OFF, =1 - "Closed" output line is ON (sinks current). 
+
+T=0 - "Thrown" output line is OFF, =1 - "Thrown" output line is ON (sinks current).
+
+[NOTE]
+====
+When JMRI receives this message, it is used to decode turnout state from the data.
+====
 
 |[[OPC_SW_REQ]]OPC_SW_REQ |0xB0 | REQ SWITCH function| NO
 
 | 3+a| `<0xB0>,<SW1>,<SW2>,<CHK>` Request switch state
 
-<SW1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 input pairs in a DS54
+<SW1> =<0,A6,A5,A4 - A3,A2,A1,A0>, 7 LS address bits. A1,A0 select 1 of 4 input pairs in a DS54.
 
-<SW2> =<0,0,DIR,ON- A10,A9,A8,A7> Control bits and 4 MS adr bits.
+<SW2> =<0,0,DIR,ON - A10,A9,A8,A7> Control bits and 4 MS address bits.
 
-DIR=1 for Closed,/GREEN, = 0 for Thrown/RED
+DIR=1 - Closed/GREEN, =0 - Thrown/RED.
 
-ON=1 for Output ON, = 0 FOR output OFF
+ON=1 - Output ON, =0 - Output OFF.
 
-Immediate response of <<OPC_LACK>> `<0xB4><30><00>` if command failed, otherwise no response.
+If command fails, immediate response of <<OPC_LACK>> `<0xB4><30><00>`, otherwise no response.
 
 There are special values for SW2 for <<stationary_broadcast, stationary broadcast>> and <<stationary_interrogation, stationary interrogation>>.
 
-NOTE: JMRI treats this message as equal to <<OPC_SW_ACK>>
+[NOTE]
+====
+JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set (by default, it's not set). Otherwise, <<OPC_SW_ACK>> is used to control turnout.
+
+When received (including looped back), JMRI treats this message as equal to <<OPC_SW_ACK>>.
+====
 
 
-| 3+a| "A" class codes
+| 3+a| **"A" class codes**
 
 NOTE: CODES 0xA8 to 0xAF have responses
 
