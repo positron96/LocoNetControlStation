@@ -526,11 +526,8 @@ If command fails, immediate response of <<OPC_LACK>> `<0xB4><30><00>`, otherwise
 There are special values for SW2 for <<stationary_broadcast, stationary broadcast>> and <<stationary_interrogation, stationary interrogation>>.
 
 [NOTE]
---
 JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set (by default, it's not set). Otherwise, <<OPC_SW_ACK>> is used to control turnout.
-
 When received (including looped back), JMRI treats this message as equal to <<OPC_SW_ACK>>.
---
 
 
 | 3+a| **"A" class codes**
@@ -586,19 +583,27 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  00/04 to 7F/7E:: NORMAL throttle RANGE
 
 
-|_OPC_PEER_XFER_ |0xE5 |;move 8 bytes PEER to PEER, SRC->DST |NO 
-| 3+| ;<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
- ; <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>
- ;SRC/DST are 7 bit args. DSTL/H=0 is BROADCAST msg
- ; SRC=0 is MASTER
- ; SRC=0x70-0x7E are reserved
-;SRC=7F is THROTTLE msg xfer, <DSTL><DSTH> encode ID#, <0><0> is THROT B'CAST
- ;<PXCT1>=<0,XC2,XC1,XC0 - D4.7,D3.7,D2.7,D1.7>
- ;XC0-XC2=ADR type CODE-0=7 bit Peer TO Peer adrs
+|[[_OPC_PEER_XFER_]] |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO 
+| 3+a| `<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
+ <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>`
+
+SRC/DST are 7 bit args. DSTL/H=0 is broadcast message.
+
+SRC=0 is MASTER
+
+SRC=0x70-0x7E are reserved.
+
+SRC=7F is throttle msg xfer, <DSTL><DSTH> encode address (ID), <0><0> is throttle broadcast.
+
+ ;<PXCT1>=<0,XC2,XC1,XC0 - D4.7,D3.7,D2.7,D1.7>, 
+ ;XC0-XC2=ADR type CODE-0=7 bit Peer TO Peer addresses
 
  ; 1=><D1>is SRC HI,<D2>is DST HI
  ;<PXCT2>=<0,XC5,XC4,XC3 - D8.7,D7.7,D6.7,D5.7>
  ;XC3-XC5=data type CODE- 0=ANSI TEXT string,balance RESERVED
+
+NOTE: This message is used to work with System Variables (SVs), as described in LocoNet Personal Use Extension (see e.g. 
+http://embeddedloconet.sourceforge.net/SV_Programming_Messages_v13_PE.pdf[embeddedloconet])
 
 |_OPC_IMM_PACKET_ |0xED |;SEND n-byte packet immediate |yes LACK
 | 3+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
