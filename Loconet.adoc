@@ -396,7 +396,12 @@ Response is:
  * <<OPC_LACK, <0xB4><3D><00><CHK> >> if DCS100 FIFO is full, command rejected
  * <<OPC_LACK, <0xB4><3D><7F><CHK> >> if DCS100 accepted
 
-NOTE: JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set. Upon receiving, JMRI treats this OPCode equally to <<OPC_SW_REQ>>.
+[NOTE]
+--
+JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set. 
+
+Upon receiving, JMRI treats this OPCode equally to <<OPC_SW_REQ>>.
+--
 
 
 |[[OPC_SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<OPC_LACK>>
@@ -505,9 +510,9 @@ C=0 - "Closed" output line is OFF, =1 - "Closed" output line is ON (sinks curren
 T=0 - "Thrown" output line is OFF, =1 - "Thrown" output line is ON (sinks current).
 
 [NOTE]
-====
+--
 When JMRI receives this message, it is used to decode turnout state from the data.
-====
+--
 
 |[[OPC_SW_REQ]]OPC_SW_REQ |0xB0 | REQ SWITCH function| NO
 
@@ -526,8 +531,13 @@ If command fails, immediate response of <<OPC_LACK>> `<0xB4><30><00>`, otherwise
 There are special values for SW2 for <<stationary_broadcast, stationary broadcast>> and <<stationary_interrogation, stationary interrogation>>.
 
 [NOTE]
-JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set (by default, it's not set). Otherwise, <<OPC_SW_ACK>> is used to control turnout.
+--
+JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set (by default, it's not set). 
+
+Otherwise, <<OPC_SW_ACK>> is used to control turnout.
+
 When received (including looped back), JMRI treats this message as equal to <<OPC_SW_ACK>>.
+--
 
 
 | 3+a| **"A" class codes**
