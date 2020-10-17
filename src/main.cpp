@@ -20,7 +20,7 @@
 LocoNetBus bus;
 
 #define LOCONET_PIN_RX 16
-#define LOCONET_PIN_TX 15
+#define LOCONET_PIN_TX 13
 //#include <LocoNetESP32UART.h>
 //LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
 LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
@@ -32,8 +32,13 @@ LbServer lbServer(1234, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
 
+#define PIN_LED  22
 
 
+
+// connect D19  to arduino nano D3
+//         D23  to              D5
+//         A35  to              A0 
 #define DCC_PIN 19
 #define DCC_PIN_EN 23
 #define DCC_PIN_SENSE 35
@@ -45,8 +50,7 @@ WiThrottleServer withrottleServer;
 
 
 #define IN_PIN 25
-int inState = HIGH;
-unsigned long nextInRead = 0;
+
 unsigned long nextDccMeter = 0;
 
 
@@ -56,7 +60,7 @@ void setup() {
     Serial.println("Ultimate LocoNet Command Station");
 
     pinMode(IN_PIN, INPUT_PULLUP);
-    pinMode(LED_BUILTIN, OUTPUT);
+    pinMode(PIN_LED, OUTPUT);
 
     locoNet.begin();
     //lSerial.begin();
@@ -153,8 +157,11 @@ void loop() {
         nextDccMeter = millis()+20;
     }*/
 
+    static unsigned long nextInRead = 0;
+    static int inState = HIGH;
     if(millis()>nextInRead) {
         int v = digitalRead(IN_PIN);
+        digitalWrite(PIN_LED, v);
         if(v!=inState) {
             Serial.printf( "reporting sensor %d\n", v==LOW) ;
             reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
@@ -162,7 +169,6 @@ void loop() {
             inState = v;
             Serial.printf("errs: rx:%d,  tx:%d\n", locoNet.getRxStats()->rxErrors, locoNet.getTxStats()->txErrors );
             nextInRead = millis()+10;
-            delay(1);
         }
     }
 
