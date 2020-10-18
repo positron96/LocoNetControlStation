@@ -23,7 +23,7 @@ LocoNetBus bus;
 #define LOCONET_PIN_TX 13
 //#include <LocoNetESP32UART.h>
 //LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
-LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+//LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 LocoNetDispatcher parser(&bus);
 
 
@@ -62,7 +62,7 @@ void setup() {
     pinMode(IN_PIN, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
 
-    locoNet.begin();
+    //locoNet.begin();
     //lSerial.begin();
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
@@ -106,10 +106,6 @@ void setup() {
     CS.setDccMain(&dccMain);
 
     dcc.setMainChannel(&dccMain);
-    
-    dcc.begin();
-
-    dccMain.setPower(true);
 
     /*
     WifiManager wifiManager;
@@ -120,9 +116,10 @@ void setup() {
 		ESP.restart();
 	}
     */
-
     
     WiFi.begin("MelNet", "melnikov-network");
+
+    Serial.println("after WiFi.begin");
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
@@ -140,6 +137,12 @@ void setup() {
 
     lbServer.begin();
     withrottleServer.begin(); 
+
+    dcc.begin();
+    //dccMain.begin();
+
+    dccMain.setPower(true);
+    Serial.println("after dccMain.setPower");
 
 }
 
@@ -167,9 +170,20 @@ void loop() {
             reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
             
             inState = v;
-            Serial.printf("errs: rx:%d,  tx:%d\n", locoNet.getRxStats()->rxErrors, locoNet.getTxStats()->txErrors );
+            //Serial.printf("errs: rx:%d,  tx:%d\n", locoNet.getRxStats()->rxErrors, locoNet.getTxStats()->txErrors );
             nextInRead = millis()+10;
         }
     }
+
+    if(Serial.available()) {
+        Serial.read();
+        dccMain.timerFunc();
+    }
+
+    /*static long nextDump = micros();
+    if(micros()>nextDump) {
+        nextDump = micros()+60;
+        dccMain.timerFunc();
+    }*/
 
 }

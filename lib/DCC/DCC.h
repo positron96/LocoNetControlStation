@@ -3,12 +3,18 @@
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
 
-#define DCC_DEBUG
+#define DCC_DEBUG_
 
 #ifdef DCC_DEBUG
-#define DCC_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#define DCC_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
+#define DCC_DEBUGF_ISR(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
+//extern char _msg[1024];
+//extern char _buf[100];
+//#define DCC_DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
+//#define DCC_DEBUG_ISR_DUMP()  do{ Serial.print(_msg); _msg[0]=0; } while(0);
 #else
 #define DCC_DEBUGF(...)
+#define DCC_DEBUGF_ISR(...) 
 #endif
 
 enum class DCCFnGroup {
@@ -21,7 +27,8 @@ public:
     DCCESP32Channel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin, bool isOps=true): 
         _outputPin(outputPin), _enPin(enPin), _sensePin(sensePin), R(isOps?3:12)
     {
-        
+        R.timerPeriodsLeft=1; // first thing a timerfunc does is decrement this, so make it not underflow
+        R.timerPeriodsHalf=2; // some nonzero sane value
     }
 
     void begin() {
@@ -67,7 +74,7 @@ public:
         Register *maxLoadedReg;
         Register *nextReg;
         /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
-        uint8_t timerPeriods;
+        uint8_t timerPeriodsHalf;
         /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
         uint8_t timerPeriodsLeft;
 
@@ -176,6 +183,8 @@ public:
         return analogRead(_sensePin);
     }
 
+    void IRAM_ATTR timerFunc();
+
 private:
 
     uint8_t _outputPin;    
@@ -187,7 +196,7 @@ private:
     RegisterList R;
 
     void IRAM_ATTR nextBit();
-    void IRAM_ATTR timerFunc();
+    //void IRAM_ATTR timerFunc();
 
     friend class DCCESP32SignalGenerator;
 
