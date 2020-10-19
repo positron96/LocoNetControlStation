@@ -88,7 +88,7 @@ It is designed to be tolerant of cabling environment.
 It is permissible for the individual wires to loop back on themselves, noting that the 2 Rail_sync lines are of opposite phase and cannot be connected. 
 The connections are balanced to minimize RFI. 
 The connections may be branched in any combination to yield a "Star" or "Bus" or any combination thereof. 
-Only a single LocoNet(R) current termination is needed and is typically supplied by the system "Master".
+Only a single LocoNet(R) current termination is needed and is typically supplied by the system **master**.
 
 
 Pinouts for the RJ11/6 connector are:
@@ -101,9 +101,9 @@ Pinouts for the RJ11/6 connector are:
 6. RAIL_SYNC+ {nbsp}{nbsp}{nbsp}{nbsp} [blue]#blue#
 
 
-Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2,000', with no point-to-point length exceeding 1000'. 
-This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors. 
-(The capacitance of 2,000'(609m) of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000').
+Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2000{nbsp}ft (609{nbsp}m), with no point-to-point length exceeding 1000{nbsp}ft (304{nbsp}m). 
+This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors.
+The capacitance of 2000{nbsp}ft of this cable is approximately 68{nbsp}nF, and the loop resistance of a pair of these stranded 26AWG conductors is 80{nbsp}ohms per 1000{nbsp}ft.
 
 The maximum amount of parallel cable is limited by the requirement that the minimum RISE TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. 
 The minimum FALL TIME in the same region should be greater than 0.75 Volts per microsecond.
@@ -115,14 +115,14 @@ LocoNet(R) is a "Wired-Or" multiple access linear network using CSMA/CD techniqu
 Repeaters, network buffers and isolators can be implemented. 
 For the current **single ended** implementation, the 2 LocoNet signals, + and -, are paralleled and the RJ11 cable connections become polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
 
-**single ended** voltage levels and characteristics are:
+**Single ended** voltage levels and characteristics are:
 
 [loweralpha]
 . High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground conductors.
 . Low = 0 = "SPACE" : LOCONET+/- voltage below +4.0 Volts with respect to grounds.
-. The data should be received with 1.0 volt of HYSTERESIS centered on +4.0 volts.
+. The data should be received with 1.0 Volt of HYSTERESIS centered on +4.0 volts.
 . Maximum LOCONET+/- high voltage is +24V and nominal is +12V.
-. Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5(gnd)
+. Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5 (GND).
 . The Transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
 . One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals.
 Typical termination is performed by the packet generating "MASTER" and is a 15 milliamp current source from +12V.
