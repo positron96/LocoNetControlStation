@@ -18,6 +18,10 @@ The goal of this document is to create a comprehensive interpretation of LocoNet
 Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points. 
 The style should also be improved.
 
+### Sources and references
+. LocoNet Personal Use Edition 1.0 SPECIFICATION: https://www.digitrax.com/static/apps/cms/media/documents/loconet/loconetpersonaledition.pdf
+. LocoNet Personal Use Edition 1.0 Extension: http://embeddedloconet.sourceforge.net/SV_Programming_Messages_v13_PE.pdf
+
 
 ## Introduction
 
@@ -99,20 +103,19 @@ Pinouts for the RJ11/6 connector are:
 
 Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2,000', with no point-to-point length exceeding 1000'. 
 This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors. 
-[The capacitance of 2,000' of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000' ].
+(The capacitance of 2,000'(609m) of this cable is approximately 68,000pF, and the loop resistance of a pair of these stranded 26AWG conductors is 80ohms per 1000').
 
-The maximum amount of parallel cable is limited by the requirement that the minimum RISE
-TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. 
-The minimum FALL TIME in the same region should be greater than 0.75 Volts per microsecond
+The maximum amount of parallel cable is limited by the requirement that the minimum RISE TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. 
+The minimum FALL TIME in the same region should be greater than 0.75 Volts per microsecond.
 
 
 ### Electrical
 
 LocoNet(R) is a "Wired-Or" multiple access linear network using CSMA/CD techniques.
 Repeaters, network buffers and isolators can be implemented. 
-For the current SINGLE ENDED implementation, the 2 LocoNet signals, + and -, are paralleled and the RJ11 cable connections become polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
+For the current **single ended** implementation, the 2 LocoNet signals, + and -, are paralleled and the RJ11 cable connections become polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
 
-SINGLE ENDED voltage levels and characteristics are:
+**single ended** voltage levels and characteristics are:
 
 [loweralpha]
 . High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground conductors.
@@ -138,19 +141,19 @@ NOTE: There must be a typo, Sleeve is mentioned twice, but Rind is not mentioned
 
 #### Network timing
 
-LocoNet(R) data is sent in normal ASYNCHRONOUS format using 1 START bit, 8 DATA bits
-and 1 STOP bit. The 8 bit data is transmitted LSB first. The bit times are 60.0 uSecs or 16.66 KBaud +/-
-1.5%. A PC serial "COM" device can use the convenient rate of 16.457 KBaud. This corresponds to a
-Divisor of 07 for the standard NS8250 UART chip or equivalent used by most compatibles. Bytes may be
-transmitted "back-to-back", with a Start bit immediately following the Stop bit of the previous character.
-DIGITRAX Inc, ÓCopyrighted information (see introduction): LocoNet Personal Use version 1.0 Page4 of 15
-Normal network "IDLE" is the "MARK" voltage state. Data is sent HALF DUPLEX and transmitters
-process the TRANSMIT ECHO to monitor network collisions.
+LocoNet(R) data is sent in normal asynchronous format using 1 START bit, 8 DATA bits and 1 STOP bit.
+The 8 bit data is transmitted LSB first.
+The bit times are 60.0 uSecs or 16.66 KBaud +/-1.5%. 
+A PC serial "COM" device can use the convenient rate of 16.457 KBaud.
+This corresponds to a divisor of 07 for the standard NS8250 UART chip or equivalent used by most compatibles.
+Bytes may be transmitted "back-to-back", with a Start bit immediately following the Stop bit of the previous character.
+Normal network "IDLE" is the "MARK" voltage state. 
+Data is sent **half duplex** and transmitters process the transmit echo to monitor network collisions.
 
-CARRIER DETECT (CD) for fundamental network access timing may utilize simple RC time
-constant "one-shots". CD becomes active immediately on any detection of network in the SPACE state. It
-then times out for 20 bit times or 1.2 milliseconds as the CD BACKOFF time and goes inactive. CD jitter
-of up to 180uS is acceptable and helps ensure even statistical network access with minimal COLLISIONS.
+CARRIER DETECT (CD) for fundamental network access timing may utilize simple RC time constant "one-shots".
+CD becomes active immediately on any detection of network in the SPACE state. 
+It then times out for 20 bit times or 1.2 milliseconds as the CD BACKOFF time and goes inactive.
+CD jitter of up to 180uS is acceptable and helps ensure even statistical network access with minimal collisions.
 
 All transmitters are responsible for detecting TRANSMIT COLLISIONS on a 1 bit or whole
 echo-byte basis. If a TRANSMIT collision is detected the TRANSMITTER will force a line BREAK of 15
