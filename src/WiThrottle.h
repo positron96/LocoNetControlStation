@@ -102,11 +102,11 @@ private:
 
     void wifiPrintln(int iClient, String v) {
         clients[iClient].println(v);
-        LOG_WIFI("WF<< "+v);
+        LOG_WIFI("WTTX "+v);
     }
     void wifiPrint(int iClient, String v) {
         clients[iClient].print(v);
-        LOG_WIFI("WF<< "+v);
+        LOG_WIFI("WFTX "+v);
     }
 
     void clientStart(int iClient) ;

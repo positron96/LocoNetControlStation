@@ -120,10 +120,10 @@ For the current **single ended** implementation, the 2 LocoNet signals, + and -,
 [loweralpha]
 . High = 1 = "MARK" : LOCONET+/- voltage above +4.0 Volts with respect to ground conductors.
 . Low = 0 = "SPACE" : LOCONET+/- voltage below +4.0 Volts with respect to grounds.
-. The data should be received with 1.0 Volt of HYSTERESIS centered on +4.0 volts.
+. The data should be received with 1.0 Volt of HYSTERESIS centered on +4.0 Volts.
 . Maximum LOCONET+/- high voltage is +24V and nominal is +12V.
 . Minimum receiver input impedance is 47 Kilohms, measured from pins 3&4 to pins 2&5 (GND).
-. The Transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
+. The transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
 . One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals.
 Typical termination is performed by the packet generating "MASTER" and is a 15 milliamp current source from +12V.
 . Loconet devices may draw up to 15 mA from the RAIL_SYNC +/- lines whenever the voltage is greater than 7V. 
@@ -137,7 +137,7 @@ The signals may be received by a differential receiver and boosted to drive the 
 The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum, because the Plug shorts the Tip and Ring when initially
 inserted.
 
-NOTE: There must be a typo, Sleeve is mentioned twice, but Rind is not mentioned.
+NOTE: There must be a typo, Sleeve is mentioned twice, but Rind is not mentioned. Anyway, these jacks are not in use since early 2000s.
 
 #### Network timing
 

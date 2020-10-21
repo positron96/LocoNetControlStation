@@ -5,7 +5,6 @@
 
 #include "CommandStation.h"
 
-#include <LocoNetESP32.h>
 #include "LocoNetSlotManager.h"
 
 #include "LocoNetSerial.h"
@@ -20,10 +19,13 @@
 LocoNetBus bus;
 
 #define LOCONET_PIN_RX 16
-#define LOCONET_PIN_TX 13
+#define LOCONET_PIN_TX 17
 //#include <LocoNetESP32UART.h>
-//LocoNetESP32Uart locoNet(16, 15, 1, false, true, false, tskNO_AFFINITY);
-//LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+//LocoNetESP32Uart locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
+//#include <LocoNetESP32Hybrid.h>
+//LocoNetESP32Hybrid locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
+#include <LocoNetESP32.h>
+LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 LocoNetDispatcher parser(&bus);
 
 
@@ -39,8 +41,8 @@ LbServer lbServer(1234, &bus);
 // connect D19  to arduino nano D3
 //         D23  to              D5
 //         A35  to              A0 
-#define DCC_PIN 19
-#define DCC_PIN_EN 23
+#define DCC_PIN 25
+#define DCC_PIN_EN 32
 #define DCC_PIN_SENSE 35
 DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
 DCCESP32SignalGenerator dcc(1); //timer1
@@ -49,7 +51,7 @@ LocoNetSlotManager slotMan(&bus);
 WiThrottleServer withrottleServer;
 
 
-#define IN_PIN 25
+#define IN_PIN 13
 
 unsigned long nextDccMeter = 0;
 
@@ -62,7 +64,7 @@ void setup() {
     pinMode(IN_PIN, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
 
-    //locoNet.begin();
+    locoNet.begin();
     //lSerial.begin();
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
