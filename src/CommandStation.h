@@ -48,7 +48,7 @@ public:
     
     CommandStation() { loadTurnouts();  }//: dccMain(0, 0, 0) {}
 
-    void setDccMain(DCCESP32Channel * ch) { dccMain = ch; }
+    void setDccMain(IDCCChannel * ch) { dccMain = ch; }
 
     void setPowerState(bool v) {
         dccMain->setPower(v);
@@ -233,7 +233,7 @@ public:
 
 
 private:
-    DCCESP32Channel * dccMain;
+    IDCCChannel * dccMain;
 
     struct LocoData {
         using Fns = etl::bitset<29>;

@@ -1,171 +1,95 @@
 #include "DCC.h"
 
-uint8_t DCCESP32Channel::RegisterList::idlePacket[3] = {0xFF, 0x00, 0}; 
-uint8_t DCCESP32Channel::RegisterList::resetPacket[3] = {0x00, 0x00, 0};
+uint8_t idlePacket[3] = {0xFF, 0x00, 0}; 
+uint8_t resetPacket[3] = {0x00, 0x00, 0};
+
+
+void IDCCChannel::setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirection){
+    uint8_t b[5];                         // save space for checksum byte
+    uint8_t nB = 0;
+
+    if (addr>127)
+        b[nB++] = highByte(addr) | 0xC0;  // convert train number into a two-byte address
+
+    b[nB++] = lowByte(addr);
+    b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
+    b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
+    
+    DCC_DEBUGF("DCC::setThrottle slot %d, addr %d, speed=%d %c\n", addr, addr, tSpeed, tDirection==1?'F':'B');
+    
+    loadPacket(slot, b, nB, 0);
+}
+void IDCCChannel::setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn){
+    DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x\n", slot, addr, (uint8_t)group, fn);
+    switch(group) {
+        case DCCFnGroup::F0_4: 
+            setFunction(slot, addr,  B10000000 | (fn & B00011111) );
+            break;
+        case DCCFnGroup::F5_8:
+            fn >>= 5;
+            setFunction(slot, addr,  B10110000 | (fn & B00001111) );
+            break;
+        case DCCFnGroup::F9_12:
+            fn >>= 9;
+            setFunction(slot, addr,  B10100000 | (fn & B00001111) );
+            break;
+        case DCCFnGroup::F13_20:
+            fn >>= 13; 
+            setFunction(slot, addr, B11011110, (uint8_t)fn );
+            break;
+        case DCCFnGroup::F21_28:
+            fn >>= 21; 
+            setFunction(slot, addr, B11011111, (uint8_t)fn );
+            break;
+    }     
+
+}
+void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) {
+    // save space for checksum byte
+    uint8_t b[5]; 
+    uint8_t nB = 0;
+
+    if (addr>127)
+        b[nB++] = highByte(addr) | 0xC0;  // convert train number into a two-byte address
+
+    b[nB++] = lowByte(addr);
+
+    if ( (fByte & B11000000) == B10000000) {// this is a request for functions FL,F1-F12  
+        b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
+    } else {                             // this is a request for functions F13-F28
+        b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
+        b[nB++] = eByte;
+    }
+
+    DCC_DEBUGF("DCC::setFunction slot %d, addr %d, fByte=%02x eByte=%02x\n", slot, addr, fByte, eByte);
+
+    /* 
+    NMRA DCC norm ask for two DCC packets instead of only one:
+    "Command Stations that generate these packets, and which are not periodically refreshing these functions,
+    must send at least two repetitions of these commands when any function state is changed."
+    https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+    */
+    loadPacket(slot, b, nB, 4);
+
+}
+void IDCCChannel::setAccessory(int aAdd, int aNum, int activate) {
+    DCC_DEBUGF("DCC::setAccessory addr=%d; ch=%d; state=%d\n", aAdd, aNum, activate);
+
+    uint8_t b[3];                      // save space for checksum byte
+
+    b[0] = aAdd % 64 + 128;            // first byte is of the form 10AAAAAA, where AAAAAA represent 6 least significant bits of accessory address  
+    b[1] = ((((aAdd / 64) % 8) << 4) + (aNum % 4 << 1) + activate % 2) ^ 0xF8;      // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent activate/deactivate
+
+    loadPacket(0, b, 2, 4);
+}
 
 //char _msg[1024];
 //char _buf[100];
-
-void DCCESP32Channel::Register::initPackets(){
+/*
+void DCCESP32Channel::PacketSlot::initPackets(){
     activePacket = packet;
     updatePacket = packet+1;
-} 
-
-DCCESP32Channel::RegisterList::RegisterList(int maxNumRegs) {
-    this->maxNumRegs = maxNumRegs;
-    reg = (Register *)calloc((maxNumRegs+1),sizeof(Register));
-    for (int i=0; i<=maxNumRegs; i++) reg[i].initPackets();
-    regMap = (Register **)calloc((maxNumRegs+1),sizeof(Register *));
-    currentReg = reg;
-    regMap[0] = reg;
-    maxLoadedReg = reg;
-    nextReg = nullptr;
-    currentBit = 0;
-    nRepeat = 0;
-} 
-
-DCCESP32Channel::RegisterList::~RegisterList() {
-
-}
-
-void DCCESP32Channel::RegisterList::loadPacket(int nReg, uint8_t *b, uint8_t nBytes, int nRepeat) {
-
-    DCC_DEBUGF("DCCESP32Channel::loadPacket reg=%d len=%d, repeat=%d\n", nReg, nBytes, nRepeat);
-
-    // force nReg to be between 0 and maxNumRegs, inclusive
-    nReg = nReg % (maxNumRegs+1);
-
-    // pause while there is a Register already waiting to be updated -- nextReg will be reset to NULL by timer when prior Register updated fully processed
-    while(nextReg != nullptr) delay(1);             
-    
-    // first time this Register Number has been called
-    // set Register Pointer for this Register Number to next available Register
-    if(regMap[nReg] == nullptr) {        
-        regMap[nReg] = maxLoadedReg + 1;   
-        DCC_DEBUGF("loadPacket:: Allocating new reg %d\n", nReg);
-    }
-    
-    Register *r = regMap[nReg];
-    Packet *p = r->updatePacket;
-    uint8_t *buf = p->buf;
-
-    // copy first byte into what will become the checksum byte 
-    // XOR remaining bytes into checksum byte 
-    b[nBytes] = b[0];                        
-    for(int i=1;i<nBytes;i++)              
-        b[nBytes]^=b[i];
-    nBytes++;  // increment number of bytes in packet to include checksum byte
-        
-    buf[0] = 0xFF;                        // first 8 bits of 22-bit preamble
-    buf[1] = 0xFF;                        // second 8 bits of 22-bit preamble
-    buf[2] = 0xFC | bitRead(b[0],7);      // last 6 bits of 22-bit preamble + data start bit + b[0], bit 7
-    buf[3] = b[0]<<1;                     // b[0], bits 6-0 + data start bit
-    buf[4] = b[1];                        // b[1], all bits
-    buf[5] = b[2]>>1;                     // start bit + b[2], bits 7-1
-    buf[6] = b[2]<<7;                     // b[2], bit 0
-    
-    if(nBytes == 3) {
-        p->nBits = 49;
-    } else {
-        buf[6] |= b[3]>>2;    // b[3], bits 7-2
-        buf[7] =  b[3]<<6;    // b[3], bit 1-0
-        if(nBytes==4) {
-            p->nBits = 58;
-        } else {
-            buf[7] |= b[4]>>3;  // b[4], bits 7-3
-            buf[8] =  b[4]<<5;   // b[4], bits 2-0
-            if(nBytes==5) {
-                p->nBits = 67;
-            } else {
-                buf[8] |= b[5]>>4;   // b[5], bits 7-4
-                buf[9] =  b[5]<<4;   // b[5], bits 3-0
-                p->nBits = 76;
-            } 
-        } 
-    } 
-    
-    nextReg = r;
-    this->nRepeat = nRepeat; // bug: if timer uses this var to send another packet, that packet will be sent more times.
-    maxLoadedReg = max(maxLoadedReg, nextReg);
-
-    char ttt[50] = {0};
-    for(int i=0; i<p->nBits/8+1; i++) {
-        snprintf(ttt, 50, "%s %02x", ttt, buf[i]);
-    }
-    DCC_DEBUGF("loadPacket: %s into Reg %d, packet %d\n", ttt, nReg, p-&r->packet[0] );
-
-}
-
-#define ARR_BIT(arr, bit)   ( (arr)[(bit)/8] & (1<<(7-(bit)%8) ) )
-
-void DCCESP32Channel::nextBit() {
-    //const uint8_t bitMask[] = {  0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01  };
-    DCC_DEBUGF_ISR("nextBit: currentReg=%d, activePacket=%d, cbit=%d, len=%d \n", (R.currentReg-&R.reg[0]), 
-        (R.currentReg->activePacket-&R.currentReg->packet[0]), R.currentBit, R.currentReg->activePacket->nBits );
-
-    // IF no more bits in this DCC Packet, reset current bit pointer and determine which Register and Packet to process next  
-	if(R.currentBit==R.currentReg->activePacket->nBits) {
-		R.currentBit = 0;
-        // IF current Register is first Register AND should be repeated, decrement repeat count; result is this same Packet will be repeated                             
-		if (R.nRepeat>0 && R.currentReg == &R.reg[0]) {        
-			R.nRepeat--;    
-            DCC_DEBUGF_ISR("nextBit: repeat packet = %d\n", R.nRepeat);                              
-		}  else {
-            // IF another Register has been updated, update currentReg to nextReg and reset nextReg to NULL 
-            if (R.nextReg != NULL){                      
-                R.currentReg = R.nextReg;                     
-                R.nextReg = NULL;         
-                // flip active and update Packets
-                Packet *tmp = R.currentReg->activePacket;    
-                R.currentReg->activePacket = R.currentReg->updatePacket; 
-                R.currentReg->updatePacket = tmp; 
-                tmp = R.currentReg->activePacket;                
-                DCC_DEBUGF_ISR("nextBit: advance to nextReg %d, packet = (%d bits) %02x %02x %02x...\n", 
-                    (R.currentReg-&R.reg[0]),    tmp->nBits, tmp->buf[2], tmp->buf[3], tmp->buf[4] );
-            } else {    
-                // ELSE simply move to next Register    
-                // BUT IF this is last Register loaded, first reset currentReg to base Register, THEN       
-                // increment current Register (note this logic causes Register[0] to be skipped when simply cycling through all Registers)  
-                
-                if (R.currentReg == R.maxLoadedReg)
-                    R.currentReg = &R.reg[0];
-                R.currentReg++;                        
-                    
-                DCC_DEBUGF_ISR("nextBit: advance currentReg=%d\n", (R.currentReg-&R.reg[0]) );
-            }      
-        }                                        
-	} // currentReg, activePacket, and currentBit should now be properly set to point to next DCC bit
-
-	if( ARR_BIT(R.currentReg->activePacket->buf, R.currentBit) ) {  
-		/* For "1" bit, we need 1 periods of 58us timer ticks for each signal level */ 
-        DCC_DEBUGF_ISR("nextBit: bit %d = 1\n", R.currentBit );
-		R.timerPeriodsHalf = 1; 
-		R.timerPeriodsLeft = 2; 
-	} else {  /* ELSE it is a ZERO bit */ 
-		/* For "0" bit, we need 2 period of 58us timer ticks for each signal level */ 
-        DCC_DEBUGF_ISR("nextBit: bit %d = 0\n", R.currentBit );
-		R.timerPeriodsHalf = 2; 
-		R.timerPeriodsLeft = 4; 
-	} 
-
-	R.currentBit++; 
-}
-
-
-void DCCESP32Channel::timerFunc() {
-    R.timerPeriodsLeft--;
-    //DCC_DEBUGF_ISR("DCCESP32Channel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);                    
-	if(R.timerPeriodsLeft == R.timerPeriodsHalf) {
-        digitalWrite(_outputPin, HIGH );
-	}                                              
-	if(R.timerPeriodsLeft == 0) {                  
-		digitalWrite(_outputPin, LOW );
-		nextBit();                           
-	}
-
-    //current = readCurrent(); 
-}
-
+} */
 
 
 static DCCESP32SignalGenerator * _inst = nullptr;

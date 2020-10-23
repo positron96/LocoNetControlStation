@@ -44,7 +44,7 @@ LbServer lbServer(1234, &bus);
 #define DCC_PIN 25
 #define DCC_PIN_EN 32
 #define DCC_PIN_SENSE 35
-DCCESP32Channel dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE, true);
+DCCESP32Channel<10> dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE);
 DCCESP32SignalGenerator dcc(1); //timer1
 LocoNetSlotManager slotMan(&bus);
 
