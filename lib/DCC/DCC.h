@@ -6,6 +6,8 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 
+#include "LocoAddress.h"
+
 #define DCC_DEBUG
 
 #ifdef DCC_DEBUG
@@ -41,6 +43,8 @@ public:
 
     virtual void end()=0;
 
+    virtual void unload(uint8_t ) = 0;
+
     virtual void setPower(bool v)=0;
 
     virtual bool getPower()=0;
@@ -51,12 +55,20 @@ public:
     void setAccessory(int aAdd, int aNum, int activate);
     virtual uint16_t readCurrent()=0;
 
-    virtual void unload(uint8_t ) = 0;
+    int16_t readCVProg(int cv);
+    bool writeCVByteProg(int cv, uint8_t bValue);
+    bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
+    void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);
+    void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
+
 protected:
     virtual void timerFunc()=0;
     virtual bool loadPacket(int, uint8_t*, uint8_t, int)=0;
 private:
     friend class DCCESP32SignalGenerator;
+
+    uint getBaselineCurrent();
+    bool checkCurrentResponse(uint baseline);
 
 };
 
@@ -117,17 +129,17 @@ public:
         etl::bitset<SLOT_COUNT+1> slotsTaken;
         etl::map<uint, size_t, SLOT_COUNT> slotMap;
         //Packet *slotMap[SLOT_COUNT+1];
-        Packet *currentSlot;
+        volatile Packet *currentSlot;
         size_t maxLoadedSlot;
-        Packet *urgentSlot;
+        volatile Packet *urgentSlot;
         /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
-        uint8_t timerPeriodsHalf;
+        volatile uint8_t timerPeriodsHalf;
         /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
-        uint8_t timerPeriodsLeft;
+        volatile uint8_t timerPeriodsLeft;
         Packet newPacket;
         //int8_t newSlot;
 
-        uint8_t currentBit;
+        volatile uint8_t currentBit;
         
         RegisterList() {
             currentSlot = &slots[0];
@@ -149,7 +161,7 @@ public:
         inline void advanceSlot() {
             if (urgentSlot != nullptr) {                      
                 currentSlot = urgentSlot; 
-                *currentSlot = newPacket; 
+                *(Packet*)currentSlot = newPacket; 
                 urgentSlot = nullptr;                
                 // flip active and update Packets
                 //Packet * p = currentSlot->flip();
@@ -251,16 +263,7 @@ protected:
                 iSlot = it->second;
             }
         }
-        
-        // first time this Register Number has been called
-        // set Register Pointer for this Register Number to next available Register
-        /*
-        if(R.slotMap[iSlot] == nullptr) {        
-            R.slotMap[iSlot] = R.maxLoadedSlot + 1;   
-            
-        }*/
-        
-        //Packet *slot = R.slotMap[iSlot];
+
         Packet *p = &R.newPacket;
         uint8_t *buf = p->buf;
 
@@ -341,8 +344,7 @@ private:
     RegisterList R;
 
     void IRAM_ATTR nextBit() {
-        //const uint8_t bitMask[] = {  0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01  };
-        Packet *p = R.currentSlot;
+        auto p = R.currentSlot;
         //DCC_DEBUGF_ISR("nextBit: currentSlot=%d, activePacket=%d, cbit=%d, bits=%d", R.currentIdx(),  R.currentSlot->activeIdx(), R.currentBit, p->nBits );
 
         // IF no more bits in this DCC Packet, reset current bit pointer and determine which Register and Packet to process next  
