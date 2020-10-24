@@ -40,7 +40,8 @@ public:
             if(cli) { cli.print("VERSION "); cli.println("ESP32 WiFi 0.1"); }
         }
         if (cli) {
-            while(cli.available()>0) {
+            size_t a = cli.available();
+            while(a-- >0) {
                 char v = cli.read();
                 if(v=='\r') continue;
 
@@ -52,7 +53,7 @@ public:
                             if(lbStr[i]==' ') {
                                 uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
                                 LB_DEBUGF("LbServer::loop adding byte %02x\n", val);
-                                lnMsg *msg = lbBuf.addByte(val);
+                                LnMsg *msg = lbBuf.addByte(val);
                                 if(msg!=nullptr) {
                                     
                                     onMessage(*msg); // echo

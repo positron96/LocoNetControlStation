@@ -30,7 +30,7 @@ LocoNetDispatcher parser(&bus);
 
 
 #define LBSERVER_TCP_PORT  1234
-LbServer lbServer(1234, &bus);
+LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
 
@@ -114,8 +114,6 @@ void setup() {
     
     WiFi.begin("MelNet", "melnikov-network");
 
-    Serial.println("after WiFi.begin");
-
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
@@ -137,7 +135,6 @@ void setup() {
     dccMain.begin();
 
     dccMain.setPower(true);
-    Serial.println("after dccMain.setPower");
 
 }
 
@@ -174,11 +171,11 @@ void loop() {
     if(Serial.available()) {
         Serial.read();
         DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
-        Packet *p = r->currentSlot->activePacket;
-        while(r->currentSlot->activePacket == p) {
+        Packet *p = r->currentSlot;
+        while(r->currentSlot == p) {
             dccMain.timerFunc();
             delay(1);
-            if(r->currentBit==r->currentSlot->activePacket->nBits) break;
+            if(r->currentBit==1) break;
         }
     }
 
