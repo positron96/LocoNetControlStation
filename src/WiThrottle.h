@@ -14,17 +14,15 @@
 
 #include "CommandStation.h"
 
-#define WT_DEBUG
+
+#define WT_DEBUG_
 
 #ifdef WT_DEBUG
-#include <Arduino.h>
-#define WT_DEBUGF(...)  { Serial.printf(__VA_ARGS__); }
+#define WT_LOGI(format, ...)  log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
 #else
-#define WT_DEBUGF(...)
+#define WT_LOGI(...)
 #endif
 
-//#define LOG_WIFI  
-#define LOG_WIFI(v)   { Serial.println(v); }
 
 class WiThrottleServer {
 public:
@@ -33,7 +31,7 @@ public:
 
     void begin() {
 
-        WT_DEBUGF("WiThrottleServer::begin\n");
+        WT_LOGI("WiThrottleServer::begin");
 
         server.begin();
 
@@ -42,7 +40,6 @@ public:
         //MDNS.setInstanceName("DCC++ Network Interface");
 
         notifyPowerStatus();
-
 
     }
 
@@ -68,6 +65,10 @@ private:
         uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
         uint32_t lastHeartbeat;
+
+        char cmdline[100];
+        size_t cmdpos = 0;
+
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
         etl::map< char, etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>, MAX_THROTTLES_PER_CLIENT> slots;
         uint8_t slot(char thr, LocoAddress addr) { 
@@ -81,6 +82,8 @@ private:
     };
 
     ClientData clientData[MAX_CLIENTS];
+
+    void processCmd(int iClient);
 
     char powerStatus = '0';
 
@@ -102,11 +105,11 @@ private:
 
     void wifiPrintln(int iClient, String v) {
         clients[iClient].println(v);
-        LOG_WIFI("WTTX "+v);
+        //WT_LOGI("WTTX %s", v.c_str() );
     }
     void wifiPrint(int iClient, String v) {
         clients[iClient].print(v);
-        LOG_WIFI("WFTX "+v);
+        //WT_LOGI("WFTX %s", v.c_str() );
     }
 
     void clientStart(int iClient) ;
