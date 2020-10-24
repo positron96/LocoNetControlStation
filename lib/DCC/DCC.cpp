@@ -4,7 +4,7 @@ uint8_t idlePacket[3] = {0xFF, 0x00, 0};
 uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
 
-void IDCCChannel::setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirection){
+void IDCCChannel::setThrottle(int iReg, int addr, uint8_t tSpeed, uint8_t tDirection){
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
@@ -15,38 +15,38 @@ void IDCCChannel::setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirec
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
     
-    DCC_DEBUGF("DCC::setThrottle slot %d, addr %d, speed=%d %c", addr, addr, tSpeed, tDirection==1?'F':'B');
+    DCC_LOGI("DCC::setThrottle iReg %d, addr %d, speed=%d %c", addr, addr, tSpeed, tDirection==1?'F':'B');
     
-    loadPacket(slot, b, nB, 0);
+    loadPacket(iReg, b, nB, 0);
 }
-void IDCCChannel::setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn) {
-    DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x", slot, addr, (uint8_t)group, fn);
+void IDCCChannel::setFunctionGroup(int iReg, int addr, DCCFnGroup group, uint32_t fn) {
+    DCC_LOGI("DCC::setFunctionGroup iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
             fn = (fn & 1)<<4 | (fn & 0x1E)<<1;
-            setFunction(slot, addr,  B10000000 | (fn & B00011111) );
+            setFunction(iReg, addr,  B10000000 | (fn & B00011111) );
             break;
         case DCCFnGroup::F5_8:
             fn >>= 5;
-            setFunction(slot, addr,  B10110000 | (fn & B00001111) );
+            setFunction(iReg, addr,  B10110000 | (fn & B00001111) );
             break;
         case DCCFnGroup::F9_12:
             fn >>= 9;
-            setFunction(slot, addr,  B10100000 | (fn & B00001111) );
+            setFunction(iReg, addr,  B10100000 | (fn & B00001111) );
             break;
         case DCCFnGroup::F13_20:
             fn >>= 13; 
-            setFunction(slot, addr, B11011110, (uint8_t)fn );
+            setFunction(iReg, addr, B11011110, (uint8_t)fn );
             break;
         case DCCFnGroup::F21_28:
             fn >>= 21; 
-            setFunction(slot, addr, B11011111, (uint8_t)fn );
+            setFunction(iReg, addr, B11011111, (uint8_t)fn );
             break;
     }     
 
 }
-void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) {
+void IDCCChannel::setFunction(int iReg, int addr, uint8_t fByte, uint8_t eByte) {
     // save space for checksum byte
     uint8_t b[5]; 
     uint8_t nB = 0;
@@ -63,7 +63,7 @@ void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) 
         b[nB++] = eByte;
     }
 
-    DCC_DEBUGF("DCC::setFunction slot %d, addr %d, fByte=%02x eByte=%02x", slot, addr, fByte, eByte);
+    DCC_LOGI("DCC::setFunction iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
 
     /* 
     NMRA DCC norm ask for two DCC packets instead of only one:
@@ -75,7 +75,7 @@ void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) 
 
 }
 void IDCCChannel::setAccessory(int aAdd, int aNum, int activate) {
-    DCC_DEBUGF("DCC::setAccessory addr=%d; ch=%d; state=%d", aAdd, aNum, activate);
+    DCC_LOGI("DCC::setAccessory addr=%d; ch=%d; state=%d", aAdd, aNum, activate);
 
     uint8_t b[3];                      // save space for checksum byte
 
