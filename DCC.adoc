@@ -1,0 +1,25 @@
+# This is a short memo about DCC packets
+
+https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+
+Preamble is 12 "1" bits. DCC++ uses 22 bits. Preamble is followed by "0" bit
+
+```
+PPP 0 0AAA-AAAA 0 01DC-SSSS 0 EEEE-EEEE 1  Speed and Direction Packet For Locomotive Decoders (7-bit). D is dir (1=FWD), 0SSSS is 14-steps speed, CSSSS is 28 steps speed.
+
+PPP 0 10AA-AAAA 0 AAA.-.... - 9-bit/11-bit accessory decoder
+
+PPP 0 11AA-AAAA 0 AAAA-AAAA 0 {instruction-bytes} 0 EEEE-EEEE 1 Extended 2-byte address
+                            
+                            0 CCCD-DDDD    CCC 
+
+
+PPP 0 0000-0000 0 0000-0000 0 0000-0000 1  Reset packet
+
+PPP 0 1111-1111 0 0000-0000 0 1111-1111 1  Idle packet
+
+PPP 0 0000-0000 0 01DC-000S 0 EEEE-EEEE 1  Stop all decoders
+
+
+```
+
