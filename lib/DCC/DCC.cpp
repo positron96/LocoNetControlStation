@@ -15,12 +15,12 @@ void IDCCChannel::setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirec
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
     
-    DCC_DEBUGF("DCC::setThrottle slot %d, addr %d, speed=%d %c\n", addr, addr, tSpeed, tDirection==1?'F':'B');
+    DCC_DEBUGF("DCC::setThrottle slot %d, addr %d, speed=%d %c", addr, addr, tSpeed, tDirection==1?'F':'B');
     
     loadPacket(slot, b, nB, 0);
 }
 void IDCCChannel::setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn){
-    DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x\n", slot, addr, (uint8_t)group, fn);
+    DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x", slot, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
             setFunction(slot, addr,  B10000000 | (fn & B00011111) );
@@ -61,7 +61,7 @@ void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) 
         b[nB++] = eByte;
     }
 
-    DCC_DEBUGF("DCC::setFunction slot %d, addr %d, fByte=%02x eByte=%02x\n", slot, addr, fByte, eByte);
+    DCC_DEBUGF("DCC::setFunction slot %d, addr %d, fByte=%02x eByte=%02x", slot, addr, fByte, eByte);
 
     /* 
     NMRA DCC norm ask for two DCC packets instead of only one:
@@ -69,11 +69,11 @@ void IDCCChannel::setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte) 
     must send at least two repetitions of these commands when any function state is changed."
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
-    loadPacket(slot, b, nB, 4);
+    loadPacket(0, b, nB, 4);
 
 }
 void IDCCChannel::setAccessory(int aAdd, int aNum, int activate) {
-    DCC_DEBUGF("DCC::setAccessory addr=%d; ch=%d; state=%d\n", aAdd, aNum, activate);
+    DCC_DEBUGF("DCC::setAccessory addr=%d; ch=%d; state=%d", aAdd, aNum, activate);
 
     uint8_t b[3];                      // save space for checksum byte
 

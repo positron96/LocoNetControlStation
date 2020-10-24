@@ -3,11 +3,13 @@
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
 
-#define DCC_DEBUG_
+#define DCC_DEBUG
 
 #ifdef DCC_DEBUG
-#define DCC_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
-#define DCC_DEBUGF_ISR(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
+#define DCC_DEBUGF(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+#define DCC_DEBUGF_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+//#define DCC_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
+//#define DCC_DEBUGF_ISR(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
 //extern char _msg[1024];
 //extern char _buf[100];
 //#define DCC_DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
@@ -57,19 +59,32 @@ struct Packet {
     uint8_t buf[10];
     uint8_t nBits;
     int8_t nRepeat;
+    void debugPrint() {
+        char ttt[50]; ttt[0]='\0'; 
+        char *pos=ttt;
+        uint8_t nBytes = nBits/8; if (nBytes*8!=nBits) nBytes++;
+        for(int i=0; i<nBytes; i++) {
+            pos += sprintf(pos, "%02x ", buf[i]);
+        }
+        DCC_DEBUGF_ISR("packet (%d): '%s'", nBits, ttt );
+    }
 };
 
 struct PacketSlot {
-    Packet packet[2];
     Packet *activePacket;
     Packet *updatePacket;
-    PacketSlot(): activePacket(packet), updatePacket(packet+1) {}
+    PacketSlot(): activePacket(&packet[0]), updatePacket(&packet[1]) { }
     inline Packet * flip() {
         Packet *tmp = activePacket;
         activePacket = updatePacket;
         updatePacket = tmp;
         return activePacket;
     }
+    inline uint8_t activeIdx() { return activePacket-&packet[0]; }
+
+private:
+    Packet packet[2];
+
 };
 
 template<uint8_t SLOT_COUNT>
@@ -84,7 +99,7 @@ public:
     }
 
 
-    void begin()override {
+    void begin() override {
         pinMode(_outputPin, OUTPUT);
         pinMode(_enPin, OUTPUT);
         //digitalWrite(_enPin, HIGH);
@@ -92,13 +107,13 @@ public:
         loadPacket(1, idlePacket, 2, 0);
     }
 
-    void end() override{
+    void end() override {
         pinMode(_outputPin, INPUT);
         pinMode(_enPin, INPUT);
     }
 
-    void setPower(bool v) override{
-        DCC_DEBUGF("DCC::setPower(%d)\n", v);
+    void setPower(bool v) override {
+        DCC_DEBUGF("setPower(%d)", v);
         digitalWrite(_enPin, v ? HIGH : LOW);
     }
 
@@ -122,11 +137,11 @@ public:
         
         RegisterList() {
             //reg = (PacketSlot *)calloc((maxNumRegs+1),sizeof(PacketSlot));
-            for (int i=0; i<=SLOT_COUNT; i++) slots[i] = PacketSlot();
+            //for (int i=0; i<=SLOT_COUNT; i++) slots[i] = PacketSlot();
             //slotMap = (PacketSlot **)calloc((SLOT_COUNT+1),sizeof(PacketSlot *));
-            currentSlot = slots;
-            slotMap[0] = slots;
-            maxLoadedSlot = slots;
+            currentSlot = &slots[0];
+            slotMap[0] = currentSlot;
+            maxLoadedSlot = currentSlot;
             urgentSlot = nullptr;
             currentBit = 0;
         } 
@@ -137,6 +152,41 @@ public:
             return (currentSlot->activePacket->buf[currentBit/8] & 1<<(7-currentBit%8) )!= 0;
         } 
 
+        inline uint8_t currentIdx() { return currentSlot-&slots[0]; }
+        inline void advanceSlot() {
+            if (urgentSlot != nullptr) {                      
+                currentSlot = urgentSlot;                     
+                urgentSlot = nullptr;         
+                // flip active and update Packets
+                Packet * p = currentSlot->flip();
+                DCC_DEBUGF_ISR("advance to urgentSlot %d, packet %d",  currentIdx(), currentSlot->activeIdx() );
+                p->debugPrint();
+            } else {    
+                // ELSE simply move to next Register    
+                // BUT IF this is last Register loaded, first reset currentSlot to base Register, THEN       
+                // increment current Register (note this logic causes Register[0] to be skipped when simply cycling through all Registers)  
+                
+                if (currentSlot == maxLoadedSlot)
+                    currentSlot = &slots[0];
+                currentSlot++;                        
+                    
+                DCC_DEBUGF_ISR("advance to next slot=%d", currentIdx() );
+                currentSlot->activePacket->debugPrint();
+            }
+        }
+        inline void setBitTimings() {
+            if ( currentBitValue() ) {  
+                /* For "1" bit, we need 1 periods of 58us timer ticks for each signal level */ 
+                //DCC_DEBUGF_ISR("bit %d (0x%02x) = 1", currentBit, currentSlot->activePacket->buf[currentBit/8] );
+                timerPeriodsHalf = 1; 
+                timerPeriodsLeft = 2; 
+            } else {  /* ELSE it is a ZERO bit */ 
+                /* For "0" bit, we need 2 period of 58us timer ticks for each signal level */ 
+                //DCC_DEBUGF_ISR("bit %d (0x%02x) = 0", currentBit, currentSlot->activePacket->buf[currentBit/8] );
+                timerPeriodsHalf = 2; 
+                timerPeriodsLeft = 4; 
+            } 
+        }
     };
 
     uint16_t readCurrent() override {
@@ -157,33 +207,37 @@ public:
         //current = readCurrent(); 
     }
 
+    RegisterList * getReg() { return &R; }
+
 protected:
 
-    void loadPacket(int slot, uint8_t *b, uint8_t nBytes, int nRepeat) override {
+    void loadPacket(int iSlot, uint8_t *b, uint8_t nBytes, int nRepeat) override {
 
-        DCC_DEBUGF("DCCESP32Channel::loadPacket reg=%d len=%d, repeat=%d\n", slot, nBytes, nRepeat);
+        DCC_DEBUGF("reg=%d len=%d, repeat=%d", iSlot, nBytes, nRepeat);
 
         // force slot to be between 0 and maxNumRegs, inclusive
-        slot = slot % (SLOT_COUNT+1);
+        iSlot = iSlot % (SLOT_COUNT+1);
 
         // pause while there is a Register already waiting to be updated -- urgentSlot will be reset to NULL by timer when prior Register updated fully processed
-        while(R.urgentSlot != nullptr) delay(1);             
+        int t=1000;
+        while(R.urgentSlot != nullptr && --t >0) delay(1);
+        if(t==0) return;
         
         // first time this Register Number has been called
         // set Register Pointer for this Register Number to next available Register
-        if(R.slotMap[slot] == nullptr) {        
-            R.slotMap[slot] = R.maxLoadedSlot + 1;   
-            DCC_DEBUGF("loadPacket:: Allocating new reg %d\n", R.slot);
+        if(R.slotMap[iSlot] == nullptr) {        
+            R.slotMap[iSlot] = R.maxLoadedSlot + 1;   
+            DCC_DEBUGF("Allocating new reg %d", iSlot);
         }
         
-        PacketSlot *r = R.slotMap[slot];
-        Packet *p = r->updatePacket;
+        PacketSlot *slot = R.slotMap[iSlot];
+        Packet *p = slot->updatePacket;
         uint8_t *buf = p->buf;
 
         // copy first byte into what will become the checksum byte 
         // XOR remaining bytes into checksum byte 
         b[nBytes] = b[0];                        
-        for(int i=1;i<nBytes;i++)              
+        for(int i=1; i<nBytes; i++)              
             b[nBytes]^=b[i];
         nBytes++;  // increment number of bytes in packet to include checksum byte
             
@@ -215,15 +269,12 @@ protected:
             } 
         } 
         
-        R.urgentSlot = r;
         p->nRepeat = nRepeat; 
+        R.urgentSlot = slot;
         R.maxLoadedSlot = max(R.maxLoadedSlot, R.urgentSlot);
 
-        char ttt[50] = {0};
-        for(int i=0; i<p->nBits/8+1; i++) {
-            snprintf(ttt, 50, "%s %02x", ttt, buf[i]);
-        }
-        DCC_DEBUGF("loadPacket: %s into Reg %d, packet %d\n", ttt, slot, p-&r->packet[0] );
+        DCC_DEBUGF("loaded into slot %d, packet idx %d", iSlot, 1-slot->activeIdx() );
+        p->debugPrint();  
 
     }
 
@@ -237,54 +288,25 @@ private:
 
     RegisterList R;
 
-    void IRAM_ATTR nextBit(){
+    void IRAM_ATTR nextBit() {
         //const uint8_t bitMask[] = {  0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01  };
         Packet *p = R.currentSlot->activePacket;
-        DCC_DEBUGF_ISR("nextBit: currentSlot=%d, activePacket=%d, cbit=%d, len=%d \n", 
-            (R.currentSlot-&R.reg[0]), 
-            (p-&R.currentSlot->packet[0]), R.currentBit, p->nBits );
+        //DCC_DEBUGF_ISR("nextBit: currentSlot=%d, activePacket=%d, cbit=%d, bits=%d", R.currentIdx(),  R.currentSlot->activeIdx(), R.currentBit, p->nBits );
 
         // IF no more bits in this DCC Packet, reset current bit pointer and determine which Register and Packet to process next  
-        if(R.currentBit==p->nBits) {
+        if (R.currentBit == p->nBits) {
             R.currentBit = 0;
             // IF current Register is first Register AND should be repeated, decrement repeat count; result is this same Packet will be repeated                             
-            if (p->nRepeat>0 && R.currentSlot == &R.reg[0]) {        
+            if (p->nRepeat>0 && R.currentSlot == &R.slots[0]) {        
                 p->nRepeat--;    
-                DCC_DEBUGF_ISR("nextBit: repeat packet = %d\n", p->nRepeat);
+                DCC_DEBUGF_ISR("repeat packet = %d", p->nRepeat);
             } else {
                 // IF another slot has been updated, update currentSlot to urgentSlot and reset urgentSlot to NULL 
-                if (R.urgentSlot != nullptr) {                      
-                    R.currentSlot = R.urgentSlot;                     
-                    R.urgentSlot = nullptr;         
-                    // flip active and update Packets
-                    p = R.currentSlot->flip();
-                    DCC_DEBUGF_ISR("nextBit: advance to urgentSlot %d, packet = (%d bits) %02x %02x %02x...\n", 
-                        (R.currentSlot-&R.reg[0]),    p->nBits, p->buf[2], p->buf[3], p->buf[4] );
-                } else {    
-                    // ELSE simply move to next Register    
-                    // BUT IF this is last Register loaded, first reset currentSlot to base Register, THEN       
-                    // increment current Register (note this logic causes Register[0] to be skipped when simply cycling through all Registers)  
-                    
-                    if (R.currentSlot == R.maxLoadedSlot)
-                        R.currentSlot = &R.reg[0];
-                    R.currentSlot++;                        
-                        
-                    DCC_DEBUGF_ISR("nextBit: advance currentSlot=%d\n", (R.currentSlot-&R.reg[0]) );
-                }      
+                R.advanceSlot();
             }                                        
         } // currentSlot, activePacket, and currentBit should now be properly set to point to next DCC bit
 
-        if( R.currentBitValue() ) {  
-            /* For "1" bit, we need 1 periods of 58us timer ticks for each signal level */ 
-            DCC_DEBUGF_ISR("nextBit: bit %d = 1\n", R.currentBit );
-            R.timerPeriodsHalf = 1; 
-            R.timerPeriodsLeft = 2; 
-        } else {  /* ELSE it is a ZERO bit */ 
-            /* For "0" bit, we need 2 period of 58us timer ticks for each signal level */ 
-            DCC_DEBUGF_ISR("nextBit: bit %d = 0\n", R.currentBit );
-            R.timerPeriodsHalf = 2; 
-            R.timerPeriodsLeft = 4; 
-        } 
+        R.setBitTimings();
 
         R.currentBit++; 
     }

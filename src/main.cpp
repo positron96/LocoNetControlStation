@@ -37,10 +37,6 @@ LbServer lbServer(1234, &bus);
 #define PIN_LED  22
 
 
-
-// connect D19  to arduino nano D3
-//         D23  to              D5
-//         A35  to              A0 
 #define DCC_PIN 25
 #define DCC_PIN_EN 32
 #define DCC_PIN_SENSE 35
@@ -52,9 +48,6 @@ WiThrottleServer withrottleServer;
 
 
 #define IN_PIN 13
-
-unsigned long nextDccMeter = 0;
-
 
 void setup() {
 
@@ -140,8 +133,8 @@ void setup() {
     lbServer.begin();
     withrottleServer.begin(); 
 
-    dcc.begin();
-    //dccMain.begin();
+    //dcc.begin();
+    dccMain.begin();
 
     dccMain.setPower(true);
     Serial.println("after dccMain.setPower");
@@ -156,6 +149,7 @@ void loop() {
     //lSerial.loop();
     
     /*
+    static unsigned long nextDccMeter = 0;
     if(millis()>nextDccMeter) {
         uint16_t v = dccMain.readCurrent() ;
         if(v > 15) dccMain.setPower(false);
@@ -179,7 +173,13 @@ void loop() {
 
     if(Serial.available()) {
         Serial.read();
-        dccMain.timerFunc();
+        DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
+        Packet *p = r->currentSlot->activePacket;
+        while(r->currentSlot->activePacket == p) {
+            dccMain.timerFunc();
+            delay(1);
+            if(r->currentBit==r->currentSlot->activePacket->nBits) break;
+        }
     }
 
     /*static long nextDump = micros();
