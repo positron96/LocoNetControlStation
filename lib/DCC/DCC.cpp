@@ -19,10 +19,12 @@ void IDCCChannel::setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirec
     
     loadPacket(slot, b, nB, 0);
 }
-void IDCCChannel::setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn){
+void IDCCChannel::setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn) {
     DCC_DEBUGF("DCC::setFunctionGroup slot %d, addr %d, group=%d fn=%08x", slot, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
+            // move FL(F0) to 5th bit
+            fn = (fn & 1)<<4 | (fn & 0x1E)<<1;
             setFunction(slot, addr,  B10000000 | (fn & B00011111) );
             break;
         case DCCFnGroup::F5_8:

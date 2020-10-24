@@ -8,6 +8,7 @@
 #ifdef DCC_DEBUG
 #define DCC_DEBUGF(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #define DCC_DEBUGF_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+//#define DCC_DEBUGF_ISR(...) 
 //#define DCC_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
 //#define DCC_DEBUGF_ISR(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
 //extern char _msg[1024];
@@ -159,7 +160,7 @@ public:
                 urgentSlot = nullptr;         
                 // flip active and update Packets
                 Packet * p = currentSlot->flip();
-                DCC_DEBUGF_ISR("advance to urgentSlot %d, packet %d",  currentIdx(), currentSlot->activeIdx() );
+                //DCC_DEBUGF_ISR("advance to urgentSlot %d, packet %d",  currentIdx(), currentSlot->activeIdx() );
                 p->debugPrint();
             } else {    
                 // ELSE simply move to next Register    
@@ -170,8 +171,8 @@ public:
                     currentSlot = &slots[0];
                 currentSlot++;                        
                     
-                DCC_DEBUGF_ISR("advance to next slot=%d", currentIdx() );
-                currentSlot->activePacket->debugPrint();
+                //DCC_DEBUGF_ISR("advance to next slot=%d", currentIdx() );
+                //currentSlot->activePacket->debugPrint();
             }
         }
         inline void setBitTimings() {
