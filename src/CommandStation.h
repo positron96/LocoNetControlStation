@@ -146,19 +146,19 @@ public:
     }
 
     void releaseLocoSlot(uint8_t slot) {
-        if(slot==0) { CS_DEBUGF("CommandStation::releaseSlot: invalid slot\n"); return; }
+        if(slot==0) { CS_DEBUGF("CommandStation::releaseLocoSlot: invalid slot\n"); return; }
         uint8_t i = slot-1;
-        CS_DEBUGF("CommandStation::releaseSlot: releasing slot %d\n", slot); 
-        setLocoRefresh(slot, false);
+        CS_DEBUGF("CommandStation::releaseLocoSlot: releasing slot %d\n", slot); 
+        setLocoSlotRefresh(slot, false);
         locoSlot.erase( slots[i].addr );        
         slots[i].deallocate();
     }
 
-    void setLocoRefresh(uint8_t slot, bool refresh) {
-        if(slot==0) { CS_DEBUGF("CommandStation::releaseSlot: invalid slot\n"); return; }
+    void setLocoSlotRefresh(uint8_t slot, bool refresh) {
+        if(slot==0) { CS_DEBUGF("CommandStation::setLocoSlotRefresh: invalid slot\n"); return; }
         LocoData &dd = getSlot(slot);
         if(dd.refreshing == refresh) return;
-        CS_DEBUGF("CommandStation::setLocoRefresh: slot %d refresh %d\n", slot, refresh); 
+        CS_DEBUGF("CommandStation::setLocoSlotRefresh: slot %d refresh %d\n", slot, refresh); 
         dd.refreshing = refresh;
         if(refresh) {
             

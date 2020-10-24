@@ -73,7 +73,7 @@ public:
                     uint8_t slot = msg->ss.slot;
                     LNSM_DEBUGF("OPC_MOVE_SLOTS NULL MOVE for slot %d\n", slot );
                     _slots[slot].stat |= LOCO_IN_USE;
-                    CS.setLocoRefresh(slot, true);
+                    CS.setLocoSlotRefresh(slot, true);
                     sendSlotData(slot);
                 }
                 break;
@@ -207,7 +207,7 @@ private:
                 return;
             }
 
-            CS.setLocoRefresh(slot, (stat & STAT1_SL_ACTIVE) != 0);
+            CS.setLocoSlotRefresh(slot, (stat & STAT1_SL_ACTIVE) != 0);
         }
         _slots[slot].stat = stat;
     }
