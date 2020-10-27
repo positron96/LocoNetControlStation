@@ -49,13 +49,14 @@ public:
 
     virtual bool getPower()=0;
 
-    void setThrottle(int slot, int addr, uint8_t tSpeed, uint8_t tDirection);
-    void setFunctionGroup(int slot, int addr, DCCFnGroup group, uint32_t fn);
-    void setFunction(int slot, int addr, uint8_t fByte, uint8_t eByte=0);
-    void setAccessory(int aAdd, int aNum, int activate);
+    void setThrottle(int slot, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection);
+    void setFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
+    void setFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
+    void setAccessory(int, int, bool);
     virtual uint16_t readCurrent()=0;
 
     int16_t readCVProg(int cv);
+    bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
     bool writeCVByteProg(int cv, uint8_t bValue);
     bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
     void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);

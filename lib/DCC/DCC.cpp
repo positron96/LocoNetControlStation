@@ -10,14 +10,15 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_MUL   1
 
 
-void IDCCChannel::setThrottle(int iReg, int addr, uint8_t tSpeed, uint8_t tDirection){
+void IDCCChannel::setThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection){
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
-    if (addr>127)
-        b[nB++] = highByte(addr) | 0xC0;  // convert train number into a two-byte address
+    uint16_t iAddr = addr.addr();
+    if ( addr.isLong() )
+        b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
 
-    b[nB++] = lowByte(addr);
+    b[nB++] = lowByte(iAddr);
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
     
@@ -25,7 +26,7 @@ void IDCCChannel::setThrottle(int iReg, int addr, uint8_t tSpeed, uint8_t tDirec
     
     loadPacket(iReg, b, nB, 0);
 }
-void IDCCChannel::setFunctionGroup(int iReg, int addr, DCCFnGroup group, uint32_t fn) {
+void IDCCChannel::setFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
     DCC_LOGI("DCC::setFunctionGroup iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
@@ -52,15 +53,16 @@ void IDCCChannel::setFunctionGroup(int iReg, int addr, DCCFnGroup group, uint32_
     }     
 
 }
-void IDCCChannel::setFunction(int iReg, int addr, uint8_t fByte, uint8_t eByte) {
+void IDCCChannel::setFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
     // save space for checksum byte
     uint8_t b[5]; 
     uint8_t nB = 0;
+    uint16_t iAddr = addr.addr();
 
-    if (addr>127)
-        b[nB++] = highByte(addr) | 0xC0;  // convert train number into a two-byte address
+    if (addr.isLong())
+        b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
 
-    b[nB++] = lowByte(addr);
+    b[nB++] = lowByte(iAddr);
 
     if ( (fByte & B11000000) == B10000000) {// this is a request for functions FL,F1-F12  
         b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
@@ -80,13 +82,13 @@ void IDCCChannel::setFunction(int iReg, int addr, uint8_t fByte, uint8_t eByte) 
     loadPacket(0, b, nB, 4);
 
 }
-void IDCCChannel::setAccessory(int aAdd, int aNum, int activate) {
-    DCC_LOGI("DCC::setAccessory addr=%d; ch=%d; state=%d", aAdd, aNum, activate);
+void IDCCChannel::setAccessory(int addr, int output, bool activate) {
+    DCC_LOGI("DCC::setAccessory addr=%d; ch=%d; state=%c", addr, output, activate?'Y':'N');
 
     uint8_t b[3];                      // save space for checksum byte
 
-    b[0] = aAdd % 64 + 128;            // first byte is of the form 10AAAAAA, where AAAAAA represent 6 least significant bits of accessory address  
-    b[1] = ((((aAdd / 64) % 8) << 4) + (aNum % 4 << 1) + activate % 2) ^ 0xF8;      // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent activate/deactivate
+    b[0] = (addr & 0x3F) | 0x7F;            // first byte is of the form 10AAAAAA, where AAAAAA represent 6 least significant bits of accessory address  
+    b[1] = (((addr>>6) & 0x7) << 4 | (output & 0x3) << 1 | (activate?1:0) ) ^ 0xF8;      // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent activate/deactivate
 
     loadPacket(0, b, 2, 4);
 }
@@ -125,12 +127,12 @@ int16_t IDCCChannel::readCVProg(int cv) {
 
 	ret = 0;
 
-	for (int i = 0; i<8; i++) {
+	for (uint8_t i = 0; i<8; i++) {
         //Serial.print("bit "+String(i) );
 
         baseline = getBaselineCurrent();
 		
-		packet[2] = 0xE8 + i;
+		packet[2] = 0xE8 | i;
 
 		loadPacket(0, resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
 		loadPacket(0, packet, 3, 5);                // NMRA recommends 5 verify packets
@@ -141,10 +143,13 @@ int16_t IDCCChannel::readCVProg(int cv) {
 		//Serial.println("");
 	}
 
+    return verifyCVByteProg(cv, ret);
+
+/*
 	bitVal = 0;
 	baseline = getBaselineCurrent();
 
-	packet[0] = 0x74 | highByte(cv) & 0x03;   // set-up to re-verify entire byte
+	packet[0] = 0x74 | (highByte(cv) & 0x03);   // set-up to re-verify entire byte
 	packet[2] = ret;
 
 	loadPacket(0, resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
@@ -159,7 +164,23 @@ int16_t IDCCChannel::readCVProg(int cv) {
 	if (!bitVal)    // verify unsuccessful
 		ret = -1;
 
-	return ret;
+	return ret;*/
+}
+
+bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
+    int baseline = getBaselineCurrent();
+    uint8_t packet[4];
+
+    packet[0] = 0x74 | (highByte(cv) & 0x03); 
+    packet[1] = lowByte(cv);
+	packet[2] = bValue;
+
+    loadPacket(0, resetPacket, 2, 3);    // NMRA recommends starting with 3 reset packets
+	loadPacket(0, packet, 3, 5);         // NMRA recommends 5 verify packets
+	loadPacket(0, resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+
+    return checkCurrentResponse(baseline);
+
 }
 
 bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
@@ -168,7 +189,7 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
 
     cv--;                              // actual CV addresses are cv-1 (0-1023)
 
-    packet[0]=0x7C | highByte(cv)&0x03;   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+    packet[0]=0x7C | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
     packet[1]=lowByte(cv);
     packet[2]=bValue;
 
@@ -179,7 +200,7 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
 
     baseline = getBaselineCurrent();
 
-    packet[0]=0x74+(highByte(cv)&0x03);   // set-up to re-verify entire byte
+    packet[0]=0x74 | (highByte(cv)&0x03);   // set-up to re-verify entire byte
 
     loadPacket(0,resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
     loadPacket(0,packet,3,5);               // NMRA recommends 5 verfy packets
@@ -195,11 +216,11 @@ bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     
     cv--;                              // actual CV addresses are cv-1 (0-1023)
     bValue &= 0x1;
-    bNum &= 0x3;
+    bNum &= 0x7;
     
     packet[0]=0x78 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
     packet[1]=lowByte(cv);  
-    packet[2]=0xF0 | bValue<<3 | bNum;
+    packet[2]=0xF0 | bValue<3 | bNum;
 
     loadPacket(0,resetPacket,2,1);
     loadPacket(0,packet,3,4);
@@ -225,12 +246,12 @@ void IDCCChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
 
     cv--;
 
-    uint16_t adr = addr.addr();
+    uint16_t iAddr = addr.addr();
     if( addr.isLong() )    
-        packet[nB++]=highByte(adr) | 0xC0;      // convert train number into a two-byte address
+        packet[nB++]=highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
 
-    packet[nB++]=lowByte(adr);
-    packet[nB++]=0xEC+(highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+    packet[nB++]=lowByte(iAddr);
+    packet[nB++]=0xEC | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
     packet[nB++]=lowByte(cv);
     packet[nB++]=bValue;
 
@@ -248,11 +269,11 @@ void IDCCChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t
     bValue &= 0x1;
     bNum &= 0x3;
 
-    uint16_t adr = addr.addr();
+    uint16_t iAddr = addr.addr();
     if( addr.isLong() )  
-        b[nB++] = highByte(adr) | 0xC0;      // convert train number into a two-byte address
+        b[nB++] = highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
   
-    b[nB++]=lowByte(adr);
+    b[nB++]=lowByte(iAddr);
     b[nB++]=0xE8 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
     b[nB++]=lowByte(cv);
     b[nB++]=0xF0 | bValue<<3 | bNum;
