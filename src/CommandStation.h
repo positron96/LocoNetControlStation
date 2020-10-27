@@ -31,9 +31,12 @@ public:
 
     static const uint8_t MAX_SLOTS = 10;
     
-    CommandStation() { loadTurnouts();  }//: dccMain(0, 0, 0) {}
+    CommandStation(): dccMain(nullptr), dccProg(nullptr) { 
+        loadTurnouts();  
+    }
 
     void setDccMain(IDCCChannel * ch) { dccMain = ch; }
+    void setDccProg(IDCCChannel * ch) { dccProg = ch; }
 
     void setPowerState(bool v) {
         dccMain->setPower(v);
@@ -165,7 +168,7 @@ public:
         else if(fn<13) fg = DCCFnGroup::F9_12;
         else if(fn<21) fg = DCCFnGroup::F13_20;
         else           fg = DCCFnGroup::F21_28;
-        dccMain->setFunctionGroup(slot, dd.addr.addr(), fg, ifn);
+        dccMain->setFunctionGroup(slot, dd.addr, fg, ifn);
     }
 
     void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
@@ -174,7 +177,7 @@ public:
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current
         // update bits (v=) and set function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->setFunctionGroup(slot, dd.addr.addr(), FG, v ); }  
+            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->setFunctionGroup(slot, dd.addr, FG, v ); }  
 
         CHECK_SEND(     0x1F, DCCFnGroup::F0_4);
         CHECK_SEND(    0x1E0, DCCFnGroup::F5_8);
@@ -196,7 +199,7 @@ public:
         LocoData &dd = getSlot(slot);
         if(dd.dir==dir) return; 
         dd.dir = dir;
-        dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
+        dccMain->setThrottle(slot, dd.addr, dd.speed, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) { 
@@ -208,7 +211,7 @@ public:
         LocoData &dd = getSlot(slot);
         if(dd.speed == spd) return;
         dd.speed = spd;
-        dccMain->setThrottle(slot, dd.addr.addr(), dd.speed, dd.dir);
+        dccMain->setThrottle(slot, dd.addr, dd.speed, dd.dir);
     }
 
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
@@ -216,9 +219,34 @@ public:
         return getSlot(slot).speed;
     }
 
+    int16_t readCVProg(uint16_t cv) {
+        if(dccProg==nullptr) return -2;
+        return dccProg->readCVProg(cv);
+    }
+    bool verifyCVProg(uint16_t cv, uint8_t val) {
+        if(dccProg==nullptr) return false;
+        return dccProg->verifyCVByteProg(cv, val);
+    }
+    bool writeCvProg(uint16_t cv, uint8_t val) {
+        if(dccProg ==nullptr) return false;
+        return dccProg->writeCVByteProg(cv, val);
+    }
+    bool writeCvProgBit(uint16_t cv, uint8_t bit, bool val) {
+        if(dccProg ==nullptr) return false;
+        return dccProg->writeCVBitProg(cv, bit, val);
+    }
+    void writeCvMain(LocoAddress addr, uint16_t cv, uint8_t val) {
+        if(dccMain==nullptr) return;
+        dccMain->writeCVByteMain(addr, cv, val);
+    }
+    void writeCvMainBit(LocoAddress addr, uint16_t cv, uint8_t bit, bool val) {
+        if(dccMain==nullptr) return;
+        dccMain->writeCVBitMain(addr, cv, bit, val?1:0);
+    }
 
 private:
     IDCCChannel * dccMain;
+    IDCCChannel * dccProg;
 
     struct LocoData {
         using Fns = etl::bitset<29>;
