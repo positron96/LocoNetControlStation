@@ -1,28 +1,53 @@
-**This is a Command station for model railroad**
+# A Command station for model railroad
 
-It is based on ESP32 chip. Development is done with Arduino core for ESP32 on PlatformIO.
+The command station is based on ESP32 chip. 
+Development is done with Arduino core for ESP32 on PlatformIO.
 
 Planned features are:
 
-* [x] Running locos on main track via DCC (broken now)
-* [ ] OPS mode programming via DCC
+* [x] Running locos on main track via DCC
+* [x] OPS mode programming via DCC (not tested yet)
 * Loconet interface with routing from several sources:
-** [x] Physical LocoNet bus (RX timings broken now)
-** [x] LbServer (LocoNetOverTCP) over WiFi
+** [x] Physical LocoNet bus
+** [x] LbServer (LocoNet over TCP) over WiFi
 ** [x] USB-Serial interface (not tested yet)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
 * [ ] Stored turnout roster
-* [ ] DCC++ interface via USB-Serial or WiFi
+* [ ] DCC++ interface via USB-Serial or WiFi (mayby I'll drop this idea if not required)
 
-The implementation is based on these libraries:
+The intended primary interface of the command station is LocoNet.
+LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB. 
+However, if needed, LocoNet can be cut from project and DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
+WiThrottle protocol is used to connect from WiFi throttles and does not depend on LocoNet routing.
 
- *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks. 
+Architecture:
 
- * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified. 
+* DCC.h/.cpp: packet generation for DCC bus. 
+** `IDCCChannel` - an interface for working with one track (main/programming).
+** `DCCESP32Channel`- implementation of IDCCChannel. 
+Contains structures to store packets, switch between allocated slots. 
+A lot of architecture is derived from DCC++
+** `DCCESP32SignalGenerator` - a class that runs timer for DCC bit generation. 
+Contains references for 2 instances of IDCCChannel, so for both tracks only one timer is used.
 
- * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
+* CommandStation.h/.cpp: an API for a command station.
+The class finds, allocates, releases locomotive slots, sends programming data on programming tracks, stores turnout list.
+Calls functions from DCC.h to generate DCC packets.
 
- * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
+* LocoNetSlotManager.h/.cpp: a class that parses and generates LocoNet messages concerning command station functions. 
+Does slot managing and programming. 
+Calls functions from CommandStation.h for actual access to locomotives and tracks.
+
+* WiThrottle.h/.cpp: class for WiFi-based throttles (EngineDriver, WiThrottle and such).
+Calls functions from CommandStation.h for actual access to locomotives and tracks.
+
+* LbServer.h: LocoNet over TCP protocol implementation (for connecting to PC wirelessly over WiFi).
+Parses data from TCP, injects LocoNet packets into LocoNet bus, sends back result of sending packet over physical bus.
+Packets from the bus are sent to TCP.
+
+* LocoNetSerial: an implementation of LocoNet over UART (for connecting to PC with USB cable).
+Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited. 
+
 
 
 ## LocoNet routing
@@ -38,3 +63,13 @@ With this in mind, the LocoNet2 library was heavily redesigned and refactored.
 The LocoNet class is now separated into hardware backend (LocoNetPhy), a message parser (LocoNetDispatcher), and a routing bus (LocoNetBus) between them. 
 Other sources of messages extend LocoNetConsumer class and are connected to the bus. and messages.
 Frontend classes (Throttle, FastClock, SystemVariable etc) are connected to the message parser instead of hardware class and so can handle messages from all sources.
+
+The implementation is based on these libraries:
+
+ *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks. 
+
+ * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified. 
+
+ * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
+
+ * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
