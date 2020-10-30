@@ -10,7 +10,7 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_MUL   1
 
 
-void IDCCChannel::setThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection){
+void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection){
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
@@ -22,38 +22,38 @@ void IDCCChannel::setThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
     
-    DCC_LOGI("DCC::setThrottle iReg %d, addr %d, speed=%d %c", addr, addr, tSpeed, tDirection==1?'F':'B');
+    DCC_LOGI("DCC::setThrottle iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, tDirection==1?'F':'B');
     
     loadPacket(iReg, b, nB, 0);
 }
-void IDCCChannel::setFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
+void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
     DCC_LOGI("DCC::setFunctionGroup iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
             fn = (fn & 1)<<4 | (fn & 0x1E)<<1;
-            setFunction(iReg, addr,  B10000000 | (fn & B00011111) );
+            sendFunction(iReg, addr,  B10000000 | (fn & B00011111) );
             break;
         case DCCFnGroup::F5_8:
             fn >>= 5;
-            setFunction(iReg, addr,  B10110000 | (fn & B00001111) );
+            sendFunction(iReg, addr,  B10110000 | (fn & B00001111) );
             break;
         case DCCFnGroup::F9_12:
             fn >>= 9;
-            setFunction(iReg, addr,  B10100000 | (fn & B00001111) );
+            sendFunction(iReg, addr,  B10100000 | (fn & B00001111) );
             break;
         case DCCFnGroup::F13_20:
             fn >>= 13; 
-            setFunction(iReg, addr, B11011110, (uint8_t)fn );
+            sendFunction(iReg, addr, B11011110, (uint8_t)fn );
             break;
         case DCCFnGroup::F21_28:
             fn >>= 21; 
-            setFunction(iReg, addr, B11011111, (uint8_t)fn );
+            sendFunction(iReg, addr, B11011111, (uint8_t)fn );
             break;
     }     
 
 }
-void IDCCChannel::setFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
+void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
     // save space for checksum byte
     uint8_t b[5]; 
     uint8_t nB = 0;
@@ -82,13 +82,32 @@ void IDCCChannel::setFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t
     loadPacket(0, b, nB, 4);
 
 }
-void IDCCChannel::setAccessory(int addr, int output, bool activate) {
-    DCC_LOGI("DCC::setAccessory addr=%d; ch=%d; state=%c", addr, output, activate?'Y':'N');
 
-    uint8_t b[3];                      // save space for checksum byte
+void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
+    if(addr11>0)
+        addr11--;
+    sendAccessory( (addr11>>2) + 1, addr11 & 0x3, thrown);
+}
 
-    b[0] = (addr & 0x3F) | 0x7F;            // first byte is of the form 10AAAAAA, where AAAAAA represent 6 least significant bits of accessory address  
-    b[1] = (((addr>>6) & 0x7) << 4 | (output & 0x3) << 1 | (activate?1:0) ) ^ 0xF8;      // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent activate/deactivate
+void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
+    DCC_LOGI("DCC::sendAccessory addr=%d; ch=%d, thrown=%c", addr9, ch, thrown?'Y':'N');
+
+    uint8_t b[3];     // save space for checksum byte
+
+    /*
+    first byte is of the form 10AAAAAA, where AAAAAA represent
+    6 least significant bits of accessory address (9-bit. Here we have 14-bit address, so take bits 2-7) */
+    b[0] = ( addr9 & 0x3F) | 0x80;      
+    /*
+    "The most significant bits of the 9-bit address are bits 4-6 of the second data byte. 
+    By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
+    https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+    */
+    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent throw/close
+    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ B01110000 )
+        | (ch & 0x3) << 1 
+        | (thrown?1:0) 
+        | B10000000   ;
 
     loadPacket(0, b, 2, 4);
 }
@@ -111,6 +130,7 @@ bool IDCCChannel::checkCurrentResponse(uint baseline) {
             ret = true;
         }
     }
+    //DCC_LOGI("current ");
     return ret;
 }
 
@@ -218,9 +238,9 @@ bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     bValue &= 0x1;
     bNum &= 0x7;
     
-    packet[0]=0x78 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[1]=lowByte(cv);  
-    packet[2]=0xF0 | bValue<3 | bNum;
+    packet[0] = 0x78 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+    packet[1] = lowByte(cv);  
+    packet[2] = 0xF0 | bValue<<3 | bNum;
 
     loadPacket(0,resetPacket,2,1);
     loadPacket(0,packet,3,4);
@@ -250,10 +270,10 @@ void IDCCChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
     if( addr.isLong() )    
         packet[nB++]=highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
 
-    packet[nB++]=lowByte(iAddr);
-    packet[nB++]=0xEC | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[nB++]=lowByte(cv);
-    packet[nB++]=bValue;
+    packet[nB++] = lowByte(iAddr);
+    packet[nB++] = 0xEC | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+    packet[nB++] = lowByte(cv);
+    packet[nB++] = bValue;
 
     loadPacket(0,packet,nB,4);
 

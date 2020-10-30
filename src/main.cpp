@@ -37,11 +37,17 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 #define PIN_LED  22
 
 
-#define DCC_PIN 25
-#define DCC_PIN_EN 32
-#define DCC_PIN_SENSE 35
-DCCESP32Channel<10> dccMain(DCC_PIN, DCC_PIN_EN, DCC_PIN_SENSE);
-DCCESP32SignalGenerator dcc(1); //timer1
+#define DCC_MAIN_PIN 25
+#define DCC_MAIN_PIN_EN 32
+#define DCC_MAIN_PIN_SENSE 36
+#define DCC_PROG_PIN 26
+#define DCC_PROG_PIN_EN 33
+#define DCC_PROG_PIN_SENSE 39
+
+DCCESP32Channel<10> dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE);
+DCCESP32Channel<2> dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE);
+DCCESP32SignalGenerator dccTimer(1); //timer1
+
 LocoNetSlotManager slotMan(&bus);
 
 WiThrottleServer withrottleServer;
@@ -56,6 +62,8 @@ void setup() {
 
     pinMode(IN_PIN, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
+    
+    digitalWrite(PIN_LED, HIGH);
 
     locoNet.begin();
     //lSerial.begin();
@@ -99,8 +107,11 @@ void setup() {
     });
 
     CS.setDccMain(&dccMain);
+    CS.setDccProg(&dccProg);
+    CS.setLocoNetBus(&bus);
 
-    dcc.setMainChannel(&dccMain);
+    dccTimer.setMainChannel(&dccMain);
+    dccTimer.setProgChannel(&dccProg);
 
     /*
     WifiManager wifiManager;
@@ -131,10 +142,12 @@ void setup() {
     lbServer.begin();
     withrottleServer.begin(); 
 
-    //dcc.begin();
-    dccMain.begin();
+    dccTimer.begin();
+    //dccMain.begin();
 
     dccMain.setPower(true);
+
+    digitalWrite(PIN_LED, HIGH);
 
 }
 
@@ -153,6 +166,7 @@ void loop() {
         nextDccMeter = millis()+20;
     }*/
 
+    /*
     static unsigned long nextInRead = 0;
     static int inState = HIGH;
     if(millis()>nextInRead) {
@@ -167,7 +181,9 @@ void loop() {
             nextInRead = millis()+10;
         }
     }
+    */
 
+    /*
     if(Serial.available()) {
         Serial.read();
         DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
@@ -178,11 +194,16 @@ void loop() {
             if(r->currentBit==1) break;
         }
     }
+    */
 
-    /*static long nextDump = micros();
-    if(micros()>nextDump) {
-        nextDump = micros()+60;
-        dccMain.timerFunc();
-    }*/
+    static long nextDump = millis();
+    static float cur=0;
+    if(millis()>nextDump) {
+        nextDump = millis()+25;
+        uint32_t v = dccMain.readCurrent();
+        cur = cur*0.95 + v*0.05;
+        Serial.printf("%d, %d\n", v, (int)cur );
+        //dccMain.timerFunc();
+    }
 
 }

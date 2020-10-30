@@ -2,11 +2,16 @@
 
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
+//#include <esp_adc_cal.h>
 
 #include <etl/map.h>
 #include <etl/bitset.h>
 
 #include "LocoAddress.h"
+
+constexpr float ADC_RESISTANCE = 0.1;
+constexpr float ADC_TO_MV = 3300.0/4096;
+constexpr int ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
 
 #define DCC_DEBUG
 
@@ -43,17 +48,25 @@ public:
 
     virtual void end()=0;
 
-    virtual void unload(uint8_t ) = 0;
+    virtual void unloadSlot(uint8_t ) = 0;
 
     virtual void setPower(bool v)=0;
 
     virtual bool getPower()=0;
 
-    void setThrottle(int slot, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection);
-    void setFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
-    void setFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
-    void setAccessory(int, int, bool);
-    virtual uint16_t readCurrent()=0;
+    void sendThrottle(int slot, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection);
+    void sendFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
+    void sendFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
+    /**
+     * @param addr11 is 1-based.
+     */
+    void sendAccessory(uint16_t addr11, bool thr);
+    /** 
+     * @param addr9 is 1-based
+     * @param ch is 0-based.
+     */
+    void sendAccessory(uint16_t addr9, uint8_t ch, bool);
+    virtual float readCurrent()=0;
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
@@ -105,7 +118,19 @@ public:
     void begin() override {
         pinMode(_outputPin, OUTPUT);
         pinMode(_enPin, OUTPUT);
-        //digitalWrite(_enPin, HIGH);
+        digitalWrite(_enPin, LOW);
+
+        //DCC_LOGI("DCCESP32Channel(%d)::begin", _enPin);
+
+        //analogSetCycles(32);
+        //analogSetWidth(11);
+        analogSetPinAttenuation(_sensePin, ADC_0db); 
+        /*esp_adc_cal_value_t ar = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_0, ADC_WIDTH_BIT_12, 1100, &adc_chars);
+        if (ar == ESP_ADC_CAL_VAL_EFUSE_VREF) {
+            DCC_LOGI("eFuse Vref");
+        } else {
+            DCC_LOGI("Default vref");
+        }*/
 
         loadPacket(1, idlePacket, 2, 0);
     }
@@ -209,8 +234,9 @@ public:
         }
     };
 
-    uint16_t readCurrent() override {
-        return analogRead(_sensePin);
+    float readCurrent() override {        
+        //return esp_adc_cal_raw_to_voltage(analogRead(_sensePin), &adc_chars);
+        return analogRead(_sensePin)*1093.0/4096;
     }
 
     void IRAM_ATTR timerFunc() override {
@@ -312,7 +338,7 @@ protected:
 
     }
 
-    void unload(uint8_t iReg) override {
+    void unloadSlot(uint8_t iReg) override {
         const auto it = R.slotMap.find(iReg);
         if(it==R.slotMap.end()) {
             DCC_LOGW("Did not find slot for reg %d", iReg);
@@ -341,6 +367,8 @@ private:
     uint8_t _sensePin;
 
     uint16_t current;
+
+    //esp_adc_cal_characteristics_t adc_chars;
 
     RegisterList R;
 
