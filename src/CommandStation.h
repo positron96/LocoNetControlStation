@@ -10,6 +10,7 @@
 
 #include "DCC.h"
 #include "LocoAddress.h"
+#include <LocoNet.h>
 
 
 #define CS_DEBUG
@@ -31,12 +32,13 @@ public:
 
     static const uint8_t MAX_SLOTS = 10;
     
-    CommandStation(): dccMain(nullptr), dccProg(nullptr) { 
+    CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) { 
         loadTurnouts();  
     }
 
     void setDccMain(IDCCChannel * ch) { dccMain = ch; }
     void setDccProg(IDCCChannel * ch) { dccProg = ch; }
+    void setLocoNetBus(LocoNetBus *bus) { locoNet = bus; }
 
     void setPowerState(bool v) {
         dccMain->setPower(v);
@@ -77,12 +79,12 @@ public:
 
     const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
 
-    TurnoutState turnoutToggle(uint16_t aAddr, bool namedTurnout) {
-        return turnoutAction(aAddr, namedTurnout, -1);
+    TurnoutState turnoutToggle(uint16_t aAddr, bool fromRoster) {
+        return turnoutAction(aAddr, fromRoster, -1);
     }
 
-    TurnoutState turnoutAction(uint16_t aAddr, bool namedTurnout, TurnoutState newStat) {
-        return turnoutAction(aAddr, namedTurnout, (int)newStat);
+    TurnoutState turnoutAction(uint16_t aAddr, bool fromRoster, TurnoutState newStat) {
+        return turnoutAction(aAddr, fromRoster, (int)newStat);
     }
 
     bool isSlotAllocated(uint8_t slot) {
@@ -151,7 +153,7 @@ public:
         if(refresh) {
             
         } else {
-            dccMain->unload(slot);
+            dccMain->unloadSlot(slot);
         }
     }
 
@@ -168,7 +170,7 @@ public:
         else if(fn<13) fg = DCCFnGroup::F9_12;
         else if(fn<21) fg = DCCFnGroup::F13_20;
         else           fg = DCCFnGroup::F21_28;
-        dccMain->setFunctionGroup(slot, dd.addr, fg, ifn);
+        dccMain->sendFunctionGroup(slot, dd.addr, fg, ifn);
     }
 
     void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
@@ -177,7 +179,7 @@ public:
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current
         // update bits (v=) and set function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->setFunctionGroup(slot, dd.addr, FG, v ); }  
+            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }  
 
         CHECK_SEND(     0x1F, DCCFnGroup::F0_4);
         CHECK_SEND(    0x1E0, DCCFnGroup::F5_8);
@@ -199,7 +201,7 @@ public:
         LocoData &dd = getSlot(slot);
         if(dd.dir==dir) return; 
         dd.dir = dir;
-        dccMain->setThrottle(slot, dd.addr, dd.speed, dd.dir);
+        dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) { 
@@ -211,7 +213,7 @@ public:
         LocoData &dd = getSlot(slot);
         if(dd.speed == spd) return;
         dd.speed = spd;
-        dccMain->setThrottle(slot, dd.addr, dd.speed, dd.dir);
+        dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.dir);
     }
 
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
@@ -247,6 +249,7 @@ public:
 private:
     IDCCChannel * dccMain;
     IDCCChannel * dccProg;
+    LocoNetBus* locoNet;
 
     struct LocoData {
         using Fns = etl::bitset<29>;
@@ -266,10 +269,10 @@ private:
     LocoData slots[MAX_SLOTS]; ///< slot 1 has index 0 in this array. Slot 0 is invalid.
     LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
 
-    TurnoutState turnoutAction(uint16_t aAddr, bool namedTurnout, int8_t newStat) {
-        CS_DEBUGF("CommandStation::turnoutAction addr=%d named=%d new state=%d\n", aAddr, namedTurnout, newStat );
+    TurnoutState turnoutAction(uint16_t aAddr, bool fromRoster, int8_t newStat) {
+        CS_DEBUGF("CommandStation::turnoutAction addr=%d named=%d new state=%d\n", aAddr, fromRoster, newStat );
 
-        if(namedTurnout) {
+        if(fromRoster) {
             
             for (int t = 0 ; (t<MAX_TURNOUTS) && (turnoutData[t].addr!=0) ; t++) {
                 if(turnoutData[t].addr==aAddr) {
@@ -278,7 +281,7 @@ private:
                         newStat = turnoutData[t].tStatus==TurnoutState::CLOSED ? 0 : 1;
                     
                     //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
-                    //dccMain.setAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
+                    //dccMain.sendAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
                     turnoutData[t].tStatus = (TurnoutState)newStat;
 
                     //DEBUGS(String("parsed new status ")+newStat );
@@ -292,14 +295,17 @@ private:
 
             if(newStat==-1) 
                 newStat=(int)TurnoutState::THROWN;
-            // accessory command
-            //int addr = ((aAddr-1) >> 2) + 1; 
-            //int sub  = (aAddr-1) & 0x3; 
-
-            //dccMain.setAccessory(addr, sub, newStat);
-            //sendDCCppCmd("a "+String(addr)+" "+sub+" "+int(newStat) );
-            
         }
+
+        // send to DCC
+        dccMain->sendAccessory(aAddr, newStat==1);
+        // send to LocoNet
+        if(locoNet!=nullptr) {
+            LnMsg ttt = makeSwRec(aAddr, true, newStat==1);
+            locoNet->broadcast(ttt);
+        }
+        
+        //sendDCCppCmd("a "+String(addr)+" "+sub+" "+int(newStat) );
 
         return (TurnoutState)newStat;
     }
