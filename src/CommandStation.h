@@ -222,22 +222,22 @@ public:
     }
 
     int16_t readCVProg(uint16_t cv) {
-        IDCCChannel *dccProg = dccMain;
+        //IDCCChannel *dccProg = dccMain;
         if(dccProg==nullptr) return -2;
         return dccProg->readCVProg(cv);
     }
     bool verifyCVProg(uint16_t cv, uint8_t val) {
-        IDCCChannel *dccProg = dccMain;
+        //IDCCChannel *dccProg = dccMain;
         if(dccProg==nullptr) return false;
         return dccProg->verifyCVByteProg(cv, val);
     }
     bool writeCvProg(uint16_t cv, uint8_t val) {
-        IDCCChannel *dccProg = dccMain;
+        //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
         return dccProg->writeCVByteProg(cv, val);
     }
     bool writeCvProgBit(uint16_t cv, uint8_t bit, bool val) {
-        IDCCChannel *dccProg = dccMain;
+        //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
         return dccProg->writeCVBitProg(cv, bit, val);
     }

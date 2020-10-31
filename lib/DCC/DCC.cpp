@@ -122,9 +122,6 @@ uint IDCCChannel::getBaselineCurrent() {
         baseline += v;
     }
     baseline /= ACK_BASE_COUNT;
-    //for (int j = 0; j < ACK_BASE_COUNT; j++) Serial.println(dbg[j]);
-    //DCC_LOGI("base current is%d, took %ld us", baseline, micros()-t);
-    //DCC_LOGI("0, base current is %d", baseline);
     return baseline;
 }
 
@@ -144,7 +141,7 @@ bool IDCCChannel::checkCurrentResponse(uint baseline) {
             ret = true;
         }
     }
-    DCC_LOGI("result is %d, last value:%d, max: %d, baseline: %d", ret?1:0, max, baseline);
+    DCC_LOGD("result is %d, last value:%d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }
 
@@ -172,31 +169,11 @@ int16_t IDCCChannel::readCVProg(int cv) {
         bool bitVal = checkCurrentResponse(baseline);
         if(bitVal) bitSet(ret, i);
 
-        DCC_LOGI("Reading bit %d, value is %d", i, bitVal?1:0);
+        DCC_LOGD("Reading bit %d, value is %d", i, bitVal?1:0);
 	}
 
     return verifyCVByteProg(cv+1, ret) ? ret : -1;
 
-/*
-	bitVal = 0;
-	baseline = getBaselineCurrent();
-
-	packet[0] = 0x74 | (highByte(cv) & 0x03);   // set-up to re-verify entire byte
-	packet[2] = ret;
-
-	loadPacket(0, resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
-	loadPacket(0, packet, 3, 5);                // NMRA recommends 5 verify packets
-	loadPacket(0, resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
-
-	//Serial.print("verify "+String(ret)+": " );
-    bitVal = checkCurrentResponse(baseline);
-
-	//Serial.println("");
-
-	if (!bitVal)    // verify unsuccessful
-		ret = -1;
-
-	return ret;*/
 }
 
 bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {

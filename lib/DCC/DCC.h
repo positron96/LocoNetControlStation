@@ -29,8 +29,11 @@ constexpr int ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
 //#define DCC_DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
 //#define DCC_DEBUG_ISR_DUMP()  do{ Serial.print(_msg); _msg[0]=0; } while(0);
 #else
-#define DCC_DEBUGF(...)
-#define DCC_DEBUGF_ISR(...) 
+#define DCC_LOGD(...) 
+#define DCC_LOGD_ISR(...)
+#define DCC_LOGI(...) 
+#define DCC_LOGI_ISR( ...) 
+#define DCC_LOGW( ...) 
 #endif
 
 

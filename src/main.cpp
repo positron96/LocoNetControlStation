@@ -21,11 +21,11 @@ LocoNetBus bus;
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17
 //#include <LocoNetESP32UART.h>
-//LocoNetESP32Uart locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
+//LocoNetESP32Uart locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
 //#include <LocoNetESP32Hybrid.h>
-//LocoNetESP32Hybrid locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
+//LocoNetESP32Hybrid locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
 #include <LocoNetESP32.h>
-LocoNetESP32 locoNet(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+LocoNetESP32 locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
 LocoNetDispatcher parser(&bus);
 
 
@@ -63,22 +63,17 @@ void setup() {
     pinMode(IN_PIN, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
     
-    digitalWrite(PIN_LED, HIGH);
+    digitalWrite(PIN_LED, LOW);
 
-    locoNet.begin();
+    locoNetPhy.begin();
     //lSerial.begin();
-
+   
+    
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
-        Serial.print("rx'd ");
-        for(uint8_t x = 0; x < 4; x++) {
-            uint8_t val = rxPacket->data[x];
-            // Print a leading 0 if less than 16 to make 2 HEX digits
-            if(val < 16) {  Serial.print('0');  }
-
-            Serial.print(val, HEX);
-            Serial.print(' ');
-        }
-        Serial.print("\r\n");
+        
+        char tmp[100];
+        formatMsg(*rxPacket, tmp, sizeof(tmp));
+        Serial.printf("onPacket: %s\n", tmp);
 
     });
 
@@ -105,6 +100,8 @@ void setup() {
         Serial.print(" - ");
         Serial.println(state ? "Active" : "Inactive");
     });
+    
+    
 
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
@@ -166,22 +163,25 @@ void loop() {
         nextDccMeter = millis()+20;
     }*/
 
-    /*
+    
     static unsigned long nextInRead = 0;
-    static int inState = HIGH;
+    static int inState = 0;
     if(millis()>nextInRead) {
-        int v = digitalRead(IN_PIN);
-        digitalWrite(PIN_LED, v);
+        int v = 1-digitalRead(IN_PIN);
         if(v!=inState) {
-            Serial.printf( "reporting sensor %d\n", v==LOW) ;
-            reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
-            
-            inState = v;
-            //Serial.printf("errs: rx:%d,  tx:%d\n", locoNet.getRxStats()->rxErrors, locoNet.getTxStats()->txErrors );
-            nextInRead = millis()+10;
+            digitalWrite(PIN_LED, LOW);
+            //bool r = dccMain.verifyCVByteProg(1, v==1 ? 13 : 14);
+            int r = dccMain.readCVProg(1);
+            digitalWrite(PIN_LED, HIGH);
+            Serial.printf("main(): readCVProg: %d\n", r);
+            //Serial.printf( "reporting sensor %d\n", v==LOW) ;
+            //reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
+            //Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
+        nextInRead = millis()+10;
+        inState = v;
     }
-    */
+    
 
     /*
     if(Serial.available()) {
@@ -196,14 +196,16 @@ void loop() {
     }
     */
 
-    static long nextDump = millis();
+    /*
+    static long nextDump = micros();
     static float cur=0;
-    if(millis()>nextDump) {
-        nextDump = millis()+25;
+    if(micros()>nextDump) {
+        nextDump = micros()+250;
         uint32_t v = dccMain.readCurrent();
-        cur = cur*0.95 + v*0.05;
-        Serial.printf("%d, %d\n", v, (int)cur );
+        cur = cur*0.9 + v*0.1;
+        if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
         //dccMain.timerFunc();
-    }
+    }*/
+    
 
 }

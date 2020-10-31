@@ -46,7 +46,8 @@ void WiThrottleServer::loop() {
                 String dataStr = cli.readStringUntil('\n'); 
                 WT_LOGI("Read new cmd(%d b), took %d ms", dataStr.length(), millis()-t0);
                 */
-                char c = cli.read();
+                int c = cli.read();
+                if(c==-1) continue;
                 //if(c>=32) WT_LOGI("read char '%c'", c); else WT_LOGI("read char #%d", c);
                 if(c=='\n') {
                     cc.cmdline[cc.cmdpos] = 0;

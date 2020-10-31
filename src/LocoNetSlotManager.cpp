@@ -13,7 +13,8 @@
 #define LNSM_LOGW(...) 
 #endif
 
-constexpr uint8_t PROG_LACK = 0x7F;
+/// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
+constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
 static LocoAddress lnAddr(uint16_t addr) {
     if(addr<=127) return LocoAddress::shortAddr(addr);
@@ -58,7 +59,7 @@ static LocoAddress lnAddr(uint16_t addr) {
                 int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
                 if(slot<=0) {
                     sendLack(OPC_LOCO_ADR);
-                    Serial.printf("OPC_LOCO_ADR for addr %d, no slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
+                    LNSM_LOGI("OPC_LOCO_ADR for addr %d, no slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
                     break;
                 }
                 
@@ -162,10 +163,10 @@ static LocoAddress lnAddr(uint16_t addr) {
     void LocoNetSlotManager::sendSlotData(uint8_t slot) {        
         LnMsg ret;
         ret.sd = _slots[slot];
-        LNSM_LOGI("LocoNetSlotManager::sendSlotData: sending ");
-        for(uint8_t i=0; i<ret.length(); i++) {
-            LNSM_LOGI(" %02X", ret.data[i]);
-        }
+        
+        char tmp[100];
+        formatMsg(ret, tmp, 100);
+        LNSM_LOGI("sending %s", tmp);
 
         writeChecksum(ret);
         _ln->broadcast(ret, this);
@@ -212,9 +213,8 @@ static LocoAddress lnAddr(uint16_t addr) {
     }
 
 void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint16_t cv, uint8_t value ) {
-    
 
-    LNSM_LOGI("LocoNetSlotManager::sendProgData pstat=%02xh, cv=%d, val=%d", 
+    LNSM_LOGI("pstat=%02xh, cv=%d, val=%d", 
         pstat, cv, value);
     cv--;
 
