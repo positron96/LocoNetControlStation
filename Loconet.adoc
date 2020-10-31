@@ -475,7 +475,7 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
 | 3+a| 
 `<0xB4>,<LOPC>,<ACK1>,<CHK>` 
 
-`<LOPC>` is copy of OPCode the LACK is responding to (msb=0). LOPC=0 (unused OPC) is also valid fail code.
+`<LOPC>` is copy of OPCode the LACK is responding to (with MSB set to 0). LOPC=0 (unused OPC) is also valid fail code.
 
 `<ACK1>` is an appropriate response code for the OPCode
 

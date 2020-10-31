@@ -3,8 +3,9 @@
 #include <WiFi.h>
 #include <ln_opc.h>
 #include <LocoNet.h>
+#include <etl/queue.h>
 
-#define LB_DEBUG_
+#define LB_DEBUG
 
 #ifdef LB_DEBUG
 #define LB_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
@@ -52,11 +53,11 @@ public:
                         for(uint8_t i=5; i<=lbPos; i++) {
                             if(lbStr[i]==' ') {
                                 uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                                LB_DEBUGF("LbServer::loop adding byte %02x\n", val);
+                                //LB_DEBUGF("LbServer::loop adding byte %02x\n", val);
                                 LnMsg *msg = lbBuf.addByte(val);
                                 if(msg!=nullptr) {
                                     
-                                    onMessage(*msg); // echo
+                                    sendMessage(*msg); // echo
 
                                     LB_DEBUGF("LbServer::loop got message ");
                                     for(int i=0; i<msg->length(); i++) { LB_DEBUGF("%02x ", msg->data[i]); }
@@ -81,20 +82,16 @@ public:
 
             }
 
+            while(!txQueue.empty()) {
+                sendMessage(txQueue.front());
+                txQueue.pop();
+            }
+
         }
     }
 
-    virtual LN_STATUS onMessage(const lnMsg& msg) {
-        if(!cli) return LN_DONE;
-
-        cli.print("RECEIVE ");
-        uint8_t ln = msg.length();
-        for(int j=0; j<ln; j++) {
-            cli.print(msg.data[j], HEX);
-            cli.print(" ");
-        }
-        cli.println();
-
+    LN_STATUS onMessage(const lnMsg& msg) override {
+        txQueue.push(msg);
         return LN_DONE;
     }
 
@@ -105,9 +102,35 @@ private:
     WiFiServer server;
     WiFiClient cli;
 
+    etl::queue<LnMsg, 5> txQueue;
+
     LocoNetMessageBuffer lbBuf;
     const static int LB_BUF_SIZE = 100;
     char lbStr[LB_BUF_SIZE];
     int lbPos = 0;
+
+    void sendMessage(const LnMsg &msg) {
+        if(!cli) return;
+        char ttt[100] = "RECEIVE";
+        uint t = strlen(ttt);
+        uint8_t ln = msg.length();
+        for(int j=0; j<ln; j++) {
+            t += sprintf(ttt+t, " %02X", msg.data[j]);
+        }
+        LB_DEBUGF("LbServer::sendMessage: Transmitting '%s'\n", ttt );
+        cli.write(ttt);
+        cli.println();
+
+        /*LB_DEBUGF("LbServer::onMessage: Transmitting %d bytes\n", msg.length() );
+        cli.print("RECEIVE ");
+        uint8_t ln = msg.length();
+        for(int j=0; j<ln; j++) {
+            if(msg.data[j]<=0xF) cli.print('0');
+            cli.print(msg.data[j], HEX);
+            cli.print(" ");
+        }
+        cli.println();*/
+
+    }
 
 };

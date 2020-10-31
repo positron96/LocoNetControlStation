@@ -4,10 +4,10 @@ uint8_t idlePacket[3] = {0xFF, 0x00, 0};
 uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
-#define  ACK_SAMPLE_COUNT          500      /**< Number of analogRead samples to take when monitoring current after a CV verify (bit or byte) has been sent.*/ 
-#define  ACK_SAMPLE_SMOOTHING      0.8      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
-#define  ACK_SAMPLE_THRESHOLD       10      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
-#define  ACK_MUL   1
+//#define  ACK_SAMPLE_COUNT          500      /**< Number of analogRead samples to take when monitoring current after a CV verify (bit or byte) has been sent.*/ 
+#define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds
+#define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
+#define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
 
 void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection){
@@ -22,12 +22,12 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
     
-    DCC_LOGI("DCC::setThrottle iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, tDirection==1?'F':'B');
+    DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, tDirection==1?'F':'B');
     
     loadPacket(iReg, b, nB, 0);
 }
 void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
-    DCC_LOGI("DCC::setFunctionGroup iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
+    DCC_LOGI("iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
@@ -71,7 +71,7 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
         b[nB++] = eByte;
     }
 
-    DCC_LOGI("DCC::setFunction iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
+    DCC_LOGI("iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
 
     /* 
     NMRA DCC norm ask for two DCC packets instead of only one:
@@ -90,7 +90,7 @@ void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
 }
 
 void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
-    DCC_LOGI("DCC::sendAccessory addr=%d; ch=%d, thrown=%c", addr9, ch, thrown?'Y':'N');
+    DCC_LOGI("addr=%d, ch=%d, thrown=%c", addr9, ch, thrown?'Y':'N');
 
     uint8_t b[3];     // save space for checksum byte
 
@@ -113,32 +113,44 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
 }
 
 uint IDCCChannel::getBaselineCurrent() {
-    uint baseline = 0;    
+    uint baseline = 0;
+    long t = micros();
+
     // collect baseline current
-    for (int j = 0; j < ACK_BASE_COUNT; j++) baseline += readCurrent();
+    for (int j = 0; j < ACK_BASE_COUNT; j++) {
+        uint16_t v = readCurrent();
+        baseline += v;
+    }
     baseline /= ACK_BASE_COUNT;
+    //for (int j = 0; j < ACK_BASE_COUNT; j++) Serial.println(dbg[j]);
+    //DCC_LOGI("base current is%d, took %ld us", baseline, micros()-t);
+    //DCC_LOGI("0, base current is %d", baseline);
     return baseline;
 }
 
+// https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
 bool IDCCChannel::checkCurrentResponse(uint baseline) {
     bool ret = false;
-    int c = 0, v;
-    for (int j = 0; j<ACK_SAMPLE_COUNT; j++) {
+    int v;
+    float c = 0;
+    int max=0;
+    uint32_t to = millis()+ACK_SAMPLE_MILLIS;
+    while(millis()<to) {    
         v = readCurrent();
-        c = (int)(ACK_MUL*(v - baseline)*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING));
-        if (c>ACK_SAMPLE_THRESHOLD*ACK_MUL) {
+        v-= baseline;
+        c = v*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING);
+        if(c>max) max=c;
+        if (c>ACK_SAMPLE_THRESHOLD) {
             ret = true;
         }
     }
-    //DCC_LOGI("current ");
+    DCC_LOGI("result is %d, last value:%d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }
 
 int16_t IDCCChannel::readCVProg(int cv) {
 	uint8_t packet[4];
 	int ret;
-	int baseline;
-    bool bitVal;
 
 	cv--;                              // actual CV addresses are cv-1 (0-1023)
 
@@ -147,23 +159,23 @@ int16_t IDCCChannel::readCVProg(int cv) {
 
 	ret = 0;
 
-	for (uint8_t i = 0; i<8; i++) {
-        //Serial.print("bit "+String(i) );
+    int baseline = getBaselineCurrent();
 
-        baseline = getBaselineCurrent();
-		
+	for (uint8_t i = 0; i<8; i++) {
 		packet[2] = 0xE8 | i;
 
 		loadPacket(0, resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
-		loadPacket(0, packet, 3, 5);                // NMRA recommends 5 verify packets
+
+		loadPacket(0, packet, 3, 5);               // NMRA recommends 5 verify packets
 		loadPacket(0, resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
-        bitVal = checkCurrentResponse(baseline);
-		bitWrite(ret, i, bitVal?1:0);
-		//Serial.println("");
+        bool bitVal = checkCurrentResponse(baseline);
+        if(bitVal) bitSet(ret, i);
+
+        DCC_LOGI("Reading bit %d, value is %d", i, bitVal?1:0);
 	}
 
-    return verifyCVByteProg(cv, ret);
+    return verifyCVByteProg(cv+1, ret) ? ret : -1;
 
 /*
 	bitVal = 0;
@@ -188,14 +200,18 @@ int16_t IDCCChannel::readCVProg(int cv) {
 }
 
 bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
-    int baseline = getBaselineCurrent();
+    DCC_LOGI("Verifying cv%d==%d", cv, bValue);
     uint8_t packet[4];
+
+    cv--;
 
     packet[0] = 0x74 | (highByte(cv) & 0x03); 
     packet[1] = lowByte(cv);
 	packet[2] = bValue;
 
-    loadPacket(0, resetPacket, 2, 3);    // NMRA recommends starting with 3 reset packets
+    loadPacket(0, resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
+    loadPacket(0, resetPacket, 2, 3); 
+    int baseline = getBaselineCurrent();
 	loadPacket(0, packet, 3, 5);         // NMRA recommends 5 verify packets
 	loadPacket(0, resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 

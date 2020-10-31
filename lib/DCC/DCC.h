@@ -122,7 +122,7 @@ public:
 
         //DCC_LOGI("DCCESP32Channel(%d)::begin", _enPin);
 
-        //analogSetCycles(32);
+        //analogSetCycles(16);
         //analogSetWidth(11);
         analogSetPinAttenuation(_sensePin, ADC_0db); 
         /*esp_adc_cal_value_t ar = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_0, ADC_WIDTH_BIT_12, 1100, &adc_chars);
@@ -236,7 +236,7 @@ public:
 
     float readCurrent() override {        
         //return esp_adc_cal_raw_to_voltage(analogRead(_sensePin), &adc_chars);
-        return analogRead(_sensePin)*1093.0/4096;
+        return analogRead(_sensePin);//*1093.0/4096;
     }
 
     void IRAM_ATTR timerFunc() override {
