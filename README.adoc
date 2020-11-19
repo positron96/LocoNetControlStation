@@ -73,3 +73,6 @@ The implementation is based on these libraries:
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
+
+
+image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
