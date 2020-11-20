@@ -4,7 +4,6 @@ uint8_t idlePacket[3] = {0xFF, 0x00, 0};
 uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
-//#define  ACK_SAMPLE_COUNT          500      /**< Number of analogRead samples to take when monitoring current after a CV verify (bit or byte) has been sent.*/ 
 #define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds
 #define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
@@ -15,14 +14,15 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8
     uint8_t nB = 0;
 
     uint16_t iAddr = addr.addr();
-    if ( addr.isLong() )
+    if ( addr.isLong() ) {
         b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
+    }
 
     b[nB++] = lowByte(iAddr);
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
-    b[nB++] = (tSpeed & B01111111) | ( (tDirection & 1) << 7); 
+    b[nB++] = (tSpeed & B01111111) | ( (tDirection & 0x1) << 7); 
     
-    DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, tDirection==1?'F':'B');
+    DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, (tDirection==1)?'F':'B');
     
     loadPacket(iReg, b, nB, 0);
 }
@@ -31,7 +31,7 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
-            fn = (fn & 1)<<4 | (fn & 0x1E)<<1;
+            fn = (fn & 0x1)<<4 | (fn & 0x1E)<<1;
             sendFunction(iReg, addr,  B10000000 | (fn & B00011111) );
             break;
         case DCCFnGroup::F5_8:
@@ -50,6 +50,8 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
             fn >>= 21; 
             sendFunction(iReg, addr, B11011111, (uint8_t)fn );
             break;
+        default:
+            break;
     }     
 
 }
@@ -59,8 +61,9 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
     uint8_t nB = 0;
     uint16_t iAddr = addr.addr();
 
-    if (addr.isLong())
+    if (addr.isLong()) {
         b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
+    }
 
     b[nB++] = lowByte(iAddr);
 
@@ -84,8 +87,9 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
 }
 
 void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
-    if(addr11>0)
+    if(addr11>0) {
         addr11--;
+    }
     sendAccessory( (addr11>>2) + 1, addr11 & 0x3, thrown);
 }
 
@@ -106,7 +110,7 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent throw/close
     b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ B01110000 )
         | (ch & 0x3) << 1 
-        | (thrown?1:0) 
+        | (thrown?0x1:0) 
         | B10000000   ;
 
     loadPacket(0, b, 2, 4);
@@ -114,7 +118,6 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
 
 uint IDCCChannel::getBaselineCurrent() {
     uint baseline = 0;
-    long t = micros();
 
     // collect baseline current
     for (int j = 0; j < ACK_BASE_COUNT; j++) {
@@ -128,15 +131,14 @@ uint IDCCChannel::getBaselineCurrent() {
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
 bool IDCCChannel::checkCurrentResponse(uint baseline) {
     bool ret = false;
-    int v;
     float c = 0;
     int max=0;
     uint32_t to = millis()+ACK_SAMPLE_MILLIS;
     while(millis()<to) {    
-        v = readCurrent();
+        int v = readCurrent();
         v-= baseline;
         c = v*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING);
-        if(c>max) max=c;
+        if(c>max) { max=c; }
         if (c>ACK_SAMPLE_THRESHOLD) {
             ret = true;
         }
