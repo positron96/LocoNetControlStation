@@ -1,4 +1,6 @@
-# A Command station for model railroad
+# A LocoNet Command station for model railroad based on ESP32
+
+image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
 The command station is based on ESP32 chip. 
 Development is done with Arduino core for ESP32 on PlatformIO.
@@ -6,7 +8,7 @@ Development is done with Arduino core for ESP32 on PlatformIO.
 Planned features are:
 
 * [x] Running locos on main track via DCC
-* [x] OPS mode programming via DCC (not tested yet)
+* [x] OPS mode programming via DCC (read CV works)
 * Loconet interface with routing from several sources:
 ** [x] Physical LocoNet bus
 ** [x] LbServer (LocoNet over TCP) over WiFi
@@ -74,5 +76,3 @@ The implementation is based on these libraries:
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
 
-
-image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]

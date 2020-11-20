@@ -20,7 +20,7 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8
 
     b[nB++] = lowByte(iAddr);
     b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
-    b[nB++] = (tSpeed & B01111111) | ( (tDirection & 0x1) << 7); 
+    b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
     
     DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, (tDirection==1)?'F':'B');
     
@@ -90,7 +90,7 @@ void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
     if(addr11>0) {
         addr11--;
     }
-    sendAccessory( (addr11>>2) + 1, addr11 & 0x3, thrown);
+    sendAccessory( (addr11>>2) + 1U, addr11 & 0x3, thrown);
 }
 
 void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
@@ -132,13 +132,13 @@ uint IDCCChannel::getBaselineCurrent() {
 bool IDCCChannel::checkCurrentResponse(uint baseline) {
     bool ret = false;
     float c = 0;
-    int max=0;
+    int max = 0;
     uint32_t to = millis()+ACK_SAMPLE_MILLIS;
     while(millis()<to) {    
         int v = readCurrent();
         v-= baseline;
         c = v*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING);
-        if(c>max) { max=c; }
+        if(c>max) { max=(int)c; }
         if (c>ACK_SAMPLE_THRESHOLD) {
             ret = true;
         }
@@ -317,8 +317,9 @@ void IRAM_ATTR timerCallback() {
     _inst->timerFunc();
 }
 
+
 DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum) 
-    : _timerNum(timerNum) 
+    : _timer(nullptr),  _timerNum(timerNum)
 {
     _inst = this;
 }
@@ -336,7 +337,7 @@ void DCCESP32SignalGenerator::begin() {
 
 void DCCESP32SignalGenerator::end() {
     if(_timer!=nullptr) {
-        if(timerStarted(_timer) ) timerStop(_timer);
+        if(timerStarted(_timer) ) { timerStop(_timer); }
         timerEnd(_timer);
         _timer = nullptr;
     }

@@ -17,7 +17,7 @@
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
 static LocoAddress lnAddr(uint16_t addr) {
-    if(addr<=127) return LocoAddress::shortAddr(addr);
+    if(addr<=127) { return LocoAddress::shortAddr(addr); }
     return LocoAddress::longAddr(addr);
 }
 
@@ -136,7 +136,9 @@ static LocoAddress lnAddr(uint16_t addr) {
                 if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;} 
                 LNSM_LOGI("OPC_RQ_SL_DATA slot %d", slot);
                 sendSlotData(slot);
+                break;
             }
+            default: break;
         }
         
     } 
@@ -144,11 +146,11 @@ static LocoAddress lnAddr(uint16_t addr) {
 
 
     int LocoNetSlotManager::locateSlot(uint8_t hi, uint8_t lo) {
-        LocoAddress addr = hi==0 ? LocoAddress::shortAddr(lo) : LocoAddress::longAddr(ADDR(hi,lo));
+        LocoAddress addr = (hi==0) ? LocoAddress::shortAddr(lo) : LocoAddress::longAddr(ADDR(hi,lo));
         uint8_t slot = CS.findLocoSlot(addr);
         if(slot==0) {
             slot = CS.locateFreeSlot();
-            if(slot==0) return 0;
+            if(slot==0) { return 0; }
             CS.initLocoSlot(slot, addr);
             initSlot(slot, hi, lo);
         }
@@ -180,7 +182,7 @@ static LocoAddress lnAddr(uint16_t addr) {
     void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
         LNSM_LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
         _slots[slot].dirf = v;
-        uint8_t dir = (v & DIRF_DIR) == DIRF_DIR ? 1 : 0;
+        uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 1 : 0;
         CS.setLocoDir(slot, dir);
         CS.setLocoFns(slot, 0x1F, (v & B00001111)<<1 | (v & B00010000)>>4 );  // fn order in this byte is 04321
     }
@@ -212,11 +214,9 @@ static LocoAddress lnAddr(uint16_t addr) {
         _slots[slot].spd = spd;
     }
 
-void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint16_t cv, uint8_t value ) {
+void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint8_t value ) {
 
-    LNSM_LOGI("pstat=%02xh, cv=%d, val=%d", 
-        pstat, cv, value);
-    cv--;
+    LNSM_LOGI("pstat=%02xh, val=%d", pstat, value);
 
     ret.command = OPC_SL_RD_DATA;
     ret.mesg_size = 14;
@@ -243,14 +243,14 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
                 LNSM_LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 1); // ack ok
                 int16_t ret = CS.readCVProg(cv);
-                sendProgData(msg, ret>=0?0:PSTAT_READ_FAIL, cv, ret>=0?ret:0);
+                sendProgData(msg, (ret>=0) ? 0 : PSTAT_READ_FAIL, ret>=0?ret:0);
                 break;
             }
             case SRVC_TRK_RESERVED: {// make it a verify command.
                 LNSM_LOGI("Verify byte on prog CV%d==%d", cv, val);
                 sendLack(PROG_LACK, 1); // ack ok
                 bool ret = CS.verifyCVProg(cv, val);
-                sendProgData(msg, ret?0:PSTAT_READ_FAIL, cv, val);
+                sendProgData(msg, ret?0:PSTAT_READ_FAIL, val);
                 break;
             }
             default:
@@ -263,7 +263,7 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
                 LNSM_LOGI("Write byte on prog CV%d=%d", cv, val);
                 sendLack(PROG_LACK, 1); // ack ok
                 bool ret = CS.writeCvProg(cv, val);
-                sendProgData(msg, ret?0:PSTAT_WRITE_FAIL, cv, val);
+                sendProgData(msg, ret?0:PSTAT_WRITE_FAIL, val);
                 break;
             }
             /*case DIR_BIT_ON_SRVC_TRK:

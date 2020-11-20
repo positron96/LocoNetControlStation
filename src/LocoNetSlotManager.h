@@ -39,7 +39,7 @@ private:
 
     void sendLack(uint8_t cmd, uint8_t arg=0);
 
-    void sendProgData(progTaskMsg, uint8_t pstat, uint16_t cv, uint8_t value );
+    void sendProgData(progTaskMsg, uint8_t pstat, uint8_t value );
 
     void processDirf(uint8_t slot, uint v) ;
 

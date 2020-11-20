@@ -25,7 +25,7 @@ LocoAddress str2addr(String addr) {
 }
 
 inline int invert(int value) {
-    return value == 0 ? 1 : 0;
+    return (value == 0) ? 1 : 0;
 };
 
 
@@ -37,7 +37,7 @@ void WiThrottleServer::loop() {
         if (!cli) {
             if(cc.connected) clientStop(iClient);
             cli = server.available();
-            if(cli) clientStart(iClient);
+            if(cli) { clientStart(iClient); }
         } 
         if (cli) { // connected client
             size_t a = cli.available();
@@ -101,7 +101,7 @@ void WiThrottleServer::processCmd(int iClient) {
                 named = false;
             }
             accessoryToggle(aAddr, aStatus, named);
-        }
+        } else {}
         break;
     }
     case 'N': { // device name
@@ -132,6 +132,8 @@ void WiThrottleServer::processCmd(int iClient) {
     case 'Q':
         // quit
         clientStop(iClient);
+        break;
+    default:
         break;
     }
 }
