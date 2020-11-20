@@ -44,7 +44,11 @@ public:
         dccMain->setPower(v);
     }
 
-    bool getPowerState() const { return dccMain->getPower(); }
+    bool getPowerState() const { 
+        return dccMain!=nullptr ? dccMain->getPower() 
+             : dccProg!=nullptr ? dccProg->getPower() 
+             : false; 
+    }
 
 
     /* Define turnout object structures */
