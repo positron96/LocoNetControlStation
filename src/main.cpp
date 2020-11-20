@@ -55,6 +55,17 @@ WiThrottleServer withrottleServer;
 
 #define IN_PIN 13
 
+constexpr int LED_INTL_NORMAL = 1000;
+constexpr int LED_INTL_CONFIG1 = 500;
+constexpr int LED_INTL_CONFIG2 = 250;
+
+uint32_t ledNextUpdate;
+uint8_t ledVal;
+
+void ledFire(uint32_t=0, uint8_t=1);
+void ledStop();
+void ledUpdate();
+
 void setup() {
 
     Serial.begin(115200);
@@ -101,14 +112,13 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
     
+    dccTimer.setMainChannel(&dccMain);
+    dccTimer.setProgChannel(&dccProg);    
     
-
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
     CS.setLocoNetBus(&bus);
-
-    dccTimer.setMainChannel(&dccMain);
-    dccTimer.setProgChannel(&dccProg);
+    
 
     /*
     WifiManager wifiManager;
@@ -143,8 +153,9 @@ void setup() {
     //dccMain.begin();
 
     dccMain.setPower(true);
+    dccProg.setPower(true);
 
-    digitalWrite(PIN_LED, HIGH);
+    ledFire();
 
 }
 
@@ -163,24 +174,28 @@ void loop() {
         nextDccMeter = millis()+20;
     }*/
 
+    ledUpdate();
+
+    
     
     static unsigned long nextInRead = 0;
     static int inState = 0;
     if(millis()>nextInRead) {
         int v = 1-digitalRead(IN_PIN);
         if(v!=inState) {
-            digitalWrite(PIN_LED, LOW);
+            
             //bool r = dccMain.verifyCVByteProg(1, v==1 ? 13 : 14);
-            int r = dccMain.readCVProg(1);
-            digitalWrite(PIN_LED, HIGH);
-            Serial.printf("main(): readCVProg: %d\n", r);
-            //Serial.printf( "reporting sensor %d\n", v==LOW) ;
-            //reportSensor(&bus, 10, v==LOW);// it's pulled up when idle.
-            //Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
+            //int r = dccMain.readCVProg(1);
+            
+            //Serial.printf("main(): readCVProg: %d\n", r);
+            Serial.printf( "reporting sensor %d\n", v==HIGH) ;
+            reportSensor(&bus, 1, v==HIGH);
+            Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
         nextInRead = millis()+10;
         inState = v;
     }
+    
     
 
     /*
@@ -208,4 +223,29 @@ void loop() {
     }*/
     
 
+}
+
+
+void ledFire(uint32_t ms, uint8_t val) {
+    if(ms==0) ms = LED_INTL_NORMAL;
+    ledVal = val;
+    digitalWrite(PIN_LED, ledVal);  
+    ledNextUpdate = millis()+ms;
+}
+void ledStop() {
+    digitalWrite(PIN_LED, LOW); 
+    ledNextUpdate = 0; // turn off blink
+}
+void ledUpdate() {
+    if(ledNextUpdate!=0 && millis()>ledNextUpdate) {
+        ledVal = 1-ledVal;
+        digitalWrite(PIN_LED, ledVal);
+        
+        //if(!configMode) {
+        ledNextUpdate = LED_INTL_NORMAL; 
+        /*} else {
+        ledNextUpdate = configVar==0 ? LED_INTL_CONFIG1 : LED_INTL_CONFIG2;
+        }*/
+        ledNextUpdate += millis();
+    }
 }

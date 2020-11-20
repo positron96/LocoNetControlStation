@@ -6,7 +6,7 @@ Development is done with Arduino core for ESP32 on PlatformIO.
 Planned features are:
 
 * [x] Running locos on main track via DCC
-* [x] OPS mode programming via DCC (read CV works)
+* [x] OPS mode programming via DCC (not tested yet)
 * Loconet interface with routing from several sources:
 ** [x] Physical LocoNet bus
 ** [x] LbServer (LocoNet over TCP) over WiFi
