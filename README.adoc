@@ -22,7 +22,16 @@ LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, U
 However, if needed, LocoNet can be cut from project and DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
 WiThrottle protocol is used to connect from WiFi throttles and does not depend on LocoNet routing.
 
-Architecture:
+## Hardware
+
+The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module (that's one of the cheapest ESP32 board) and L298N chip for DCC generation for both main and program tracks.
+LocoNet part uses usual in DIY LocoNet community LM393 comparator with resistors adapted for 3.3V levels.
+
+The PCB is open-source and is available here: https://easyeda.com/positron96/loconet-command-station.
+
+The project also works on breadboard with L298N board (a red one with current sensing pins broken out) and DIP versions of components.
+
+## Code architecture:
 
 * DCC.h/.cpp: packet generation for DCC bus. 
 ** `IDCCChannel` - an interface for working with one track (main/programming).
@@ -50,9 +59,7 @@ Packets from the bus are sent to TCP.
 * LocoNetSerial: an implementation of LocoNet over UART (for connecting to PC with USB cable).
 Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited. 
 
-
-
-## LocoNet routing
+### LocoNet routing
 
 Since this project is an Ultimate Command Station, it must accepts Loconet messages from different sources: physical LocoNet bus, USB-Serial, LbServer (LocoNet over TCP). All messages must be transparently routed to between all connected buses. It means that:
 
