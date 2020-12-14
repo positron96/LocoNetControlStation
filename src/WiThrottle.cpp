@@ -149,9 +149,11 @@ void WiThrottleServer::clientStart(int iClient) {
     wifiPrintln(iClient, String("PPA")+powerStatus );
     wifiPrintln(iClient, "PTT]\\[Turnouts}|{Turnout]\\[Closed}|{"+String(TURNOUT_CLOSED)+"]\\[Thrown}|{"+String(TURNOUT_THROWN) );
     wifiPrint(iClient, "PTL");
-    for (int t = 0 ; t<CS.getTurnoutCount(); t++) {
-        const CommandStation::TurnoutData &tt = CS.getTurnout(t);
-        wifiPrint(iClient, String("]\\[")+TURNOUT_PREF+tt.addr+"}|{"+tt.id+"}|{"
+    for(const auto &t: CS.getTurnouts() ) {
+    //for (int t = 0 ; t<CS.getTurnoutCount(); t++) {
+        //const CommandStation::TurnoutData &tt = CS.getTurnout(t);
+        const CommandStation::TurnoutData &tt = t.second;
+        wifiPrint(iClient, String("]\\[")+TURNOUT_PREF+tt.addr11+"}|{"+tt.id+"}|{"
             +(tt.tStatus==TurnoutState::THROWN ? TURNOUT_THROWN : TURNOUT_CLOSED) );
     }
     wifiPrintln(iClient, "");

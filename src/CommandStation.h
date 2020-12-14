@@ -53,20 +53,24 @@ public:
 
     /* Define turnout object structures */
     struct TurnoutData {
-        uint16_t addr;	
-        uint8_t subAddr;
-        uint16_t id;
+        uint16_t addr11;	
+        //uint8_t subAddr;
+        int id;
         TurnoutState tStatus;
     };
 
     const static int MAX_TURNOUTS = 15;
-    TurnoutData turnoutData[MAX_TURNOUTS];
+    using TurnoutMap = etl::map<uint16_t, TurnoutData, MAX_TURNOUTS>;
+    TurnoutMap turnoutData;
 
-    uint16_t getTurnoutCount() { return 2; }
+    uint16_t getTurnoutCount() { return turnoutData.size(); }
     
     void loadTurnouts() {
-        turnoutData[0] = { 10, 1, 100, TurnoutState::CLOSED };
-        turnoutData[1] = { 20, 2, 200, TurnoutState::THROWN };
+        turnoutData[6] = { 6, 0, TurnoutState::CLOSED };
+        turnoutData[7] = { 7, 1, TurnoutState::CLOSED };
+        turnoutData[10] = { 10, 2, TurnoutState::CLOSED };
+        turnoutData[11] = { 11, 3, TurnoutState::CLOSED };
+        
         /*sendDCCppCmd("T");
         waitForDCCpp();
         int t = 0;
@@ -81,7 +85,11 @@ public:
         }*/
     }
 
-    const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
+    //const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
+
+    const TurnoutMap& getTurnouts() {
+        return turnoutData;
+    }
 
     TurnoutState turnoutToggle(uint16_t aAddr, bool fromRoster) {
         return turnoutAction(aAddr, fromRoster, -1);
@@ -281,28 +289,26 @@ private:
         CS_DEBUGF("CommandStation::turnoutAction addr=%d named=%d new state=%d\n", aAddr, fromRoster, newStat );
 
         if(fromRoster) {
-            
-            for (int t = 0 ; (t<MAX_TURNOUTS) && (turnoutData[t].addr!=0) ; t++) {
-                if(turnoutData[t].addr==aAddr) {
-                    // turnout command
-                    if (newStat==-1) 
-                        newStat = turnoutData[t].tStatus==TurnoutState::CLOSED ? 0 : 1;
-                    
-                    //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
-                    //dccMain.sendAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
-                    turnoutData[t].tStatus = (TurnoutState)newStat;
+            auto t = turnoutData.find(aAddr);
+            if(t != turnoutData.end() ) {
+                // turnout command
+                if (newStat==-1) 
+                    newStat = t->second.tStatus==TurnoutState::CLOSED ? 0 : 1;
+                
+                //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
+                //dccMain.sendAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
+                t->second.tStatus = (TurnoutState)newStat;
 
-                    //DEBUGS(String("parsed new status ")+newStat );
-                    
-                    break;
-                }
-
+                //DEBUGS(String("parsed new status ")+newStat );
             }
-
         } else {
-
             if(newStat==-1) 
                 newStat=(int)TurnoutState::THROWN;
+
+            if(turnoutData.capacity()>0) {
+                // add turnout to roster
+                turnoutData[aAddr] = {aAddr, int(turnoutData.size()+1), (TurnoutState)newStat};
+            }
         }
 
         // send to DCC

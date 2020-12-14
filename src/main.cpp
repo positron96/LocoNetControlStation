@@ -219,6 +219,7 @@ void loop() {
         bool oc = dccMain.checkOvercurrent();
         if(!oc) {
             withrottleServer.notifyPowerStatus();
+            Serial.println("Overcurrent protection in action!");
         }
         /*uint32_t v = dccMain.readCurrentAdc();
         cur = cur*0.9 + v*0.1;
