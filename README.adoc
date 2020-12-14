@@ -27,7 +27,7 @@ WiThrottle protocol is used to connect from WiFi throttles and does not depend o
 The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module (that's one of the cheapest ESP32 board) and L298N chip for DCC generation for both main and program tracks.
 LocoNet part uses usual in DIY LocoNet community LM393 comparator with resistors adapted for 3.3V levels.
 
-The PCB is open-source and is available here: https://easyeda.com/positron96/loconet-command-station.
+The PCB is open-source and is available here: https://oshwlab.com/positron96/loconet-command-station.
 
 The project also works on breadboard with L298N board (a red one with current sensing pins broken out) and DIP versions of components.
 
