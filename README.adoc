@@ -88,13 +88,13 @@ The implementation is based on these libraries:
 Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
 * LocoNet
-** TX - UART OUT  - 25
-** RX - UART IN   - 26
+** TX - OUT - 17
+** RX - IN - 16
 * DCC Main
-** Data - OUT     - 16  OK
-** Enable - OUT   - 17  OK
+** Data - OUT - 25
+** Enable - OUT   - 32
 ** Sense - Analog IN   - 36  in only
 * DCC Prog
-** Data - OUT     - 18  OK
-** Enable - OUT   - 23  OK
+** Data - OUT     - 26  OK
+** Enable - OUT   - 33  OK
 ** Sense - Analog In   - 39  in only
