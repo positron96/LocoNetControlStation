@@ -80,7 +80,9 @@ public:
     void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
 
     bool checkOvercurrent() {
-        float mA = readCurrentAdc() * ADC_TO_MA;
+        uint16_t v = readCurrentAdc();
+        float mA = v * ADC_TO_MA;
+        //if(v!=0) DCC_LOGI("%d, %d", v, (int)mA);
         if(mA>MAX_CURRENT) {
             setPower(0);
             return false;

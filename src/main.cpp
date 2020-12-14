@@ -53,7 +53,8 @@ LocoNetSlotManager slotMan(&bus);
 WiThrottleServer withrottleServer;
 
 
-#define IN_PIN 13
+#define PIN_BT 13
+#define PIN_BT2 15
 
 constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 500;
@@ -71,7 +72,8 @@ void setup() {
     Serial.begin(115200);
     Serial.println("Ultimate LocoNet Command Station");
 
-    pinMode(IN_PIN, INPUT_PULLUP);
+    pinMode(PIN_BT, INPUT_PULLUP);
+    pinMode(PIN_BT2, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
     
     digitalWrite(PIN_LED, LOW);
@@ -180,9 +182,9 @@ void loop() {
     
     
     static unsigned long nextInRead = 0;
-    static int inState = 0;
+    static int inState = 0, inState2=0;
     if(millis()>nextInRead) {
-        int v = 1-digitalRead(IN_PIN);
+        int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
             
             //bool r = dccMain.verifyCVByteProg(1, v==1 ? 13 : 14);
@@ -193,8 +195,15 @@ void loop() {
             reportSensor(&bus, 1, v==HIGH);
             Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
-        nextInRead = millis()+10;
         inState = v;
+
+        v = 1-digitalRead(PIN_BT2);
+        if(v!=inState2) {
+            dccMain.setPower(!dccMain.getPower());
+        }
+        inState2 = v;
+
+        nextInRead = millis()+10;
     }
     
     
@@ -221,11 +230,11 @@ void loop() {
             withrottleServer.notifyPowerStatus();
             Serial.println("Overcurrent protection in action!");
         }
-        /*uint32_t v = dccMain.readCurrentAdc();
-        cur = cur*0.9 + v*0.1;
-        if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
+        uint32_t v = dccMain.readCurrentAdc();
+        //cur = cur*0.9 + v*0.1;
+        //if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
         //dccMain.timerFunc();
-        */
+        
     }
     
 
