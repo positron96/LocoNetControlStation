@@ -47,6 +47,17 @@ public:
         server.end();
     }
 
+    
+    void notifyPowerStatus(int8_t iClient=-1) {
+        bool v = CS.getPowerState();
+        powerStatus = v ? '1' : '0';
+        if(iClient==-1) {
+            for (int p=0; p<MAX_CLIENTS; p++) {
+                if (clients[p]) wifiPrintln(p, String("PPA")+powerStatus);
+            }
+        } else if(clients[iClient]) wifiPrintln(iClient, String("PPA")+powerStatus);
+    }
+
     void loop();
 
 private:
@@ -86,16 +97,6 @@ private:
     void processCmd(int iClient);
 
     char powerStatus = '0';
-
-    void notifyPowerStatus(int8_t iClient=-1) {
-        bool v = CS.getPowerState();
-        powerStatus = v ? '1' : '0';
-        if(iClient==-1) {
-            for (int p=0; p<MAX_CLIENTS; p++) {
-                if (clients[p]) wifiPrintln(p, String("PPA")+powerStatus);
-            }
-        } else if(clients[iClient]) wifiPrintln(iClient, String("PPA")+powerStatus);
-    }
 
     void turnPower(char v) {
         CS.setPowerState(v=='1');

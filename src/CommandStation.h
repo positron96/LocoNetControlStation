@@ -41,12 +41,12 @@ public:
     void setLocoNetBus(LocoNetBus *bus) { locoNet = bus; }
 
     void setPowerState(bool v) {
-        dccMain->setPower(v);
+        if( dccMain!=nullptr ) dccMain->setPower(v);
     }
 
     bool getPowerState() const { 
         return dccMain!=nullptr ? dccMain->getPower() 
-             : dccProg!=nullptr ? dccProg->getPower() 
+             //: dccProg!=nullptr ? dccProg->getPower() 
              : false; 
     }
 

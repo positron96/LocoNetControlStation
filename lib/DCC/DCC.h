@@ -11,7 +11,8 @@
 
 constexpr float ADC_RESISTANCE = 0.1;
 constexpr float ADC_TO_MV = 3300.0/4096;
-constexpr int ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
+constexpr float ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
+constexpr uint16_t MAX_CURRENT = 2000;
 
 #define DCC_DEBUG
 
@@ -69,7 +70,7 @@ public:
      * @param ch is 0-based.
      */
     void sendAccessory(uint16_t addr9, uint8_t ch, bool);
-    virtual float readCurrent()=0;
+    virtual uint16_t readCurrentAdc()=0;
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
@@ -77,6 +78,15 @@ public:
     bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
     void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);
     void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
+
+    bool checkOvercurrent() {
+        float mA = readCurrentAdc() * ADC_TO_MA;
+        if(mA>MAX_CURRENT) {
+            setPower(0);
+            return false;
+        }
+        else return true;
+    }
 
 protected:
     virtual void timerFunc()=0;
@@ -114,7 +124,7 @@ public:
         _outputPin(outputPin), _enPin(enPin), _sensePin(sensePin)
     {
         R.timerPeriodsLeft=1; // first thing a timerfunc does is decrement this, so make it not underflow
-        R.timerPeriodsHalf=2; // some nonzero sane value
+        R.timerPeriodsHalf=2; // some sane nonzero value
     }
 
 
@@ -123,7 +133,7 @@ public:
         pinMode(_enPin, OUTPUT);
         digitalWrite(_enPin, LOW);
 
-        //DCC_LOGI("DCCESP32Channel(%d)::begin", _enPin);
+        //DCC_LOGI("DCCESP32Channel(enPin=%d)::begin", _enPin);
 
         //analogSetCycles(16);
         //analogSetWidth(11);
@@ -237,7 +247,7 @@ public:
         }
     };
 
-    float readCurrent() override {        
+    uint16_t readCurrentAdc() override {        
         //return esp_adc_cal_raw_to_voltage(analogRead(_sensePin), &adc_chars);
         return analogRead(_sensePin);//*1093.0/4096;
     }
@@ -253,7 +263,7 @@ public:
             nextBit();                           
         }
 
-        //current = readCurrent(); 
+        //current = readCurrentAdc(); 
     }
 
     RegisterList * getReg() { return &R; }

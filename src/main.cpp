@@ -130,6 +130,7 @@ void setup() {
 	}
     */
     
+    
     WiFi.begin("MelNet", "melnikov-network");
 
     while (WiFi.status() != WL_CONNECTED) {
@@ -146,14 +147,14 @@ void setup() {
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName("OpenCommandStation");
 
-    lbServer.begin();
-    withrottleServer.begin(); 
-
     dccTimer.begin();
     //dccMain.begin();
 
     dccMain.setPower(true);
     dccProg.setPower(true);
+
+    lbServer.begin();
+    withrottleServer.begin(); 
 
     ledFire();
 
@@ -169,7 +170,7 @@ void loop() {
     /*
     static unsigned long nextDccMeter = 0;
     if(millis()>nextDccMeter) {
-        uint16_t v = dccMain.readCurrent() ;
+        uint16_t v = dccMain.readCurrentAdc() ;
         if(v > 15) dccMain.setPower(false);
         nextDccMeter = millis()+20;
     }*/
@@ -210,17 +211,21 @@ void loop() {
         }
     }
     */
-
-    /*
-    static long nextDump = micros();
-    static float cur=0;
-    if(micros()>nextDump) {
-        nextDump = micros()+250;
-        uint32_t v = dccMain.readCurrent();
+    
+    static uint32_t lastCurrentCheck = millis();
+    //static float cur=0;
+    if(millis()-lastCurrentCheck > 1) {
+        lastCurrentCheck = millis();
+        bool oc = dccMain.checkOvercurrent();
+        if(!oc) {
+            withrottleServer.notifyPowerStatus();
+        }
+        /*uint32_t v = dccMain.readCurrentAdc();
         cur = cur*0.9 + v*0.1;
         if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
         //dccMain.timerFunc();
-    }*/
+        */
+    }
     
 
 }

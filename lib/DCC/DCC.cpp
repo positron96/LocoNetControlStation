@@ -121,7 +121,7 @@ uint IDCCChannel::getBaselineCurrent() {
 
     // collect baseline current
     for (int j = 0; j < ACK_BASE_COUNT; j++) {
-        uint16_t v = readCurrent();
+        uint16_t v = readCurrentAdc();
         baseline += v;
     }
     baseline /= ACK_BASE_COUNT;
@@ -135,7 +135,7 @@ bool IDCCChannel::checkCurrentResponse(uint baseline) {
     int max = 0;
     uint32_t to = millis()+ACK_SAMPLE_MILLIS;
     while(millis()<to) {    
-        int v = readCurrent();
+        int v = readCurrentAdc();
         v-= baseline;
         c = v*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING);
         if(c>max) { max=(int)c; }
