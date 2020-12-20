@@ -13,6 +13,7 @@
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
+#include <WiFiManager.h>
 
 #include "WiThrottle.h"
 
@@ -122,20 +123,15 @@ void setup() {
     CS.setLocoNetBus(&bus);
     
 
-    /*
-    WifiManager wifiManager;
+    
+    WiFiManager wifiManager;
 	wifiManager.setConfigPortalTimeout(300); // 5 min
 	if ( !wifiManager.autoConnect("LocoNet WiFi") ) {
 		delay(1000);
         Serial.print("Failed connection");
 		ESP.restart();
 	}
-    */
     
-    
-    //WiFi.begin("ESSID", "password"); // use hardcoded WiFi
-    WiFi.begin(); // connect to stored WiFi
-
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
         Serial.print(".");
