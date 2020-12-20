@@ -200,7 +200,13 @@ void loop() {
 
         v = 1-digitalRead(PIN_BT2);
         if(v!=inState2) {
-            dccMain.setPower(!dccMain.getPower());
+            if(dccMain.getPower()) {
+                dccMain.setPower(false);
+                dccProg.setPower(false);
+            } else {
+                dccMain.setPower(true);
+                dccProg.setPower(true);
+            }
         }
         inState2 = v;
 
@@ -229,9 +235,15 @@ void loop() {
         bool oc = dccMain.checkOvercurrent();
         if(!oc) {
             withrottleServer.notifyPowerStatus();
-            Serial.println("Overcurrent protection in action!");
+            Serial.println("Overcurrent on main");
         }
-        uint32_t v = dccMain.readCurrentAdc();
+
+        oc = dccProg.checkOvercurrent(); 
+        if(!oc) {
+            Serial.println("Overcurrent on prog");
+        }
+
+        //uint32_t v = dccMain.readCurrentAdc();
         //cur = cur*0.9 + v*0.1;
         //if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
         //dccMain.timerFunc();
