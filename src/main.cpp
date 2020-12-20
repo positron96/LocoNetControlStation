@@ -133,7 +133,8 @@ void setup() {
     */
     
     
-    WiFi.begin("MelNet", "melnikov-network");
+    //WiFi.begin("ESSID", "password"); // use hardcoded WiFi
+    WiFi.begin(); // connect to stored WiFi
 
     while (WiFi.status() != WL_CONNECTED) {
         delay(500);
