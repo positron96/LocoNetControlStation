@@ -2,19 +2,23 @@
 
 image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
+Video demonstration:
+
+image:https://img.youtube.com/vi/KVks68XLQuE/mqdefault.jpg[link=https://youtu.be/KVks68XLQuE]
+
 The command station is based on ESP32 chip. 
 Development is done with Arduino core for ESP32 on PlatformIO.
 
 Planned features are:
 
 * [x] Running locos on main track via DCC
-* [x] OPS mode programming via DCC (read CV works)
+* [x] Ops mode programming via DCC (reading CVs works)
 * Loconet interface with routing from several sources:
 ** [x] Physical LocoNet bus
 ** [x] LbServer (LocoNet over TCP) over WiFi
 ** [x] USB-Serial interface (not tested yet)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
-* [ ] Stored turnout roster
+* [ ] Stored turnout roster (partially done)
 * [ ] DCC++ interface via USB-Serial or WiFi (mayby I'll drop this idea if not required)
 
 The intended primary interface of the command station is LocoNet.
