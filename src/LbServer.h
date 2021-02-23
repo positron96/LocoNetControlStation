@@ -9,7 +9,7 @@
 
 #ifdef LB_DEBUG
 #define LB_LOGI(format, ...)  do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__); }while(0)
-#define LB_LOGD(...)  
+#define LB_LOGD(format, ...)  //do{ log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__); }while(0)
 #else
 #define LB_LOGI(...)
 #define LB_LOGD(...) 
@@ -40,7 +40,10 @@ public:
 
         if (!cli) {
             cli = server.available();
-            if(cli) { cli.print("VERSION "); cli.println("ESP32 WiFi 0.1"); }
+            if(cli) { 
+                LB_LOGI("New client: %s", cli.remoteIP().toString().c_str() );
+                cli.print("VERSION "); cli.println("ESP32 WiFi 0.1"); 
+            }
         }
 
         if (cli) {
@@ -57,7 +60,7 @@ public:
                         for(uint8_t i=5; i<=lbPos; i++) {
                             if(lbStr[i]==' ') {
                                 uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                                //LB_LOGD("LbServer::loop adding byte %02x", val);
+                                LB_LOGD("LbServer::loop adding byte %02x", val);
                                 LnMsg *msg = lbBuf.addByte(val);
                                 if(msg!=nullptr) {
                                     
@@ -67,6 +70,7 @@ public:
 
                                     if(ret==LN_DONE) cli.println("SENT OK"); else
                                     if(ret==LN_RETRY_ERROR) cli.println("SENT ERROR LN_RETRY_ERROR");
+                                    break;
                                 }
                             }
                         }
@@ -115,8 +119,8 @@ private:
         for(int j=0; j<ln; j++) {
             t += sprintf(ttt+t, " %02X", msg.data[j]);
         }
-        t += sprintf(ttt+t, "\n");
         LB_LOGD("Transmitting '%s'", ttt );
+        t += sprintf(ttt+t, "\n");
         cli.write(ttt);
     }
 
