@@ -314,6 +314,10 @@ private:
         // send to DCC
         dccMain->sendAccessory(aAddr, newStat==1);
         // send to LocoNet
+        // FIXME: this is a dirty hack. 
+        // If LocoNet calls this function, it will be bounced back to bus.
+        // Fortunately, right now, accessory commands from LocoNet do not get propagated to DCC
+        // and this command is only called from WiThrottle code.
         if(locoNet!=nullptr) {
             LnMsg ttt = makeSwRec(aAddr, true, newStat==1);
             locoNet->broadcast(ttt);

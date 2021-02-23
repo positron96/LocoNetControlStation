@@ -25,7 +25,7 @@ class LbServer: public LocoNetConsumer {
 
 public:
 
-    LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus), server(port) {
+    LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus), port(port), server(port) {
         //server = Server(port);
         bus->addConsumer(this);
 
@@ -59,6 +59,7 @@ public:
     }
 
     void begin() {
+        MDNS.addService("lbserver","tcp", port);
         server.begin();
     }
 
@@ -68,7 +69,6 @@ public:
 
 
     void loop() {
-
         if (!clients.empty()) {
             while(!txQueue.empty()) {
                 sendMessage(txQueue.front());
@@ -78,13 +78,15 @@ public:
     }
 
     LN_STATUS onMessage(const lnMsg& msg) override {
-        txQueue.push(msg);
+        if( !txQueue.full() && !clients.empty() ) txQueue.push(msg);
         return LN_DONE;
     }
 
 private:
 
     LocoNetBus *bus;
+
+    uint16_t port;
 
     AsyncServer server;
     etl::set<AsyncClient*, 5> clients;
@@ -110,11 +112,11 @@ private:
                         if(msg!=nullptr) {
                             
                             sendMessage(*msg); // echo
-
                             LN_STATUS ret = bus->broadcast(*msg, this);
 
                             if(ret==LN_DONE) cli->write("SENT OK\n"); else
-                            if(ret==LN_RETRY_ERROR) cli->write("SENT ERROR LN_RETRY_ERROR\n");
+                            if(ret==LN_RETRY_ERROR) cli->write("SENT ERROR LN_RETRY_ERROR\n"); else
+                            cli->write("SENT ERROR generic\n"); 
                             break;
                         }
                     }
