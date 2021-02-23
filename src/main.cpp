@@ -126,7 +126,7 @@ void setup() {
     
     WiFiManager wifiManager;
 	wifiManager.setConfigPortalTimeout(300); // 5 min
-	if ( !wifiManager.autoConnect("LocoNet WiFi") ) {
+	if ( !wifiManager.autoConnect("ESP32CommandStation AP") ) {
 		delay(1000);
         Serial.print("Failed connection");
 		ESP.restart();
@@ -144,7 +144,7 @@ void setup() {
 
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
-	MDNS.setInstanceName("OpenCommandStation");
+	MDNS.setInstanceName("ESP32CommandStation");
 
     dccTimer.begin();
     //dccMain.begin();
