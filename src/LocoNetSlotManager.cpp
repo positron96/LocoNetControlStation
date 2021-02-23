@@ -46,6 +46,10 @@ static LocoAddress lnAddr(uint16_t addr) {
         sd.id2 = 0;
     }
 
+    #define LNSM_LOGI_SLOT(TAG, I, S) LNSM_LOGI( TAG \
+        " slot %d: ADDR=%d STAT=%02X(%s) ID=%02X%02X", I, \
+        ADDR(S.adr2, S.adr), S.stat, LOCO_STAT(S.stat), S.id1, S.id2 )
+
     void LocoNetSlotManager::processMessage(const lnMsg* msg) {
 
         switch(msg->data[0]) {
@@ -58,13 +62,13 @@ static LocoAddress lnAddr(uint16_t addr) {
             case OPC_LOCO_ADR: {
                 int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
                 if(slot<=0) {
+                    LNSM_LOGI("OPC_LOCO_ADR for addr %d, no available slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
                     sendLack(OPC_LOCO_ADR);
-                    LNSM_LOGI("OPC_LOCO_ADR for addr %d, no slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
                     break;
                 }
                 
-                sendSlotData(slot);
                 LNSM_LOGI("OPC_LOCO_ADR for addr %d, slot is %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                sendSlotData(slot);
                 break;
             }
             case OPC_MOVE_SLOTS: {
@@ -128,7 +132,8 @@ static LocoAddress lnAddr(uint16_t addr) {
 
                 //_slot = msg->sd;
 
-                LNSM_LOGI("OPC_WR_SL_DATA slot %d", slot);
+                LNSM_LOGI_SLOT("OPC_WR_SL_DATA", slot, _slot);
+
                 break;
             }
             case OPC_RQ_SL_DATA: {
@@ -163,13 +168,12 @@ static LocoAddress lnAddr(uint16_t addr) {
     }
 
     void LocoNetSlotManager::sendSlotData(uint8_t slot) {        
-        LnMsg ret;
+        LnMsg ret;        
         ret.sd = _slots[slot];
+        rwSlotDataMsg *s = &ret.sd;
         
-        char tmp[100];
-        formatMsg(ret, tmp, 100);
-        LNSM_LOGI("sending %s", tmp);
-
+        LNSM_LOGI_SLOT("Sending", slot, (*s));
+        
         writeChecksum(ret);
         _ln->broadcast(ret, this);
     }
@@ -197,7 +201,7 @@ static LocoAddress lnAddr(uint16_t addr) {
         LNSM_LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
 
         if( (_slots[slot].stat & LOCOSTAT_MASK) != (stat&LOCOSTAT_MASK) ) {
-            LNSM_LOGI("Changing active+busy: %02x", stat&LOCOSTAT_MASK);
+            LNSM_LOGI("Changing active+busy bits: %02x", stat&LOCOSTAT_MASK);
             if( (stat & STAT1_SL_BUSY) == 0) { 
                 releaseSlot(slot);
                 return;
