@@ -4,6 +4,9 @@
 #include <ln_opc.h>
 #include <LocoNet.h>
 #include <etl/queue.h>
+#include <etl/set.h>
+
+#include <AsyncTCP.h>
 
 #define LB_DEBUG
 
@@ -22,9 +25,37 @@ class LbServer: public LocoNetConsumer {
 
 public:
 
-    LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus) {
-        server = WiFiServer(port);
+    LbServer(const uint16_t port, LocoNetBus * const bus): bus(bus), server(port) {
+        //server = Server(port);
         bus->addConsumer(this);
+
+        server.onClient( [this](void*, AsyncClient* cli ) {
+            if(clients.full()) {
+                LB_LOGI("onConnect: Not accepting client: %s", cli->remoteIP().toString().c_str() );
+                cli->close();
+                return;
+            }
+            clients.insert(cli);
+            LB_LOGI("onConnect: New client: %s", cli->remoteIP().toString().c_str() );
+            cli->write("VERSION ESP32 WiFi 0.1");
+
+            cli->onDisconnect([this](void*, AsyncClient* cli) {
+                LB_LOGI("onDisconnect: Client disconnected" );
+                clients.erase(cli);
+            });
+
+            cli->onData( [this](void*, AsyncClient* cli, void *data, size_t len) {
+                for(size_t i=0; i<len; i++)
+                    processRx( ((uint8_t*)data)[i], cli);
+            });
+
+            cli->onError([this](void*, AsyncClient* cli, int8_t err) { LB_LOGI("onError: %d", err);  });
+            cli->onTimeout([this](void*, AsyncClient* cli, uint32_t time) { 
+                LB_LOGI("onTimeout: %d", time); 
+                cli->close(); 
+            });
+
+        }, nullptr);
     }
 
     void begin() {
@@ -38,57 +69,11 @@ public:
 
     void loop() {
 
-        if (!cli) {
-            cli = server.available();
-            if(cli) { 
-                LB_LOGI("New client: %s", cli.remoteIP().toString().c_str() );
-                cli.print("VERSION "); cli.println("ESP32 WiFi 0.1"); 
-            }
-        }
-
-        if (cli) {
-            while(cli.available() > 0) {
-                int v = cli.read();
-                if(v==-1) return;
-                if(v=='\r') continue;
-
-                lbStr[lbPos] = v;
-                if(v=='\n') {
-                    lbStr[lbPos] = ' '; lbStr[lbPos+1]=0;
-                    LB_LOGD("Processing string '%s'", lbStr);
-                    if(strncmp("SEND ", lbStr, 5)==0) {
-                        for(uint8_t i=5; i<=lbPos; i++) {
-                            if(lbStr[i]==' ') {
-                                uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                                LB_LOGD("LbServer::loop adding byte %02x", val);
-                                LnMsg *msg = lbBuf.addByte(val);
-                                if(msg!=nullptr) {
-                                    
-                                    sendMessage(*msg); // echo
-
-                                    LN_STATUS ret = bus->broadcast(*msg, this);
-
-                                    if(ret==LN_DONE) cli.println("SENT OK"); else
-                                    if(ret==LN_RETRY_ERROR) cli.println("SENT ERROR LN_RETRY_ERROR");
-                                    break;
-                                }
-                            }
-                        }
-                    } else {
-                        LB_LOGI("Got line but it's not SEND: %s", lbStr);
-                    }
-                    lbPos=0;
-                } else {
-                    lbPos++;
-                }
-
-            }
-
+        if (!clients.empty()) {
             while(!txQueue.empty()) {
                 sendMessage(txQueue.front());
                 txQueue.pop();
             }
-
         }
     }
 
@@ -101,8 +86,8 @@ private:
 
     LocoNetBus *bus;
 
-    WiFiServer server;
-    WiFiClient cli;
+    AsyncServer server;
+    etl::set<AsyncClient*, 5> clients;
 
     etl::queue<LnMsg, 5> txQueue;
 
@@ -111,8 +96,40 @@ private:
     char lbStr[LB_BUF_SIZE];
     int lbPos = 0;
 
+    void processRx(uint8_t v, AsyncClient *cli) {
+        lbStr[lbPos] = v;
+        if(v=='\n') {
+            lbStr[lbPos] = ' '; lbStr[lbPos+1]=0;
+            LB_LOGD("Processing string '%s'", lbStr);
+            if(strncmp("SEND ", lbStr, 5)==0) {
+                for(uint8_t i=5; i<=lbPos; i++) {
+                    if(lbStr[i]==' ') {
+                        uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
+                        LB_LOGD("LbServer::loop adding byte %02x", val);
+                        LnMsg *msg = lbBuf.addByte(val);
+                        if(msg!=nullptr) {
+                            
+                            sendMessage(*msg); // echo
+
+                            LN_STATUS ret = bus->broadcast(*msg, this);
+
+                            if(ret==LN_DONE) cli->write("SENT OK\n"); else
+                            if(ret==LN_RETRY_ERROR) cli->write("SENT ERROR LN_RETRY_ERROR\n");
+                            break;
+                        }
+                    }
+                }
+            } else {
+                LB_LOGI("Got line but it's not SEND: %s", lbStr);
+            }
+            lbPos=0;
+        } else {
+            lbPos++;
+        }
+    }
+
     void sendMessage(const LnMsg &msg) {
-        if(!cli) return;
+        
         char ttt[LB_BUF_SIZE] = "RECEIVE";
         uint t = strlen(ttt);
         uint8_t ln = msg.length();
@@ -121,7 +138,12 @@ private:
         }
         LB_LOGD("Transmitting '%s'", ttt );
         t += sprintf(ttt+t, "\n");
-        cli.write(ttt);
+        for (auto cli: clients) {
+            size_t len = cli->write(ttt);
+            if(len != t) {
+                LB_LOGI("length mismatch: expected %d, actual %d", t, len);
+            }
+        }
     }
 
 };

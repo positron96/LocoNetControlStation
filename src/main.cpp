@@ -206,7 +206,7 @@ void loop() {
         }
         inState2 = v;
 
-        nextInRead = millis()+10;
+        nextInRead = millis() + 10;
     }
     
     
