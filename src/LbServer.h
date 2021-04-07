@@ -1,3 +1,6 @@
+/**
+ * @see http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html
+ */
 #pragma once
 
 #include <WiFi.h>
@@ -21,7 +24,7 @@
 #endif
 
 
-#define FROM_HEX(c) (   ((c)>'9') ? ((c) &~ 0x20)-'A'+0xA : ((c)-'0')   )
+#define FROM_HEX(c) (   ((c)>'9') ? ((c) & ~0x20)-'A'+0xA : ((c)-'0')   )
 
 class LbServer: public LocoNetConsumer {
 
@@ -48,7 +51,7 @@ public:
 
             cli->onData( [this](void*, AsyncClient* cli, void *data, size_t len) {
                 for(size_t i=0; i<len; i++)
-                    processRx( ((uint8_t*)data)[i], cli);
+                    processRx( ((char*)data)[i], cli);
             });
 
             cli->onError([this](void*, AsyncClient* cli, int8_t err) { 
@@ -102,16 +105,17 @@ private:
     char lbStr[LB_BUF_SIZE];
     int lbPos = 0;
 
-    void processRx(uint8_t v, AsyncClient *cli) {
+    void processRx(char v, AsyncClient *cli) {
         lbStr[lbPos] = v;
-        if(v=='\n') {
+        if(v=='\n' || v=='\r') {
+            if(lbPos==0 || lbPos==1 || lbPos==2) return; // deal with CRLF ending
             lbStr[lbPos] = ' '; lbStr[lbPos+1]=0;
             LB_LOGD("Processing string '%s'", lbStr);
             if(strncmp("SEND ", lbStr, 5)==0) {
                 for(uint8_t i=5; i<=lbPos; i++) {
                     if(lbStr[i]==' ') {
                         uint8_t val = FROM_HEX(lbStr[i-2])<<4 | FROM_HEX(lbStr[i-1]);
-                        LB_LOGD("LbServer::loop adding byte %02x", val);
+                        LB_LOGD("LbServer::loop adding byte %02x from chars '%c' '%c' (pos %d)", val, lbStr[i-2], lbStr[i-1], i);
                         LnMsg *msg = lbBuf.addByte(val);
                         if(msg!=nullptr) {
                             
