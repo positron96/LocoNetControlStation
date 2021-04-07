@@ -108,7 +108,7 @@ private:
     void processRx(char v, AsyncClient *cli) {
         lbStr[lbPos] = v;
         if(v=='\n' || v=='\r') {
-            if(lbPos==0 || lbPos==1 || lbPos==2) return; // deal with CRLF ending
+            if(lbPos==0) return; // deal with CRLF ending
             lbStr[lbPos] = ' '; lbStr[lbPos+1]=0;
             LB_LOGD("Processing string '%s'", lbStr);
             if(strncmp("SEND ", lbStr, 5)==0) {
@@ -130,7 +130,7 @@ private:
                     }
                 }
             } else {
-                LB_LOGI("Got line but it's not SEND: %s", lbStr);
+                LB_LOGI("Got line but it's not SEND: '%s'", lbStr);
             }
             lbPos=0;
         } else {
