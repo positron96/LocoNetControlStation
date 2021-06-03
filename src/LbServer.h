@@ -40,6 +40,7 @@ public:
                 cli->close();
                 return;
             }
+            cli->setKeepAlive(10000, 2);
             clients.insert(cli);
             LB_LOGI("onConnect: New client(%X): %s", (intptr_t)cli, cli->remoteIP().toString().c_str() );
             cli->write("VERSION ESP32 WiFi 0.1");
