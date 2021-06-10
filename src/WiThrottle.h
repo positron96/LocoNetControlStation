@@ -11,6 +11,7 @@
 #include <ESPmDNS.h>
 #include <etl/map.h>
 #include <etl/utility.h>
+#include <AsyncTCP.h>
 
 #include "CommandStation.h"
 
@@ -27,35 +28,23 @@
 class WiThrottleServer {
 public:
 
-    WiThrottleServer(uint16_t port=44444) : port(port), server(port) {}
+    WiThrottleServer(uint16_t port=44444);
 
-    void begin() {
-
-        WT_LOGI("WiThrottleServer::begin");
-
-        server.begin();
-
-        //MDNS.begin(hostString);
-        MDNS.addService("withrottle","tcp", port);
-        //MDNS.setInstanceName("DCC++ Network Interface");
-
-        notifyPowerStatus();
-
-    }
+    void begin();
 
     void end() {
         server.end();
     }
 
     
-    void notifyPowerStatus(int8_t iClient=-1) {
+    void notifyPowerStatus(AsyncClient *c=nullptr) {
         bool v = CS.getPowerState();
         powerStatus = v ? '1' : '0';
-        if(iClient==-1) {
-            for (int p=0; p<MAX_CLIENTS; p++) {
-                if (clients[p]) wifiPrintln(p, String("PPA")+powerStatus);
+        if(c==nullptr) {
+            for (auto p: clients) {
+                wifiPrintln(p.first, String("PPA")+powerStatus);
             }
-        } else if(clients[iClient]) wifiPrintln(iClient, String("PPA")+powerStatus);
+        } else wifiPrintln(c, String("PPA")+powerStatus);
     }
 
     void loop();
@@ -68,8 +57,8 @@ private:
     const static int MAX_THROTTLES_PER_CLIENT = 6;
     const static int MAX_LOCOS_PER_THROTTLE = 2;
 
-    WiFiServer server;
-    WiFiClient clients[MAX_CLIENTS];
+    AsyncServer server;
+    //WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
         bool connected;
@@ -92,9 +81,10 @@ private:
 
     };
 
-    ClientData clientData[MAX_CLIENTS];
+    etl::map<AsyncClient*, ClientData, MAX_CLIENTS> clients;
+    //ClientData clientData[MAX_CLIENTS];
 
-    void processCmd(int iClient);
+    void processCmd(AsyncClient *c);
 
     char powerStatus = '0';
 
@@ -104,28 +94,32 @@ private:
     }
 
 
-    void wifiPrintln(int iClient, String v) {
-        clients[iClient].println(v);
+    void wifiPrintln(AsyncClient *c, String v) {
+        c->add(v.c_str(), v.length() );
+        char lf = '\n';
+        c->add(&lf, 1);
+        c->send();
         //WT_LOGI("WTTX %s", v.c_str() );
     }
-    void wifiPrint(int iClient, String v) {
-        clients[iClient].print(v);
+    void wifiPrint(AsyncClient *c, String v) {
+        c->write(v.c_str(), v.length() );
+        //clients[iClient].print(v);
         //WT_LOGI("WFTX %s", v.c_str() );
     }
 
-    void clientStart(int iClient) ;
+    void clientStart(AsyncClient *c) ;
 
-    void clientStop(int iClient);
+    void clientStop(AsyncClient *c);
 
-    void locoAdd(char th, String sLocoAddr, int iClient);
+    void locoAdd(char th, String sLocoAddr, AsyncClient *c);
 
-    void locoRelease(char th, String sLocoAddr, int iClient);
-    void locoRelease(char th, LocoAddress addr, int iClient);
+    void locoRelease(char th, String sLocoAddr, AsyncClient *c);
+    void locoRelease(char th, LocoAddress addr, AsyncClient *c);
 
-    void locoAction(char th, String sLocoAddr, String actionVal, int iClient);
-    void locoAction(char th, LocoAddress addr, String actionVal, int iClient);
+    void locoAction(char th, String sLocoAddr, String actionVal, AsyncClient *c);
+    void locoAction(char th, LocoAddress addr, String actionVal, AsyncClient *c);
 
-    void checkHeartbeat(int iClient);
+    void checkHeartbeat(AsyncClient *c);
 
     void accessoryToggle(int aAddr, char aStatus, bool namedTurnout);
 };
