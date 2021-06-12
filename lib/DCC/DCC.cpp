@@ -19,7 +19,7 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8
     }
 
     b[nB++] = lowByte(iAddr);
-    b[nB++] = B00111111;  // 128-step speed control byte (0x3F)
+    b[nB++] = 0b00111111;  // 128-step speed control byte (0x3F)
     b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
     
     DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, (tDirection==1)?'F':'B');
@@ -32,23 +32,23 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
             fn = (fn & 0x1)<<4 | (fn & 0x1E)<<1;
-            sendFunction(iReg, addr,  B10000000 | (fn & B00011111) );
+            sendFunction(iReg, addr,  0b10000000 | (fn & 0b00011111) );
             break;
         case DCCFnGroup::F5_8:
             fn >>= 5;
-            sendFunction(iReg, addr,  B10110000 | (fn & B00001111) );
+            sendFunction(iReg, addr,  0b10110000 | (fn & 0b00001111) );
             break;
         case DCCFnGroup::F9_12:
             fn >>= 9;
-            sendFunction(iReg, addr,  B10100000 | (fn & B00001111) );
+            sendFunction(iReg, addr,  0b10100000 | (fn & 0b00001111) );
             break;
         case DCCFnGroup::F13_20:
             fn >>= 13; 
-            sendFunction(iReg, addr, B11011110, (uint8_t)fn );
+            sendFunction(iReg, addr,  0b11011110, (uint8_t)fn );
             break;
         case DCCFnGroup::F21_28:
             fn >>= 21; 
-            sendFunction(iReg, addr, B11011111, (uint8_t)fn );
+            sendFunction(iReg, addr,  0b11011111, (uint8_t)fn );
             break;
         default:
             break;
@@ -67,7 +67,7 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
 
     b[nB++] = lowByte(iAddr);
 
-    if ( (fByte & B11000000) == B10000000) {// this is a request for functions FL,F1-F12  
+    if ( (fByte & 0b11000000) == 0b10000000) {// this is a request for functions FL,F1-F12  
         b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
     } else {                             // this is a request for functions F13-F28
         b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
@@ -108,10 +108,10 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
     // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent throw/close
-    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ B01110000 )
+    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b01110000 )
         | (ch & 0x3) << 1 
         | (thrown?0x1:0) 
-        | B10000000   ;
+        | 0b10000000   ;
 
     loadPacket(0, b, 2, 4);
 }
