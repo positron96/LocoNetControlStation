@@ -94,7 +94,7 @@ void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
 }
 
 void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
-    DCC_LOGI("addr=%d, ch=%d, thrown=%c", addr9, ch, thrown?'Y':'N');
+    DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
 
     uint8_t b[3];     // save space for checksum byte
 
