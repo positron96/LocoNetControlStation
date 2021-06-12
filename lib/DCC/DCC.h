@@ -22,9 +22,6 @@ constexpr uint16_t MAX_CURRENT = 2000;
 #define DCC_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
 #define DCC_LOGI_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
 #define DCC_LOGW(format, ...) log_printf(ARDUHAL_LOG_FORMAT(W, format), ##__VA_ARGS__)
-//#define DCC_DEBUGF_ISR(...) 
-//#define DCC_DEBUGF(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
-//#define DCC_DEBUGF_ISR(...)  do{ Serial.printf(__VA_ARGS__); }while(0)
 //extern char _msg[1024];
 //extern char _buf[100];
 //#define DCC_DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
@@ -45,6 +42,8 @@ enum class DCCFnGroup {
     F0_4, F5_8, F9_12, F13_20, F21_28
 };
 
+enum class SpeedMode { S14, S28, S128 };
+
 class IDCCChannel {
 
 public:
@@ -58,7 +57,7 @@ public:
 
     virtual bool getPower()=0;
 
-    void sendThrottle(int slot, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection);
+    void sendThrottle(int slot, LocoAddress addr, uint8_t tSpeed,  SpeedMode sm, uint8_t tDirection);
     void sendFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
     void sendFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
     /**

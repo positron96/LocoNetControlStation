@@ -1,3 +1,8 @@
+/**
+ * @see https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
+ * @see Official document: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+ */
+
 #include "DCC.h"
 
 uint8_t idlePacket[3] = {0xFF, 0x00, 0}; 
@@ -9,7 +14,7 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
 
-void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8_t tDirection){
+void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection){
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
@@ -19,13 +24,24 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, uint8
     }
 
     b[nB++] = lowByte(iAddr);
-    b[nB++] = 0b00111111;  // 128-step speed control byte (0x3F)
-    b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
+    if(sm==SpeedMode::S128) {
+        // Advanced Operations Instruction: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf #200
+        b[nB++] = 0b00111111; 
+        b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
+    } else {
+        // basic packet: https://www.nmra.org/sites/default/files/s-92-2004-07.pdf #35
+        uint8_t t=nB;
+        b[nB++] = 0b01000000;
+        if(tDirection==1) b[t] |= 0b00100000;
+        if(sm==SpeedMode::S14) b[t] |= tSpeed & 0b00001111;
+        if(sm==SpeedMode::S28) b[t] |= (tSpeed & 1)<<4 | (tSpeed & 0b11110)>>1;
+    }
     
     DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, (tDirection==1)?'F':'B');
     
     loadPacket(iReg, b, nB, 0);
 }
+
 void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
     DCC_LOGI("iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
