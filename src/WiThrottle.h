@@ -1,7 +1,9 @@
 /**
  * Based on https://github.com/positron96/withrottle
  * 
- * Also, see JMRI sources, start at java\src\jmri\jmrit\withrottle\DeviceServer.java
+ * Also, see JMRI sources, start at https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrit/withrottle/DeviceServer.java
+ * 
+ * Official documentation: https://www.jmri.org/help/en/package/jmri/jmrit/withrottle/Protocol.shtml
  */
 
 #pragma once
@@ -16,10 +18,10 @@
 #include "CommandStation.h"
 
 
-#define WT_DEBUG_
+#define WT_DEBUG
 
 #ifdef WT_DEBUG
-#define WT_LOGI(format, ...)  log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
+#define WT_LOGI(format, ...)  do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__);  } while(0)
 #else
 #define WT_LOGI(...)
 #endif
@@ -54,15 +56,14 @@ private:
     const uint16_t port;
 
     const static int MAX_CLIENTS = 3;
-    const static int MAX_THROTTLES_PER_CLIENT = 6;
-    const static int MAX_LOCOS_PER_THROTTLE = 2;
+    constexpr static int MAX_THROTTLES_PER_CLIENT = 6;
+    constexpr static int MAX_LOCOS_PER_THROTTLE = 2;
 
     AsyncServer server;
     //WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
         AsyncClient *cli;
-        bool connected;
         uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
         uint32_t lastHeartbeat;
@@ -70,8 +71,9 @@ private:
         char cmdline[100];
         size_t cmdpos = 0;
 
+        using AddrToSlotMap = etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
-        etl::map< char, etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>, MAX_THROTTLES_PER_CLIENT> slots;
+        etl::map< char, AddrToSlotMap, MAX_THROTTLES_PER_CLIENT> slots;
         uint8_t slot(char thr, LocoAddress addr) { 
             auto it = slots.find(thr);
             if(it == slots.end()) return 0;
@@ -79,6 +81,18 @@ private:
             if(iit == it->second.end() ) return 0;
             return iit->second;
         }
+
+        void locoAdd(char th, String sLocoAddr);
+
+        void locoRelease(char th, String sLocoAddr);
+        void locoRelease(char th, LocoAddress addr);
+
+        void locoAction(char th, String sLocoAddr, String actionVal);
+        void locoAction(char th, LocoAddress addr, String actionVal);
+
+        void checkHeartbeat();
+
+        void sendMessage(String msg, bool alert=false);
 
     };
 
@@ -95,14 +109,14 @@ private:
     }
 
 
-    void wifiPrintln(AsyncClient *c, String v) {
+    static void wifiPrintln(AsyncClient *c, String v) {
         c->add(v.c_str(), v.length() );
         char lf = '\n';
         c->add(&lf, 1);
         c->send();
         //WT_LOGI("WTTX %s", v.c_str() );
     }
-    void wifiPrint(AsyncClient *c, String v) {
+    static void wifiPrint(AsyncClient *c, String v) {
         c->write(v.c_str(), v.length() );
         //clients[iClient].print(v);
         //WT_LOGI("WFTX %s", v.c_str() );
@@ -112,15 +126,5 @@ private:
 
     void clientStop(ClientData &c);
 
-    void locoAdd(char th, String sLocoAddr, ClientData &c);
-
-    void locoRelease(char th, String sLocoAddr, ClientData &c);
-    void locoRelease(char th, LocoAddress addr, ClientData &c);
-
-    void locoAction(char th, String sLocoAddr, String actionVal, ClientData &c);
-    void locoAction(char th, LocoAddress addr, String actionVal, ClientData &c);
-
-    void checkHeartbeat(ClientData &c);
-
-    void accessoryToggle(int aAddr, char aStatus, bool namedTurnout);
+    void accessoryToggle(int aAddr, char aStatus, bool namedTurnout, ClientData &cc);
 };
