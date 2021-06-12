@@ -200,7 +200,7 @@ public:
         inline void advanceSlot() {
             if (urgentSlot != nullptr) {                      
                 currentSlot = urgentSlot; 
-                *currentSlot = newPacket;  // this copies packet into packet array
+                *(Packet*)currentSlot = newPacket;  // this copies packet into packet array
                 urgentSlot = nullptr;                
                 // flip active and update Packets
                 //Packet * p = currentSlot->flip();
