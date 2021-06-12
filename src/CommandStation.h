@@ -285,11 +285,11 @@ public:
             }
         } else {
             if (action==TurnoutAction::TOGGLE) {
-                    CS_DEBUGF("Trying to toggle numeric turnout");
-                    newState = TurnoutState::THROWN;
-                } else {  // throw or close
-                    newState = (TurnoutState)(int)action;
-                }
+                CS_DEBUGF("Trying to toggle numeric turnout");
+                newState = TurnoutState::THROWN;
+            } else {  // throw or close
+                newState = (TurnoutState)(int)action;
+            }
 
             if(turnoutData.available()>0) {
                 // add turnout to roster
