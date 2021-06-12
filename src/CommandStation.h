@@ -40,6 +40,8 @@ public:
     static constexpr uint8_t N_FUNCTIONS = 29;
 
     static constexpr uint8_t MAX_SLOTS = 10;
+
+    static constexpr uint32_t PURGE_DELAY = 200*1000; //200s
     
     CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) { 
         loadTurnouts();  
@@ -103,8 +105,17 @@ public:
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
         bool refreshing;
+        uint32_t lastUpdate;
         bool allocated() const { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
+        void kickWatchdog() { lastUpdate=millis(); /*CS_DEBUGF("updating timeout to %ld", lastUpdate);*/}
+        bool timedOut() { 
+            uint32_t ms = millis();
+            // This checks for time anomaly: lastUpdate in future, but should work when one value overflows); 
+            if(lastUpdate-ms<100) { CS_DEBUGF("time anomaly: now=%ld last=%ld", ms, lastUpdate); return false;}
+            CS_DEBUGF("time out: now=%ld last=%ld", ms, lastUpdate); 
+            return ms-lastUpdate > PURGE_DELAY; 
+        }
     };
 
     bool isSlotAllocated(uint8_t slot) const {
@@ -143,6 +154,7 @@ public:
         _slot.refreshing = false;
         _slot.speed = 0;
         _slot.speedMode = SpeedMode::S128;
+        _slot.lastUpdate = millis();
         locoSlot[addr] = slot;
     }
 
@@ -169,13 +181,21 @@ public:
         LocoData &dd = getSlot(slot);
         if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
         if(dd.refreshing == refresh) return;
-        CS_DEBUGF("slot %d refresh %d", slot, refresh); 
+        CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N'); 
         dd.refreshing = refresh;
+        
         if(refresh) {
             // no need to load, it will load itself on setLocoSpeed
+            dd.kickWatchdog();
         } else {
             dccMain->unloadSlot(slot);
         }
+    }
+
+    void kickSlot(uint8_t slot) {
+        LocoData &dd = getSlot(slot);
+        if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
+        dd.kickWatchdog();
     }
 
     LocoAddress getLocoAddr(uint8_t slot) {
@@ -189,11 +209,13 @@ public:
 
     void setLocoSpeedMode(uint8_t slot, SpeedMode mode) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         dd.speedMode = mode;
     }
 
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.fn[fn] == val) return;
 
         dd.fn[fn] = val;
@@ -210,6 +232,7 @@ public:
 
     void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         uint32_t v = dd.fn.value<uint32_t>();
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
         // update bits (v=) and send function group
@@ -234,6 +257,7 @@ public:
      * */
     void setLocoDir(uint8_t slot, uint8_t dir) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.dir==dir) return; 
         dd.dir = dir;
         if(dd.refreshing)
@@ -247,10 +271,26 @@ public:
     /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
     void setLocoSpeed(uint8_t slot, uint8_t spd) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.speed == spd) return;
         dd.speed = spd;
         if(dd.refreshing)
             dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+    }
+
+
+    /**
+     * Updates slots that have not been used for a long time (PURGE_DELAY)
+     */
+    void loop() {
+        for(const auto &i: locoSlot) {
+            uint8_t slot = i.second;
+            LocoData &dd = getSlot(slot);
+            if(dd.refreshing && dd.timedOut()) {
+                CS_DEBUGF("slot %d timed out, stopping refreshing at %ld", slot, millis() );
+                setLocoSlotRefresh(slot, false);
+            }
+        }
     }
 
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
