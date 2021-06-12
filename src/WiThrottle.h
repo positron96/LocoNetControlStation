@@ -61,6 +61,7 @@ private:
     //WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
+        AsyncClient *cli;
         bool connected;
         uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
@@ -84,7 +85,7 @@ private:
     etl::map<AsyncClient*, ClientData, MAX_CLIENTS> clients;
     //ClientData clientData[MAX_CLIENTS];
 
-    void processCmd(AsyncClient *c);
+    void processCmd(ClientData &cc);
 
     char powerStatus = '0';
 
@@ -107,19 +108,19 @@ private:
         //WT_LOGI("WFTX %s", v.c_str() );
     }
 
-    void clientStart(AsyncClient *c) ;
+    void clientStart(AsyncClient *cli) ;
 
-    void clientStop(AsyncClient *c);
+    void clientStop(ClientData &c);
 
-    void locoAdd(char th, String sLocoAddr, AsyncClient *c);
+    void locoAdd(char th, String sLocoAddr, ClientData &c);
 
-    void locoRelease(char th, String sLocoAddr, AsyncClient *c);
-    void locoRelease(char th, LocoAddress addr, AsyncClient *c);
+    void locoRelease(char th, String sLocoAddr, ClientData &c);
+    void locoRelease(char th, LocoAddress addr, ClientData &c);
 
-    void locoAction(char th, String sLocoAddr, String actionVal, AsyncClient *c);
-    void locoAction(char th, LocoAddress addr, String actionVal, AsyncClient *c);
+    void locoAction(char th, String sLocoAddr, String actionVal, ClientData &c);
+    void locoAction(char th, LocoAddress addr, String actionVal, ClientData &c);
 
-    void checkHeartbeat(AsyncClient *c);
+    void checkHeartbeat(ClientData &c);
 
     void accessoryToggle(int aAddr, char aStatus, bool namedTurnout);
 };
