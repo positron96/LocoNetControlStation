@@ -37,7 +37,7 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, Speed
         if(sm==SpeedMode::S28) b[t] |= (tSpeed & 1)<<4 | (tSpeed & 0b11110)>>1;
     }
     
-    DCC_LOGI("iReg %d, addr %d, speed=%d %c", iReg, addr, tSpeed, (tDirection==1)?'F':'B');
+    DCC_LOGI("iReg %d, addr %d, speed=%d(mode %d) %c", iReg, addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
     
     loadPacket(iReg, b, nB, 0);
 }

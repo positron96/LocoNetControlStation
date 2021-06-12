@@ -168,7 +168,6 @@ public:
         Packet slots[SLOT_COUNT+1];
         etl::bitset<SLOT_COUNT+1> slotsTaken;
         etl::map<uint, size_t, SLOT_COUNT> slotMap;
-        //Packet *slotMap[SLOT_COUNT+1];
         volatile Packet *currentSlot;
         size_t maxLoadedSlot;
         volatile Packet *urgentSlot;
@@ -201,7 +200,7 @@ public:
         inline void advanceSlot() {
             if (urgentSlot != nullptr) {                      
                 currentSlot = urgentSlot; 
-                *(Packet*)currentSlot = newPacket; 
+                *currentSlot = newPacket;  // this copies packet into packet array
                 urgentSlot = nullptr;                
                 // flip active and update Packets
                 //Packet * p = currentSlot->flip();
@@ -212,7 +211,7 @@ public:
                 // BUT IF this is last Register loaded, first reset currentSlot to base Register, THEN       
                 // increment current Register (note this logic causes Register[0] to be skipped when simply cycling through all Registers)  
                 
-                size_t i = currentSlot - &slots[0];
+                size_t i = currentIdx();
                 do {
                     if (i == maxLoadedSlot) { i = 0; }
                     i++;
