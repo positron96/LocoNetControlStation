@@ -21,29 +21,79 @@ static LocoAddress lnAddr(uint16_t addr) {
     return LocoAddress::longAddr(addr);
 }
 
-    LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
-        for(int i=0; i<MAX_SLOTS; i++) {
-            initSlot(i);
-        }
+// reverse to ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
+inline static uint8_t addrLo(const LocoAddress &addr) {
+    return addr.addr() & 0b00011111;
+}
 
+inline static uint8_t addrHi(const LocoAddress &addr) {
+    return (addr.addr() >> 7);
+}
+
+using LocoData = CommandStation::LocoData;
+using SM = SpeedMode;
+
+inline static uint8_t speedMode2int(SM sm) {
+    switch(sm) {
+        case SM::S128: return DEC_MODE_128;
+        case SM::S28: return DEC_MODE_28;
+        case SM::S14: return DEC_MODE_14;
+    }
+    LNSM_LOGW("bad speed mode: %d", (int)sm);
+    return DEC_MODE_128;
+}
+
+inline static SM int2SpeedMode(uint8_t sm) {
+    sm &= DEC_MODE_MASK;
+    if(sm == DEC_MODE_128) return SM::S128;
+    if(sm == DEC_MODE_14) return SM::S14;
+    if(sm == DEC_MODE_28) return SM::S28;
+    LNSM_LOGW("bad speed mode bits: %x", (int)sm);
+    return SM::S128;
+}
+
+    LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
         ln->addConsumer(this);
     }
 
-    void LocoNetSlotManager::initSlot(uint8_t i, uint8_t addrHi, uint8_t addrLo) {
-        rwSlotDataMsg &sd = _slots[i];
+    void LocoNetSlotManager::fillSlotMsg(uint8_t slot, rwSlotDataMsg &sd) {
         sd.command = 0xE7;
         sd.mesg_size = 14;
-        sd.slot = i;
-        sd.stat = DEC_MODE_128 | LOCO_FREE;
-        sd.adr = addrLo; 
-        sd.spd = 0; 
-        sd.dirf = DIRF_DIR;  // FWD
-        sd.trk = GTRK_IDLE | GTRK_POWER | GTRK_MLOK1; // POWER ON & Loconet 1.1 by default; 
-        sd.ss2 = 0; 
-        sd.adr2 = addrHi; 
-        sd.snd = 0; 
-        sd.id1 = i; 
-        sd.id2 = 0;
+        sd.slot = slot;
+
+        if(!CS.isSlotAllocated(slot) ) {
+            sd.stat = DEC_MODE_128 | LOCO_FREE;
+            sd.adr = 0; 
+            sd.spd = 0; 
+            sd.spd = 0; 
+            sd.spd = 0; 
+            sd.dirf = DIRF_DIR;  // FWD
+            sd.adr2 = 0; 
+            sd.snd = 0; 
+
+            sd.ss2 = 0; 
+            sd.id1 = slot; 
+            sd.id2 = 0;
+        } else {
+            const CommandStation::LocoData &d = CS.getSlotData(slot);
+            uint32_t fns = d.fn.value<uint32_t>();
+            sd.stat = speedMode2int(d.speedMode) | STAT1_SL_BUSY;
+            if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
+            sd.adr = addrLo(d.addr); 
+            sd.spd = d.speed; 
+            sd.dirf = d.dir ==1 ? DIRF_DIR : 0;
+            sd.dirf |= fn15swap(fns);
+            sd.adr2 = addrHi(d.addr); 
+            sd.snd = (fns & 0b111100000)>>5; 
+
+            const LnSlotData & e = extra[slot];
+            sd.ss2 = e.ss2; 
+            sd.id1 = e.id1; 
+            sd.id2 = e.id2;
+        }        
+       
+        sd.trk = GTRK_IDLE | GTRK_MLOK1; // POWER ON & Loconet 1.1 by default; 
+        if(CS.getPowerState()) sd.trk |= GTRK_POWER;
     }
 
     #define LNSM_LOGI_SLOT(TAG, I, S) LNSM_LOGI( TAG \
@@ -67,7 +117,7 @@ static LocoAddress lnAddr(uint16_t addr) {
                     break;
                 }
                 
-                LNSM_LOGI("OPC_LOCO_ADR for addr %d, slot is %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                LNSM_LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
                 sendSlotData(slot);
                 break;
             }
@@ -77,8 +127,7 @@ static LocoAddress lnAddr(uint16_t addr) {
                 } else {
                     uint8_t slot = msg->ss.slot;
                     LNSM_LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", slot );
-                    _slots[slot].stat |= LOCO_IN_USE;
-                    CS.setLocoSlotRefresh(slot, true);
+                    CS.setLocoSlotRefresh(slot, true); // enable refresh
                     sendSlotData(slot);
                 }
                 break;
@@ -112,27 +161,27 @@ static LocoAddress lnAddr(uint16_t addr) {
                 uint8_t slot = m.slot;
                 if(m.slot == PRG_SLOT) {
                     processProgMsg(msg->pt);
-                    return;
+                    break;
                 }
                 if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; } 
-                rwSlotDataMsg &_slot = _slots[slot];
+                rwSlotDataMsg _slot;
+                fillSlotMsg(slot, _slot);
 
                 if(_slot.stat != m.stat) processStat1(slot, m.stat);
-                if( !CS.isSlotAllocated(slot) ) return; // stat1 sets slot to inactive, do not continue
+                if( !CS.isSlotAllocated(slot) ) break; // stat1 can set slot to inactive, do not continue in this case
                 if(_slot.spd != m.spd) processSpd(slot, m.spd);
                 if(_slot.dirf != m.dirf) processDirf(slot, m.dirf);
                 if(_slot.snd != m.snd) processSnd(slot, m.snd);
-                
-                _slot.adr = m.adr;
-                _slot.trk = m.trk;
-                _slot.ss2 = m.ss2;
-                _slot.adr2 = m.adr2;
-                _slot.id1 = m.id1;
-                _slot.id2 = m.id2;
 
-                //_slot = msg->sd;
+                if(extra.find(slot) != extra.end() ) {
+                    extra[slot] = LnSlotData{};
+                }
+                LnSlotData &e = extra[slot];
+                e.ss2 = m.ss2;
+                e.id1 = m.id1;
+                e.id2 = m.id2;
 
-                LNSM_LOGI_SLOT("OPC_WR_SL_DATA", slot, _slot);
+                LNSM_LOGI_SLOT("OPC_WR_SL_DATA", slot, m);
 
                 break;
             }
@@ -157,22 +206,21 @@ static LocoAddress lnAddr(uint16_t addr) {
             slot = CS.locateFreeSlot();
             if(slot==0) { return 0; }
             CS.initLocoSlot(slot, addr);
-            initSlot(slot, hi, lo);
+            extra[slot] = LnSlotData{};
         }
         return slot;
     }
 
     void LocoNetSlotManager::releaseSlot(uint8_t slot) {
         CS.releaseLocoSlot(slot);
-        _slots[slot].stat &= ~STAT1_SL_BUSY;
+        extra.erase(slot);
     }
 
     void LocoNetSlotManager::sendSlotData(uint8_t slot) {        
-        LnMsg ret;        
-        ret.sd = _slots[slot];
-        rwSlotDataMsg *s = &ret.sd;
-        
-        LNSM_LOGI_SLOT("Sending", slot, (*s));
+        LnMsg ret;
+        fillSlotMsg(slot, ret.sd);
+
+        LNSM_LOGI_SLOT("Sending", slot, (ret.sd));
         
         writeChecksum(ret);
         _ln->broadcast(ret, this);
@@ -185,37 +233,35 @@ static LocoAddress lnAddr(uint16_t addr) {
 
     void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
         LNSM_LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
-        _slots[slot].dirf = v;
         uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 1 : 0;
         CS.setLocoDir(slot, dir);
-        CS.setLocoFns(slot, 0x1F, (v & B00001111)<<1 | (v & B00010000)>>4 );  // fn order in this byte is 04321
+        CS.setLocoFns(slot, 0b00011111, fn15swap(v) );  // fn order in this byte is 04321
     }
 
     void LocoNetSlotManager::processSnd(uint8_t slot, uint8_t snd) {
         LNSM_LOGI("OPC_LOCO_SND slot %d snd %02x", slot, snd);
         CS.setLocoFns(slot, 0x1E0, snd << 5 );
-        _slots[slot].snd = snd;
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {
         LNSM_LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
 
-        if( (_slots[slot].stat & LOCOSTAT_MASK) != (stat&LOCOSTAT_MASK) ) {
-            LNSM_LOGI("Changing active+busy bits: %02x", stat&LOCOSTAT_MASK);
-            if( (stat & STAT1_SL_BUSY) == 0) { 
-                releaseSlot(slot);
-                return;
-            }
-
-            CS.setLocoSlotRefresh(slot, (stat & STAT1_SL_ACTIVE) != 0);
+        auto newSpeedMode = int2SpeedMode(stat);
+        bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
+        bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
+        if( !newBusy ) { 
+            releaseSlot(slot);
+            return;
         }
-        _slots[slot].stat = stat;
+
+        const LocoData &dd = CS.getSlotData(slot);
+        if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
+        if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
     }
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {
         LNSM_LOGI("OPC_LOCO_SPD slot %d spd %d", slot, spd);
         CS.setLocoSpeed(slot, spd);
-        _slots[slot].spd = spd;
     }
 
 void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint8_t value ) {
