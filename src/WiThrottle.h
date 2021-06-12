@@ -67,6 +67,7 @@ private:
         uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
         uint32_t lastHeartbeat;
+        uint8_t heartbeatsLost=0;
 
         char cmdline[100];
         size_t cmdpos = 0;
@@ -91,6 +92,10 @@ private:
         void locoAction(char th, LocoAddress addr, String actionVal);
 
         void checkHeartbeat();
+        void updateHeartbeat() {
+            lastHeartbeat = millis();
+            heartbeatsLost = 0;
+        }
 
         void sendMessage(String msg, bool alert=false);
 

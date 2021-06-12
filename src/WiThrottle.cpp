@@ -33,23 +33,35 @@ inline int invert(int value) {
 WiThrottleServer::WiThrottleServer(uint16_t port) : port(port), server(port) {
     server.onClient( [this](void*, AsyncClient* cli ) {
         if(clients.full()) {
-            WT_LOGI("onConnect: Not accepting client: %s", cli->remoteIP().toString().c_str() );
+            WT_LOGI("onConnect: Not accepting client: %s, no space left", cli->remoteIP().toString().c_str() );
             cli->close();
             return;
         }
-        //cli->setKeepAlive(10000, 2);
-        WT_LOGI("onConnect: New client(%X): %s", (intptr_t)cli, cli->remoteIP().toString().c_str() );
+        // here keepalives are built into protocol, no need for TCP keepalives
+        //cli->setKeepAlive(10000, 2); 
         clientStart(cli); 
+        cli->setAckTimeout(clients[cli].heartbeatTimeout*3); 
+        WT_LOGI("onConnect: New client(%X): %s, have %d clients", 
+                (intptr_t)cli, cli->remoteIP().toString().c_str(), clients.size() );
 
         cli->onDisconnect([this](void*, AsyncClient* cli) {
             WT_LOGI("onDisconnect: Client(%X) disconnected", (intptr_t)cli );
+            if(clients.find(cli)==clients.end() ) {
+                WT_LOGI("Not clearing up client(%X), it is not registered", (intptr_t)cli);
+                return;
+            }
             clientStop(clients[cli]);
         });
 
         cli->onData( [this](void*, AsyncClient* cli, void *data, size_t len) {
+            if(clients.find(cli)==clients.end() ) { 
+                // after sending Q(quit), the client might send other commands
+                WT_LOGI("Got some data from client(%X), but it is not recognised", (intptr_t)cli);
+                return;
+            }
             ClientData &cc = clients[cli];
             if(cc.heartbeatEnabled) { 
-                cc.lastHeartbeat = millis();
+                cc.updateHeartbeat();
             }
             for(size_t i=0; i<len; i++) {
                 char c = ((char*)data)[i];
@@ -212,7 +224,8 @@ void WiThrottleServer::clientStop(ClientData &client) {
     client.slots.clear();
     client.heartbeatEnabled = false;
     AsyncClient *cli = client.cli;
-    if(cli->connected() ) cli->stop();
+    // this method should be called only from onDisconnected, so this should be false
+    if(cli->connected() ) cli->stop(); 
     clients.erase(cli);
 }
 
@@ -326,15 +339,22 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
     
-    if ( (lastHeartbeat > 0) && (lastHeartbeat + heartbeatTimeout*1000 < millis() ) ) {
-        // stop loco
-        WT_LOGI("timeout exceeded: last: %d, current %d", lastHeartbeat/1000, millis()/1000 );
-        lastHeartbeat = 0;
-        for(const auto& throttle: slots)
-            for(const auto& slot: throttle.second) {
-                CS.setLocoSpeed(slot.second, 1); // emgr
-                wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+"<;>V"+CS.getLocoSpeed(slot.second));
-            }
+    if ( lastHeartbeat > 0) {
+        if (millis()-lastHeartbeat > heartbeatTimeout*1000  && heartbeatsLost==0) {
+            // stop loco
+            WT_LOGI("timeout exceeded: last: %d, current %d", lastHeartbeat/1000, millis()/1000 );
+            heartbeatsLost++;
+            for(const auto& throttle: slots)
+                for(const auto& slot: throttle.second) {
+                    CS.setLocoSpeed(slot.second, 1); // emgr
+                    wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+"<;>V"+CS.getLocoSpeed(slot.second));
+                }
+        }
+        if (millis()-lastHeartbeat > 2*heartbeatTimeout*1000 && heartbeatsLost==1) {
+            WT_LOGI("timeout exceeded twice: closing connection" );
+            heartbeatsLost++;
+            cli->close();
+        }
         
     }
 }
