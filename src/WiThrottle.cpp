@@ -323,16 +323,17 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
 
     }
     else if (actionVal.startsWith("X")) { // EMGR stop
-        CS.setLocoSpeed(slot, 1);
+        CS.setLocoSpeed(slot, SPEED_EMGR);
         //sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" -1 "+String(locoState[30]));
     }
     else if (actionVal.startsWith("I")) { // idle
         // sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" 0 "+String(locoState[30]));
-        CS.setLocoSpeed(slot, 0);
+        CS.setLocoSpeed(slot, SPEED_IDLE);
     }
-    else if (actionVal.startsWith("Q")) { // quit, TODO: kill throttle here
+    else if (actionVal.startsWith("Q")) { // quit
         //sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" 0 "+String(locoState[30]));
-        CS.setLocoSpeed(slot, 0);
+        CS.setLocoSpeed(slot, SPEED_IDLE);
+        cli->close();
     }
 }
 

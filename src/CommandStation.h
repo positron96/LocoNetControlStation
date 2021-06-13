@@ -29,6 +29,9 @@ enum class TurnoutAction {
     STATES, TOGGLE
 };
 
+constexpr uint8_t SPEED_IDLE = 0;
+constexpr uint8_t SPEED_EMGR = 1;
+
 /** Puts bit 0 of arg to 5th place, shifts bits 1-5 to right */
 inline static uint8_t fn15swap(uint8_t normal) {
     return (normal & 0b00001111)<<1 | (normal & 0b00010000)>>4;
