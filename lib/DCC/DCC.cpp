@@ -1,6 +1,6 @@
 /**
- * @see https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
- * @see Official document: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+ * @see On basic packets: https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
+ * @see On extended packets: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
  */
 
 #include "DCC.h"
