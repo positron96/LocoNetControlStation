@@ -57,7 +57,7 @@ inline static SM int2SpeedMode(uint8_t sm) {
     }
 
     void LocoNetSlotManager::fillSlotMsg(uint8_t slot, rwSlotDataMsg &sd) {
-        sd.command = 0xE7;
+        sd.command = OPC_SL_RD_DATA;
         sd.mesg_size = 14;
         sd.slot = slot;
 

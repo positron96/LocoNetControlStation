@@ -359,7 +359,7 @@ protected:
         }
 
         size_t slot = it->second;
-        DCC_LOGI("Found slot %d for reg %d", slot, iReg);
+        DCC_LOGI("unloading slot %d for reg %d", slot, iReg);
         if(R.slotMap.size()==1) {
             // if it's last last slot, remove it and load Idle packet into slot 1
             loadPacket(1, idlePacket, 2, 0);
