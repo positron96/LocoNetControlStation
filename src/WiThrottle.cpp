@@ -40,7 +40,7 @@ WiThrottleServer::WiThrottleServer(uint16_t port) : port(port), server(port) {
         // here keepalives are built into protocol, no need for TCP keepalives
         //cli->setKeepAlive(10000, 2); 
         clientStart(cli); 
-        cli->setAckTimeout(clients[cli].heartbeatTimeout*3); 
+        cli->setAckTimeout(HEARTBEAT_INTL*1000*3); 
         WT_LOGI("onConnect: New client(%X): %s, have %d clients", 
                 (intptr_t)cli, cli->remoteIP().toString().c_str(), clients.size() );
 
@@ -144,7 +144,7 @@ void WiThrottleServer::processCmd(ClientData & cc) {
     }
     case 'N': { // device name
         WT_LOGI("Device ID: '%s'", cc.cmdline+1 );
-        wifiPrintln(cc.cli, "*" + String(cc.heartbeatTimeout));
+        wifiPrintln(cc.cli, "*" + String(HEARTBEAT_INTL));
         break;
     }
     case 'H': {
@@ -205,10 +205,12 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
         wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr11+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.tStatus) );
     }
     wifiPrintln(cli, "");
-    wifiPrintln(cli, "*"+String(cc.heartbeatTimeout));
+    wifiPrintln(cli, "*"+String(HEARTBEAT_INTL));
 
     cc.cmdpos = 0;
     cc.cli = cli;
+    cc.heartbeatEnabled = false;
+    cc.updateHeartbeat();
 
     clients[cli] = cc;
 }
@@ -340,10 +342,10 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
     
-    if ( lastHeartbeat > 0) {
-        if (millis()-lastHeartbeat > heartbeatTimeout*1000  && heartbeatsLost==0) {
+    //if ( lastHeartbeat > 0) {
+        if (wdt.timedOut() && heartbeatsLost==0) {
             // stop loco
-            WT_LOGI("timeout exceeded: last: %d, current %d", lastHeartbeat/1000, millis()/1000 );
+            WT_LOGI("timeout exceeded: last: %ds, current %ds", wdt.getLastUpdate()/1000, millis()/1000 );
             heartbeatsLost++;
             for(const auto& throttle: slots)
                 for(const auto& slot: throttle.second) {
@@ -351,13 +353,13 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
                     wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+"<;>V"+CS.getLocoSpeed(slot.second));
                 }
         }
-        if (millis()-lastHeartbeat > 2*heartbeatTimeout*1000 && heartbeatsLost==1) {
+        if (wdt.timedOut2() && heartbeatsLost==1) {
             WT_LOGI("timeout exceeded twice: closing connection" );
             heartbeatsLost++;
             cli->close();
         }
         
-    }
+    //}
 }
 
 void WiThrottleServer::ClientData::sendMessage(String msg, bool alert) {

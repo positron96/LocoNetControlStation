@@ -12,6 +12,8 @@
 #include "LocoAddress.h"
 #include <LocoNet.h>
 
+#include "Watchdog.h"
+
 
 #define CS_DEBUG
 
@@ -44,7 +46,7 @@ public:
 
     static constexpr uint8_t MAX_SLOTS = 10;
 
-    static constexpr uint32_t PURGE_DELAY = 200*1000; //200s
+    static constexpr millis_t PURGE_DELAY = 200*1000; //200s
     
     CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) { 
         loadTurnouts();  
@@ -108,17 +110,10 @@ public:
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
         bool refreshing;
-        uint32_t lastUpdate;
+        Watchdog<PURGE_DELAY, 500> wdt;
         bool allocated() const { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
-        void kickWatchdog() { lastUpdate=millis(); /*CS_DEBUGF("updating timeout to %ld", lastUpdate);*/}
-        bool timedOut() { 
-            uint32_t ms = millis();
-            // This checks for time anomaly: lastUpdate in future, but should work when one value overflows); 
-            if(lastUpdate-ms<100) { CS_DEBUGF("time anomaly: now=%ld last=%ld", ms, lastUpdate); return false;}
-            CS_DEBUGF("time out: now=%ld last=%ld", ms, lastUpdate); 
-            return ms-lastUpdate > PURGE_DELAY; 
-        }
+        void kickWatchdog() { wdt.kick(); }
     };
 
     bool isSlotAllocated(uint8_t slot) const {
@@ -157,7 +152,7 @@ public:
         _slot.refreshing = false;
         _slot.speed = 0;
         _slot.speedMode = SpeedMode::S128;
-        _slot.lastUpdate = millis();
+        _slot.kickWatchdog();
         locoSlot[addr] = slot;
     }
 
@@ -289,8 +284,9 @@ public:
         for(const auto &i: locoSlot) {
             uint8_t slot = i.second;
             LocoData &dd = getSlot(slot);
-            if(dd.refreshing && dd.timedOut()) {
-                CS_DEBUGF("slot %d timed out, stopping refreshing at %ld", slot, millis() );
+            if(dd.refreshing && dd.wdt.timedOut()) {
+                CS_DEBUGF("slot %d timed out, current %lds, last update was at %lds", slot,
+                     millis()/1000, dd.wdt.getLastUpdate()/1000 );
                 setLocoSlotRefresh(slot, false);
             }
         }

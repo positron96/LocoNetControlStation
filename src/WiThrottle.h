@@ -16,6 +16,7 @@
 #include <AsyncTCP.h>
 
 #include "CommandStation.h"
+#include "Watchdog.h"
 
 
 #define WT_DEBUG
@@ -55,19 +56,20 @@ private:
 
     const uint16_t port;
 
-    const static int MAX_CLIENTS = 3;
+    constexpr static int MAX_CLIENTS = 3;
     constexpr static int MAX_THROTTLES_PER_CLIENT = 6;
     constexpr static int MAX_LOCOS_PER_THROTTLE = 2;
+
+    constexpr static millis_t HEARTBEAT_INTL = 30; ///< in seconds
 
     AsyncServer server;
     //WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
         AsyncClient *cli;
-        uint16_t heartbeatTimeout = 30;
         bool heartbeatEnabled;
-        uint32_t lastHeartbeat;
         uint8_t heartbeatsLost=0;
+        Watchdog<HEARTBEAT_INTL*1000+5000, 500, HEARTBEAT_INTL*1000*2+5000> wdt;
 
         char cmdline[100];
         size_t cmdpos = 0;
@@ -93,8 +95,8 @@ private:
 
         void checkHeartbeat();
         void updateHeartbeat() {
-            lastHeartbeat = millis();
-            heartbeatsLost = 0;
+            wdt.kick();
+            heartbeatsLost=0;
         }
 
         void sendMessage(String msg, bool alert=false);
