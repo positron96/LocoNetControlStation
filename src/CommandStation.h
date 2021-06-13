@@ -12,6 +12,8 @@
 #include "LocoAddress.h"
 #include <LocoNet.h>
 
+#include "Watchdog.h"
+
 
 #define CS_DEBUG
 
@@ -29,12 +31,22 @@ enum class TurnoutAction {
     STATES, TOGGLE
 };
 
+constexpr uint8_t SPEED_IDLE = 0;
+constexpr uint8_t SPEED_EMGR = 1;
+
+/** Puts bit 0 of arg to 5th place, shifts bits 1-5 to right */
+inline static uint8_t fn15swap(uint8_t normal) {
+    return (normal & 0b00001111)<<1 | (normal & 0b00010000)>>4;
+}
+
 class CommandStation {
 public:
 
     static constexpr uint8_t N_FUNCTIONS = 29;
 
     static constexpr uint8_t MAX_SLOTS = 10;
+
+    static constexpr millis_t PURGE_DELAY = 200*1000; //200s
     
     CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) { 
         loadTurnouts();  
@@ -90,7 +102,21 @@ public:
 
     //const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
 
-    bool isSlotAllocated(uint8_t slot) {
+    struct LocoData {
+        using Fns = etl::bitset<N_FUNCTIONS>;
+        LocoAddress addr;
+        uint8_t speed;
+        SpeedMode speedMode;
+        int8_t dir; ///< 1 = FWD, 0 = REW
+        Fns fn;
+        bool refreshing;
+        Watchdog<PURGE_DELAY, 500> wdt;
+        bool allocated() const { return addr.isValid(); }
+        void deallocate() { addr = LocoAddress(); }
+        void kickWatchdog() { wdt.kick(); }
+    };
+
+    bool isSlotAllocated(uint8_t slot) const {
         if(slot<1 || slot>MAX_SLOTS) return true;
         return slots[slot-1].allocated();
     }
@@ -125,7 +151,8 @@ public:
         _slot.fn = LocoData::Fns();
         _slot.refreshing = false;
         _slot.speed = 0;
-        _slot.speedMode = LocoData::SpeedMode::S128;
+        _slot.speedMode = SpeedMode::S128;
+        _slot.kickWatchdog();
         locoSlot[addr] = slot;
     }
 
@@ -141,7 +168,7 @@ public:
     void releaseLocoSlot(uint8_t slot) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
         uint8_t i = slot-1;
-        CS_DEBUGF("releasing slot %d\n", slot); 
+        CS_DEBUGF("releasing slot %d", slot); 
         setLocoSlotRefresh(slot, false);
         locoSlot.erase( slots[i].addr );        
         slots[i].deallocate();
@@ -150,18 +177,43 @@ public:
     void setLocoSlotRefresh(uint8_t slot, bool refresh) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
         LocoData &dd = getSlot(slot);
+        if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
         if(dd.refreshing == refresh) return;
-        CS_DEBUGF("slot %d refresh %d", slot, refresh); 
+        CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N'); 
         dd.refreshing = refresh;
+        
         if(refresh) {
-            
+            // no need to load, it will load itself on setLocoSpeed
+            dd.kickWatchdog();
         } else {
             dccMain->unloadSlot(slot);
         }
     }
 
+    void kickSlot(uint8_t slot) {
+        LocoData &dd = getSlot(slot);
+        if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
+        dd.kickWatchdog();
+    }
+
+    LocoAddress getLocoAddr(uint8_t slot) {
+        if(!isSlotAllocated(slot)) return LocoAddress{};
+        return getSlot(slot).addr;
+    }
+
+    const LocoData &getSlotData(uint8_t slot) {
+        return getSlot(slot);
+    }
+
+    void setLocoSpeedMode(uint8_t slot, SpeedMode mode) {
+        LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
+        dd.speedMode = mode;
+    }
+
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.fn[fn] == val) return;
 
         dd.fn[fn] = val;
@@ -178,9 +230,10 @@ public:
 
     void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         uint32_t v = dd.fn.value<uint32_t>();
-        // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current
-        // update bits (v=) and set function group
+        // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
+        // update bits (v=) and send function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
             { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }  
 
@@ -202,9 +255,11 @@ public:
      * */
     void setLocoDir(uint8_t slot, uint8_t dir) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.dir==dir) return; 
         dd.dir = dir;
-        dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.dir);
+        if(dd.refreshing)
+            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) { 
@@ -214,9 +269,27 @@ public:
     /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
     void setLocoSpeed(uint8_t slot, uint8_t spd) {
         LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
         if(dd.speed == spd) return;
         dd.speed = spd;
-        dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.dir);
+        if(dd.refreshing)
+            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+    }
+
+
+    /**
+     * Updates slots that have not been used for a long time (PURGE_DELAY)
+     */
+    void loop() {
+        for(const auto &i: locoSlot) {
+            uint8_t slot = i.second;
+            LocoData &dd = getSlot(slot);
+            if(dd.refreshing && dd.wdt.timedOut()) {
+                CS_DEBUGF("slot %d timed out, current %lds, last update was at %lds", slot,
+                     millis()/1000, dd.wdt.getLastUpdate()/1000 );
+                setLocoSlotRefresh(slot, false);
+            }
+        }
     }
 
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
@@ -320,23 +393,10 @@ private:
     IDCCChannel * dccProg;
     LocoNetBus* locoNet;
 
-    struct LocoData {
-        using Fns = etl::bitset<N_FUNCTIONS>;
-        LocoAddress addr;
-        uint8_t speed;
-        enum class SpeedMode { S14, S28, S128 };
-        SpeedMode speedMode;
-        int8_t dir;
-        Fns fn;
-        bool refreshing;
-        bool allocated() { return addr.isValid(); }
-        void deallocate() { addr = LocoAddress(); }
-    };
-
     etl::map<LocoAddress, uint8_t, MAX_SLOTS> locoSlot;
 
     LocoData slots[MAX_SLOTS]; ///< slot 1 has index 0 in this array. Slot 0 is invalid.
-    LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
+    inline LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
 
 };
 

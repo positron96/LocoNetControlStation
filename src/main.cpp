@@ -164,6 +164,7 @@ void loop() {
 
     lbServer.loop();
     withrottleServer.loop();
+    CS.loop();
     //lSerial.loop();
     
     /*

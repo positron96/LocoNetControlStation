@@ -2,14 +2,19 @@
 
 https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
 
+https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
+
 Preamble is 12 "1" bits. DCC++ uses 22 bits. Preamble is followed by "0" bit
 
 ```
-PPP 0 0AAA-AAAA 0 01DC-SSSS 0 EEEE-EEEE 1  Speed and Direction Packet For Locomotive Decoders (7-bit). D is dir (1=FWD), 0SSSS is 14-steps speed, CSSSS is 28 steps speed.
+PPP - preamble
+PPP 0 0AAA-AAAA 0 01DC-SSSS 0 EEEE-EEEE 1  Speed and Direction Packet For Locomotive Decoders (7-bit). 
+                    D                      dir (1=FWD)
+                      0SSSS                14-steps speed
+                      CSSSS                28 steps speed
 
-PPP 0 11AA-AAAA 0 AAAA-AAAA 0 instructn 0 EEEE-EEEE 1 - Usage of extended 2-byte address
+PPP 0 11AA-AAAA 0 AAAA-AAAA 0 instructn 0 EEEE-EEEE 1 - extended 2-byte address
                             0 CCCD-DDDD  
-
 
 PPP 0 10AA-AAAA 0 1AAA-CDDD 0 EEEE-EEEE 1 - 9-bit (basic) accessory decoder
 PPP 0 10AA-AAAA 0 0AAA-0AA1 0 000X-XXXX 0 EEEE-EEEE 1 - 14-bit (extended) accessory decoder
