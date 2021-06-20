@@ -596,7 +596,7 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  00/04 to 7F/7E:: NORMAL throttle RANGE
 
 
-|[[_OPC_PEER_XFER_]] |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO 
+|[[OPC_PEER_XFER]]_OPC_PEER_XFER_ |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO 
 | 3+a| `<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
  <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>`
 
@@ -618,11 +618,17 @@ SRC=7F is throttle msg xfer, <DSTL><DSTH> encode address (ID), <0><0> is throttl
 NOTE: This message is used to work with System Variables (SVs), as described in LocoNet Personal Use Extension (see e.g. 
 http://embeddedloconet.sourceforge.net/SV_Programming_Messages_v13_PE.pdf[embeddedloconet])
 
-|_OPC_IMM_PACKET_ |0xED |;SEND n-byte packet immediate |yes LACK
-| 3+| ;<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>
- ;<DHI>=<0,0,1,IM5.7-IM4.7,IM3.7,IM2.7,IM1.7>
- ;in <REPS> D4,5,6=#IM bytes,D3=0(reserved); D2,1,0=repeat CNT
-;Not limited MASTER then LACK=<B4>,<7D>,<7F>,<chk> if CMD ok
+|[[OPC_IMM_PACKET]]_OPC_IMM_PACKET_ |0xED | Send n-byte packet (to DCC bus) immediately |yes LACK
+| 3+a| `<0xED>,<0B>,<7F>,<REPS>,<DHI>,<IM1>,<IM2>,<IM3>,<IM4>,<IM5>,<CHK>`
+
+<REPS> D4,5,6=number of bytes in packet,D3=0(reserved); D2,1,0=repeat count.
+
+<DHI> = <0,0,1,IM5.7 - IM4.7,IM3.7,IM2.7,IM1.7> - high bits of packet.
+
+NOTE: JMRI sends DHI byte with D5=0, i.e only high bits are set.
+
+
+;Not limited MASTER then <<OPC_LACK>>=<B4>,<7D>,<7F>,<chk> if CMD ok
 ;IF limited MASTER then Lim Masters respond with <B4>,<7E>,<lim adr>,<chk>
 ;If internal buffer BUSY/full respond with <B4>,<7D>,<0>,<chk>
 

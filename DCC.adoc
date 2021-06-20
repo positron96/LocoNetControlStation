@@ -1,8 +1,10 @@
 # This is a short memo about DCC packets
 
-https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+https://www.nmra.org/sites/default/files/s-92-2004-07.pdf -- basic packet
 
-https://www.nmra.org/sites/default/files/s-92-2004-07.pdf
+https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf -- on extended packets
+
+https://github.com/JMRI/JMRI/blob/master/java/src/jmri/NmraPacket.java#L652 -- on extended accessory packet addressing
 
 Preamble is 12 "1" bits. DCC++ uses 22 bits. Preamble is followed by "0" bit
 
@@ -17,7 +19,15 @@ PPP 0 11AA-AAAA 0 AAAA-AAAA 0 instructn 0 EEEE-EEEE 1 - extended 2-byte address
                             0 CCCD-DDDD  
 
 PPP 0 10AA-AAAA 0 1AAA-CDDD 0 EEEE-EEEE 1 - 9-bit (basic) accessory decoder
+                   AAA                    - high bits of address, in 1's complement  
+                       C                  - activate or deactivate
+                        DD                - output pair or 2 lowest bits of 11-bit address
+                          D               - thrown/closed 
 PPP 0 10AA-AAAA 0 0AAA-0AA1 0 000X-XXXX 0 EEEE-EEEE 1 - 14-bit (extended) accessory decoder
+                                 X-XXXX               - aspect to be shown. 0=stop aspect
+                   AAA                                - 1's complement, highest 3 bits of address
+                        AA                            - lowest 2 bits of address
+                                                         
 
 PPP 0 1011-1111 0 1000-CDDD 0 EEEE-EEEE 1 - broadcast for basic accessory decoders
 PPP 0 1011-1111 0 0000-0111 0 000X-XXXX 0 EEEE-EEEE 1 - broadcast for extended accessory decoders
