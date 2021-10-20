@@ -401,7 +401,13 @@ Response is:
 
 [NOTE]
 --
-JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set. 
+JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set in the Command station. 
+
+With this flag set, normal turnout commands(<<OPC_SW_REQ>>) are not forwarded to DCC by command stations.
+
+See details  
+https://www.jmri.org/help/en/html/scripthelp/LnBushbyForwarder/LnBushbyForwarder.shtml[here] and
+https://www.jmri.org/jython/LnBushbyForwarder.py[here (a python script to turn normal commands to bushby ones)].
 
 Upon receiving, JMRI treats this OPCode equally to <<OPC_SW_REQ>>.
 --
@@ -535,7 +541,9 @@ There are special values for SW2 for <<stationary_broadcast, stationary broadcas
 
 [NOTE]
 --
-JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set (by default, it's not set). 
+JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set 
+
+(by default, it's not set). 
 
 Otherwise, <<OPC_SW_ACK>> is used to control turnout.
 
