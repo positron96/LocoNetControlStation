@@ -54,36 +54,36 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
 
         if(!CS.isSlotAllocated(slot) ) {
             sd.stat = DEC_MODE_128 | LOCO_FREE;
-            sd.adr = 0; 
-            sd.spd = 0; 
-            sd.spd = 0; 
-            sd.spd = 0; 
+            sd.adr = 0;
+            sd.spd = 0;
+            sd.spd = 0;
+            sd.spd = 0;
             sd.dirf = DIRF_DIR;  // FWD
-            sd.adr2 = 0; 
-            sd.snd = 0; 
+            sd.adr2 = 0;
+            sd.snd = 0;
 
-            sd.ss2 = 0; 
-            sd.id1 = slot; 
+            sd.ss2 = 0;
+            sd.id1 = slot;
             sd.id2 = 0;
         } else {
             const CommandStation::LocoData &d = CS.getSlotData(slot);
             uint32_t fns = d.fn.value<uint32_t>();
             sd.stat = speedMode2int(d.speedMode) | STAT1_SL_BUSY;
             if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
-            sd.adr = addrLo(d.addr); 
-            sd.spd = d.speed.get128(); 
+            sd.adr = addrLo(d.addr);
+            sd.spd = d.speed.get128();
             sd.dirf = d.dir==1 ? DIRF_DIR : 0;
             sd.dirf |= moveBit1to5(fns);
-            sd.adr2 = addrHi(d.addr); 
-            sd.snd = (fns & 0b1'1110'0000)>>5; 
+            sd.adr2 = addrHi(d.addr);
+            sd.snd = (fns & 0b1'1110'0000)>>5;
 
             const LnSlotData & e = extra[slot];
-            sd.ss2 = e.ss2; 
-            sd.id1 = e.id1; 
+            sd.ss2 = e.ss2;
+            sd.id1 = e.id1;
             sd.id2 = e.id2;
-        }        
-       
-        sd.trk = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default; 
+        }
+
+        sd.trk = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default;
         if(CS.getPowerState()) sd.trk |= GTRK_POWER;
     }
 
@@ -107,43 +107,67 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
                     sendLack(OPC_LOCO_ADR);
                     break;
                 }
-                
+
                 LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
                 sendSlotData(slot);
                 break;
             }
             case OPC_MOVE_SLOTS: {
-                if( msg->sm.dest!=msg->sm.src || !slotValid(msg->sm.dest) || !slotValid(msg->sm.src) ) {
+                uint8_t srcSlot = msg->sm.src;
+                uint8_t dstSlot = msg->sm.dest;
+                if( dstSlot==srcSlot && slotValid(srcSlot)) {
+                    LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", srcSlot );
+                    CS.setLocoSlotRefresh(srcSlot, true); // enable refresh
+                    sendSlotData(srcSlot);
+                } else
+                if(dstSlot==0 && slotValid(srcSlot) ) {
+                    LOGI("OPC_MOVE_SLOTS DISPATCH PUT for slot %d", srcSlot );
+                    if(haveDispatchedSlot() ) {
+                        sendLack(OPC_MOVE_SLOTS, 0);
+                    } else {
+                        dispatchedSlot = srcSlot;
+                        sendSlotData(dispatchedSlot);
+                    }
+                } else
+                if(srcSlot == 0 ) {
+                    // DISPATCH GET
+                    LOGI("OPC_MOVE_SLOTS DISPATCH GET" );
+                    if(haveDispatchedSlot() ) {
+                        sendSlotData(dispatchedSlot);
+                        removeDispatchedSlot();
+                    } else {
+                        sendLack(OPC_MOVE_SLOTS, 0);
+                    }
+                } else
+                if(slotValid(srcSlot) && slotValid(dstSlot)) {
+                    // a valid move, but we don't support it atm
                     sendLack(OPC_MOVE_SLOTS);
                 } else {
-                    uint8_t slot = msg->ss.slot;
-                    LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", slot );
-                    CS.setLocoSlotRefresh(slot, true); // enable refresh
-                    sendSlotData(slot);
+                    sendLack(OPC_MOVE_SLOTS);
                 }
                 break;
             }
             case OPC_SLOT_STAT1: {
                 uint8_t slot = msg->ss.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; } 
+                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processStat1(slot, msg->ss.stat);
                 break;
             }
             case OPC_LOCO_SND: {
                 uint8_t slot = msg->ls.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; } 
+                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processSnd(slot, msg->ls.snd);
                 break;
             }
             case OPC_LOCO_DIRF: {
                 uint8_t slot = msg->ldf.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_DIRF); break; } 
+                if( !slotValid(slot) ) { sendLack(OPC_LOCO_DIRF); break; }
                 processDirf(slot, msg->ldf.dirf);
                 break;
             }
             case OPC_LOCO_SPD : {
                 uint8_t slot = msg->lsp.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SPD); break; } 
+                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SPD); break; }
                 processSpd(slot, msg->lsp.spd);
                 break;
             }
@@ -154,7 +178,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
                     processProgMsg(msg->pt);
                     break;
                 }
-                if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; } 
+                if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
                 rwSlotDataMsg _slot;
                 fillSlotMsg(slot, _slot);
 
@@ -178,15 +202,15 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             }
             case OPC_RQ_SL_DATA: {
                 uint8_t slot = msg->sr.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;} 
+                if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;}
                 LOGI("OPC_RQ_SL_DATA slot %d", slot);
                 sendSlotData(slot);
                 break;
             }
             default: break;
         }
-        
-    } 
+
+    }
 
 
 
@@ -207,18 +231,18 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         extra.erase(slot);
     }
 
-    void LocoNetSlotManager::sendSlotData(uint8_t slot) {        
+    void LocoNetSlotManager::sendSlotData(uint8_t slot) {
         LnMsg ret;
         fillSlotMsg(slot, ret.sd);
 
         LOGI_SLOT("Sending", slot, (ret.sd));
-        
+
         writeChecksum(ret);
         _ln->broadcast(ret, this);
     }
 
     void LocoNetSlotManager::sendLack(uint8_t cmd, uint8_t arg) {
-        LnMsg lack = makeLongAck(cmd, arg); 
+        LnMsg lack = makeLongAck(cmd, arg);
         _ln->broadcast(lack, this);
     }
 
@@ -241,7 +265,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         auto newSpeedMode = int2SpeedMode(stat);
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
         bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
-        if( !newBusy ) { 
+        if( !newBusy ) {
             releaseSlot(slot);
             return;
         }
@@ -267,7 +291,7 @@ void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint8_t va
     //value = (((progTaskMsg.cvh & CVH_D7) << 6) | (progTaskMsg.data7 & 0x7f))
     bitWrite(ret.cvh, 1, (value>>7));
     ret.data7 = value & 0x7F;
-    
+
     LnMsg msg; msg.pt = ret;
     writeChecksum(msg);
     _ln->broadcast(msg, this);
@@ -313,7 +337,7 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
                 bool ret = CS.writeCvProgBit(cv, 0, val);
                 break;*/
             case OPS_BYTE_NO_FEEDBACK:
-                LOGI("Read byte on prog CV%d", cv);            
+                LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
                 CS.writeCvMain(lnAddr(addr), cv, val);
                 break;
@@ -327,8 +351,8 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
 
         }
     }
-    
+
     //sendLack(PROG_LACK, 1); // ack ok
     //sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
-    
+
 }

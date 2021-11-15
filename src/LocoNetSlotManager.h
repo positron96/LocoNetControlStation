@@ -24,6 +24,8 @@ private:
 
     LocoNetBus * const _ln;
 
+    uint8_t dispatchedSlot;
+
     struct LnSlotData {
         uint8_t ss2; 
         uint8_t id1; 
@@ -36,6 +38,9 @@ private:
     bool slotValid(uint8_t slot) {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
     }
+
+    bool haveDispatchedSlot() { return slotValid(dispatchedSlot); }
+    void removeDispatchedSlot() { dispatchedSlot = 0;}
 
     int locateSlot(uint8_t hi, uint8_t lo);
 
