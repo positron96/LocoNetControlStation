@@ -216,8 +216,8 @@ void loop() {
     if(Serial.available()) {
         Serial.read();
         DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
-        Packet *p = r->currentSlot;
-        while(r->currentSlot == p) {
+        Packet *p = r->currentPacket;
+        while(r->currentPacket == p) {
             dccMain.timerFunc();
             delay(1);
             if(r->currentBit==1) break;
