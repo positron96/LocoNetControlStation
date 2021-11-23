@@ -2,7 +2,7 @@
 
 image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
-Video demonstration:
+Video demon:
 
 image:https://img.youtube.com/vi/KVks68XLQuE/mqdefault.jpg[link=https://youtu.be/KVks68XLQuE]
 
@@ -19,17 +19,20 @@ Planned features are:
 ** [x] USB-Serial interface (not tested yet)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
 * [ ] Stored turnout roster (partially done)
-* [ ] DCC++ interface via USB-Serial or WiFi (mayby I'll drop this idea if not required)
+* [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)+++
 
 The intended primary interface of the command station is LocoNet.
 LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB. 
 However, if needed, LocoNet can be cut from project and DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
-WiThrottle protocol is used to connect from WiFi throttles and does not depend on LocoNet routing.
+WiThrottle protocol is used to connect WiFi throttle to Command station and does not depend on LocoNet routing.
 
 ## Hardware
 
-The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module (that's one of the cheapest ESP32 board) and L298N chip for DCC generation for both main and program tracks.
-LocoNet part uses usual in DIY LocoNet community LM393 comparator with resistors adapted for 3.3V levels.
+The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module (that's one of the cheapest ESP32 board).
+The board has L298N chip for DCC generation for both main and program tracks.
+
+LocoNet part uses LM393 comparator with resistors adapted for 3.3V levels.
+This circuitry is common in DIY LocoNet communityfootnote:[http://www.spcoast.com/pages/LocoShield.html]footnote:[https://images.beneluxspoor.net/bnls/LocoNet_Shield_Schema.png].
 
 The PCB is open-source and is available here: https://oshwlab.com/positron96/loconet-command-station.
 
