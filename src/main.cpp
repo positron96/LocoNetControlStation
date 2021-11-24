@@ -35,8 +35,9 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
 
-#define PIN_LED  22
+#define CS_NAME "ESP32CommandStation"
 
+#define PIN_LED  22
 
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
@@ -51,8 +52,8 @@ DCCESP32SignalGenerator dccTimer(1); //timer1
 
 LocoNetSlotManager slotMan(&bus);
 
-WiThrottleServer withrottleServer;
 
+WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_NAME);
 
 #define PIN_BT 13
 #define PIN_BT2 15
@@ -126,7 +127,7 @@ void setup() {
     
     WiFiManager wifiManager;
 	wifiManager.setConfigPortalTimeout(300); // 5 min
-	if ( !wifiManager.autoConnect("ESP32CommandStation AP") ) {
+	if ( !wifiManager.autoConnect(CS_NAME " AP") ) {
 		delay(1000);
         Serial.print("Failed connection");
 		ESP.restart();
@@ -144,7 +145,7 @@ void setup() {
 
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
-	MDNS.setInstanceName("ESP32CommandStation");
+	MDNS.setInstanceName(CS_NAME);
 
     dccTimer.begin();
     //dccMain.begin();

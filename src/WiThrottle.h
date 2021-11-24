@@ -14,6 +14,7 @@
 #include <etl/map.h>
 #include <etl/utility.h>
 #include <AsyncTCP.h>
+#include "esp_task_wdt.h"
 
 #include "CommandStation.h"
 #include "Watchdog.h"
@@ -22,7 +23,7 @@
 #define WT_DEBUG
 
 #ifdef WT_DEBUG
-#define WT_LOGI(format, ...)  do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__);  } while(0)
+#define WT_LOGI(format, ...)  do{ ets_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__);  } while(0)
 #else
 #define WT_LOGI(...)
 #endif
@@ -31,7 +32,9 @@
 class WiThrottleServer {
 public:
 
-    WiThrottleServer(uint16_t port=44444);
+    constexpr static uint16_t DEF_PORT = 4444;
+
+    WiThrottleServer(uint16_t port, const char* name=nullptr);
 
     void begin();
 
@@ -55,6 +58,7 @@ public:
 private:
 
     const uint16_t port;
+    const char* name;
 
     constexpr static int MAX_CLIENTS = 3;
     constexpr static int MAX_THROTTLES_PER_CLIENT = 6;
@@ -63,7 +67,6 @@ private:
     constexpr static millis_t HEARTBEAT_INTL = 30; ///< in seconds
 
     AsyncServer server;
-    //WiFiClient clients[MAX_CLIENTS];
 
     struct ClientData {
         AsyncClient *cli;
@@ -71,8 +74,9 @@ private:
         uint8_t heartbeatsLost=0;
         Watchdog<HEARTBEAT_INTL*1000+5000, 500, HEARTBEAT_INTL*1000*2+5000> wdt;
 
-        char cmdline[100];
-        size_t cmdpos = 0;
+        constexpr static size_t RX_SIZE = 100;
+        char rx[RX_SIZE];
+        size_t rxpos = 0;
 
         using AddrToSlotMap = etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
@@ -87,16 +91,16 @@ private:
 
         void locoAdd(char th, String sLocoAddr);
 
-        void locoRelease(char th, String sLocoAddr);
+        void locosRelease(char th, String sLocoAddr);
         void locoRelease(char th, LocoAddress addr);
 
-        void locoAction(char th, String sLocoAddr, String actionVal);
+        void locosAction(char th, String sLocoAddr, String actionVal);
         void locoAction(char th, LocoAddress addr, String actionVal);
 
         void checkHeartbeat();
         void updateHeartbeat() {
             wdt.kick();
-            heartbeatsLost=0;
+            heartbeatsLost = 0;
         }
 
         void sendMessage(String msg, bool alert=false);
@@ -121,12 +125,13 @@ private:
         char lf = '\n';
         c->add(&lf, 1);
         c->send();
-        //WT_LOGI("WTTX %s", v.c_str() );
+        //WT_LOGI("WTTXl %s", v.c_str() );
+        //Serial.printf(ARDUHAL_LOG_FORMAT(I, "WTTXl %s"), v.c_str());
     }
     static void wifiPrint(AsyncClient *c, String v) {
         c->write(v.c_str(), v.length() );
-        //clients[iClient].print(v);
-        //WT_LOGI("WFTX %s", v.c_str() );
+        //WT_LOGI("WFTX  %s", v.c_str() );
+        //Serial.println("WTTX "+v);
     }
 
     void clientStart(AsyncClient *cli) ;
