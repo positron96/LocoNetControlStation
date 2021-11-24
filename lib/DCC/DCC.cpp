@@ -14,8 +14,7 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
 
-void IDCCChannel::copyPacket(uint8_t *src, uint8_t nBytes, int nRepeat, Packet *dst) {
-    uint8_t *buf = dst->buf;
+void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
 
     // copy first byte into what will become the checksum byte 
     // XOR remaining bytes into checksum byte 
@@ -33,26 +32,26 @@ void IDCCChannel::copyPacket(uint8_t *src, uint8_t nBytes, int nRepeat, Packet *
     buf[6] = src[2]<<7;                     // src[2], bit 0
     
     if(nBytes == 3) {
-        dst->nBits = 49;
+        nBits = 49;
     } else {
         buf[6] |= src[3]>>2;    // src[3], bits 7-2
         buf[7] =  src[3]<<6;    // src[3], bit 1-0
         if(nBytes==4) {
-            dst->nBits = 58;
+            nBits = 58;
         } else {
             buf[7] |= src[4]>>3;  // src[4], bits 7-3
             buf[8] =  src[4]<<5;   // src[4], bits 2-0
             if(nBytes==5) {
-                dst->nBits = 67;
+                nBits = 67;
             } else {
                 buf[8] |= src[5]>>4;   // src[5], bits 7-4
                 buf[9] =  src[5]<<4;   // src[5], bits 3-0
-                dst->nBits = 76;
+                nBits = 76;
             } 
         } 
     }
-    dst->nRepeat = nRepeat; 
-    dst->debugPrint();  
+    nRepeat = repeatCount; 
+    debugPrint();  
 }
 
 void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection){
@@ -164,7 +163,7 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
-    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent throw/close
+    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represents throw/close
     b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
         | (ch & 0x3) << 1 
         | (thrown?0x1:0) 

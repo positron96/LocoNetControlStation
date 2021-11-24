@@ -59,6 +59,8 @@ struct Packet {
         DCC_DEBUGF_ISR("packet (%d): '%s'", nBits, ttt );
         */
     }
+
+    void setData(uint8_t *src, uint8_t nBytes, int nRepeat);
 };
 
 class IDCCChannel {
@@ -109,7 +111,7 @@ public:
 protected:
     virtual void timerFunc()=0;
     virtual bool loadPacket(int, uint8_t*, uint8_t, int)=0;
-    static void copyPacket(uint8_t *src, uint8_t len, int repeat, Packet *dst);
+    
 private:
     friend class DCCESP32SignalGenerator;
 
@@ -123,10 +125,8 @@ class DCCESP32Channel: public IDCCChannel {
 public:
 
     DCCESP32Channel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin): 
-        _outputPin(outputPin), _enPin(enPin), _sensePin(sensePin)
+        _outputPin{outputPin}, _enPin{enPin}, _sensePin{sensePin}
     {
-        R.timerPeriodsLeft=1; // first thing a timerfunc does is decrement this, so make it not underflow
-        R.timerPeriodsHalf=2; // some sane nonzero value
     }
 
 
@@ -149,7 +149,7 @@ public:
 
         // during loadPacket there is time when new index is enabled for refresh, but urgentPacket is not yet loaded.
         for(size_t i=1; i<=SLOT_COUNT; i++) {
-            copyPacket(idlePacket, 2, 0, &R.packets[i]);
+            R.packets[i].setData(idlePacket, 2, 0);
         }
         loadPacket(1, idlePacket, 2, 0);
     }
@@ -190,6 +190,9 @@ public:
             maxIdx = 0;
             urgentPacket = nullptr;
             currentBit = 0;
+
+            timerPeriodsLeft = 1; // first thing a timerfunc does is decrement this, so make it not underflow
+            timerPeriodsHalf = 2; // some sane nonzero value.
         } 
 
         ~RegisterList() {}
@@ -268,8 +271,60 @@ public:
             return arrIdx;
         }
 
-        void bindNewPacket(size_t idx) {
+        void prepareNewPacket(size_t idx, uint8_t *packetData, uint8_t nBytes, int nRepeat) {
+            newPacket.setData(packetData, nBytes, nRepeat);
+            // newPacket will be copied to idx when new packet is starting to be sent
             urgentPacket = &packets[idx];
+        }
+
+        bool loadReg(int iReg, uint8_t *b, uint8_t nBytes, int nRepeat) {
+            //DCC_DEBUGF("reg=%d len=%d, repeat=%d", iReg, nBytes, nRepeat);
+
+            // force slot to be between 0 and maxNumRegs, inclusive
+            //iReg = iReg % (SLOT_COUNT+1);
+
+            // pause while there is a Register already waiting to be updated -- urgentPacket will be reset to NULL by timer when prior Register updated fully processed
+            int t = 1000;
+            while(!newPacketVacant() && --t>0) delay(1);
+            if(t==0) {
+                DCC_LOGW("timeout for slot %d", iReg );
+                return false;
+            }
+            //DCC_DEBUGF("Loading into slot %d, took %d ms", iReg, 1000-t );
+
+            size_t arrIdx;
+            if(iReg==0) {
+                arrIdx = 0;
+            } else {
+                arrIdx = findOrAllocateIdx(iReg);
+                if(arrIdx==0) return false;
+            }
+
+            prepareNewPacket(arrIdx, b, nBytes, nRepeat);
+            return true;
+        }
+
+        void unloadReg(size_t iReg) {
+            const auto it = regToIdxMap.find(iReg);
+            if(it==regToIdxMap.end()) {
+                DCC_LOGW("Did not find slot for reg %d", iReg);
+                return;
+            }
+
+            size_t idx = it->second;
+            DCC_LOGI("unloading idx %d for reg %d", idx, iReg);
+            if(regToIdxMap.size()==1) {
+                // if it's last last idx, remove it and load Idle packet into idx 1
+                loadReg(1, idlePacket, 2, 0);
+                DCC_LOGI(" only 1 idx remaining, filled as idlePacket");
+                if(idx==1) return; // don't unload idx 1 if it's the only one left
+            }
+            
+            regToIdxMap.erase(iReg);
+            indicesTaken[idx] = false;
+            for(int i=1; i<=SLOT_COUNT; i++) {
+                if (indicesTaken[i]) { maxIdx = i; break; }
+            }
         }
     };
 
@@ -297,58 +352,11 @@ public:
 protected:
 
     bool loadPacket(int iReg, uint8_t *b, uint8_t nBytes, int nRepeat) override {
-
-        //DCC_DEBUGF("reg=%d len=%d, repeat=%d", iReg, nBytes, nRepeat);
-
-        // force slot to be between 0 and maxNumRegs, inclusive
-        //iReg = iReg % (SLOT_COUNT+1);
-
-        // pause while there is a Register already waiting to be updated -- urgentPacket will be reset to NULL by timer when prior Register updated fully processed
-        int t=1000;
-        while(!R.newPacketVacant() && --t>0) delay(1);
-        if(t==0) {
-            DCC_LOGW("timeout for slot %d", iReg );
-            return false;
-        }
-        //DCC_DEBUGF("Loading into slot %d, took %d ms", iReg, 1000-t );
-
-        size_t arrIdx;
-        if(iReg==0) {
-            arrIdx = 0;
-        } else {
-            arrIdx = R.findOrAllocateIdx(iReg);
-            if(arrIdx==0) return false;
-        }
-
-        Packet *p = &R.newPacket;
-        copyPacket(b, nBytes, nRepeat, p);
-        R.bindNewPacket(arrIdx);
-
-        return true;
-
+        return R.loadReg(iReg, b, nBytes, nRepeat);
     }
 
     void unloadSlot(uint8_t iReg) override {
-        const auto it = R.regToIdxMap.find(iReg);
-        if(it==R.regToIdxMap.end()) {
-            DCC_LOGW("Did not find slot for reg %d", iReg);
-            return;
-        }
-
-        size_t idx = it->second;
-        DCC_LOGI("unloading idx %d for reg %d", idx, iReg);
-        if(R.regToIdxMap.size()==1) {
-            // if it's last last idx, remove it and load Idle packet into idx 1
-            loadPacket(1, idlePacket, 2, 0);
-            DCC_LOGI(" only 1 idx remaining, filled as idlePacket");
-            if(idx==1) return; // don't unload idx 1 if it's the only one left
-        }
-        
-        R.regToIdxMap.erase(iReg);
-        R.indicesTaken[idx] = false;
-        for(int i=R.regToIdxMap.capacity()-1; i>0; i--) {
-            if (R.indicesTaken[i]) { R.maxIdx = i; break; }
-        }
+        R.unloadReg(iReg);
     }
 
 private:
