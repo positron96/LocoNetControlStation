@@ -334,6 +334,14 @@ public:
         return turnoutAction(aAddr, fromRoster, TurnoutAction::TOGGLE);
     }
 
+    TurnoutState getTurnoutState(uint16_t aAddr) {
+        auto t = turnoutData.find(aAddr);
+        if(t != turnoutData.end() ) {
+            return t->second.tStatus;
+        }
+        return TurnoutState::UNKNOWN;
+    }
+
     TurnoutState turnoutAction(uint16_t aAddr, bool fromRoster, TurnoutAction action) {
         CS_DEBUGF("addr=%d named=%d action=%d", aAddr, fromRoster, (int)action );
 

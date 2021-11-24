@@ -14,6 +14,47 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
 
+void IDCCChannel::copyPacket(uint8_t *src, uint8_t nBytes, int nRepeat, Packet *dst) {
+    uint8_t *buf = dst->buf;
+
+    // copy first byte into what will become the checksum byte 
+    // XOR remaining bytes into checksum byte 
+    src[nBytes] = src[0];                        
+    for(int i=1; i<nBytes; i++)              
+        src[nBytes]^=src[i];
+    nBytes++;  // increment number of bytes in packet to include checksum byte
+        
+    buf[0] = 0xFF;                        // first 8 bits of 22-bit preamble
+    buf[1] = 0xFF;                        // second 8 bits of 22-bit preamble
+    buf[2] = 0xFC | bitRead(src[0],7);      // last 6 bits of 22-bit preamble + data start bit + src[0], bit 7
+    buf[3] = src[0]<<1;                     // src[0], bits 6-0 + data start bit
+    buf[4] = src[1];                        // src[1], all bits
+    buf[5] = src[2]>>1;                     // start bit + src[2], bits 7-1
+    buf[6] = src[2]<<7;                     // src[2], bit 0
+    
+    if(nBytes == 3) {
+        dst->nBits = 49;
+    } else {
+        buf[6] |= src[3]>>2;    // src[3], bits 7-2
+        buf[7] =  src[3]<<6;    // src[3], bit 1-0
+        if(nBytes==4) {
+            dst->nBits = 58;
+        } else {
+            buf[7] |= src[4]>>3;  // src[4], bits 7-3
+            buf[8] =  src[4]<<5;   // src[4], bits 2-0
+            if(nBytes==5) {
+                dst->nBits = 67;
+            } else {
+                buf[8] |= src[5]>>4;   // src[5], bits 7-4
+                buf[9] =  src[5]<<4;   // src[5], bits 3-0
+                dst->nBits = 76;
+            } 
+        } 
+    }
+    dst->nRepeat = nRepeat; 
+    dst->debugPrint();  
+}
+
 void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection){
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
