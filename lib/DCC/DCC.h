@@ -257,11 +257,11 @@ public:
             if(it == regToIdxMap.end() ) {
                 arrIdx = findEmptyIdx();
                 if(arrIdx==0) return 0;
-                //DCC_DEBUGF("Allocating new slot %d for reg %d", arrIdx,  iReg);
                 regToIdxMap[iReg] = arrIdx;
                 indicesTaken[arrIdx] = true;
                 maxIdx = max(maxIdx, arrIdx);
-                //DCC_DEBUGF("maxIdx=%d", R.maxIdx);
+                DCC_LOGI("Allocated new index %d for reg %d, max idx %d", arrIdx, iReg, maxIdx);
+                
             } else {
                 arrIdx = it->second;
             }
@@ -335,16 +335,17 @@ protected:
             return;
         }
 
-        size_t slot = it->second;
-        DCC_LOGI("unloading slot %d for reg %d", slot, iReg);
+        size_t idx = it->second;
+        DCC_LOGI("unloading idx %d for reg %d", idx, iReg);
         if(R.regToIdxMap.size()==1) {
-            // if it's last last slot, remove it and load Idle packet into slot 1
+            // if it's last last idx, remove it and load Idle packet into idx 1
             loadPacket(1, idlePacket, 2, 0);
-            if(slot==1) return; // don't unload slot 1 if it's the only one left
+            DCC_LOGI(" only 1 idx remaining, filled as idlePacket");
+            if(idx==1) return; // don't unload idx 1 if it's the only one left
         }
         
         R.regToIdxMap.erase(iReg);
-        R.indicesTaken[slot] = false;
+        R.indicesTaken[idx] = false;
         for(int i=R.regToIdxMap.capacity()-1; i>0; i--) {
             if (R.indicesTaken[i]) { R.maxIdx = i; break; }
         }
