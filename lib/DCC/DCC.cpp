@@ -13,6 +13,14 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
+uint8_t getMaxSpeedVal(SpeedMode s) {
+    switch(s) {
+        case SpeedMode::S14: return 14;
+        case SpeedMode::S28: return 28;
+        case SpeedMode::S128: return 126;
+        default: return 0;
+    }
+}
 
 void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
 
@@ -73,7 +81,7 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, Speed
         uint8_t t=nB;
         b[nB++] = 0b0100'0000;
         if(tDirection==1) b[t] |= 0b0010'0000;
-        if(sm==SpeedMode::S14) b[t] |= tSpeed & 0b0000'1111;
+        if(sm==SpeedMode::S14) b[t] |= tSpeed & 0b0000'1111; else
         if(sm==SpeedMode::S28) b[t] |= (tSpeed & 1)<<4 | (tSpeed & 0b1'1110)>>1;
     }
     

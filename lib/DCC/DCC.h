@@ -44,6 +44,8 @@ enum class DCCFnGroup {
 
 enum class SpeedMode { S14, S28, S128 };
 
+uint8_t getMaxSpeedVal(SpeedMode s);
+
 struct Packet {
     uint8_t buf[10];
     uint8_t nBits;

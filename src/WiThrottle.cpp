@@ -2,6 +2,8 @@
 
 #include <etl/vector.h>
 
+#include "DCC.h"
+
 /* Network parameters */
 #define TURNOUT_PREF "LT"
 #define TURNOUT_UNKNOWN '1'
@@ -9,6 +11,8 @@
 #define TURNOUT_THROWN '4'
 
 #define DELIM "<;>"
+
+#define SPEED_MAX 126.0
     
 /*
 StringSumHelper & operator +(const StringSumHelper &lhs, const LocoAddress a) {
@@ -40,6 +44,19 @@ char turnoutState2Chr(TurnoutState s) {
             CS_DEBUGF("Unknown turnout state: %d", (int)s);
             return TURNOUT_UNKNOWN;
     }
+}
+
+int speedMode2int(SpeedMode sm) {
+    switch(sm) {
+        case SpeedMode::S128: return 1;
+        case SpeedMode::S14: return 8;
+        case SpeedMode::S28: return 2;
+        default: return 0;
+    }
+}
+
+int speed2int(float s) {
+    return s * SPEED_MAX;
 }
 
 
@@ -253,9 +270,9 @@ void WiThrottleServer::ClientData::locoAdd(char th, String sLocoAddr) {
     for (int fKey=0; fKey<CommandStation::N_FUNCTIONS; fKey++) {
         wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"F"+(CS.getLocoFn(slot, fKey)?'1':'0')+String(fKey));
     }
-    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"V0");
-    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"R1");
-    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"s1"); // TODO: this is speed steps 128 -> 1, 28->2 14->8
+    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"V"+speed2int(CS.getLocoSpeedF(slot)) );
+    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"R"+CS.getLocoDir(slot) );
+    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"s"+speedMode2int(CS.getLocoSpeedMode(slot)) ); 
 
     //DEBUGS("loco add thr="+String(th)+"; addr"+String(sLocoAddr) );
 
@@ -311,12 +328,13 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
     }
     else if (actionVal.startsWith("qV")) {
         //DEBUGS("query speed for loco "+String(dccLocoAddr) );
-        wifiPrintln(cli, String("M")+th+"A"+addr2str(iLocoAddr)+DELIM + "V"+String(CS.getLocoSpeed(slot)));							
+        wifiPrintln(cli, String("M")+th+"A"+addr2str(iLocoAddr)+DELIM + "V"+speed2int(CS.getLocoSpeedF(slot)) );
         CS.kickSlot(slot);
     }
     else if (actionVal.startsWith("V")) {
         //DEBUGS("Sending velocity to addr "+String(dccLocoAddr) );
-        CS.setLocoSpeed(slot, actionVal.substring(1).toInt());
+        int s = actionVal.substring(1).toInt();
+        CS.setLocoSpeedF(slot, s/SPEED_MAX);
     }
     else if (actionVal.startsWith("qR")) {
         //DEBUGS("query dir for loco "+String(dccLocoAddr) );
@@ -329,14 +347,11 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
     }
     else if (actionVal.startsWith("X")) { // EMGR stop
         CS.setLocoSpeed(slot, SPEED_EMGR);
-        //sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" -1 "+String(locoState[30]));
     }
     else if (actionVal.startsWith("I")) { // idle
-        // sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" 0 "+String(locoState[30]));
         CS.setLocoSpeed(slot, SPEED_IDLE);
     }
     else if (actionVal.startsWith("Q")) { // quit
-        //sendDCCppCmd("t "+String(iThrottle+1)+" "+dccLocoAddr+" 0 "+String(locoState[30]));
         CS.setLocoSpeed(slot, SPEED_IDLE);
         cli->close();
     }
@@ -345,25 +360,23 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
     
-    //if ( lastHeartbeat > 0) {
-        if (wdt.timedOut() && heartbeatsLost==0) {
-            // stop loco
-            WT_LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
-            sendMessage("Timeout exceeded, locos stopped");
-            heartbeatsLost++;
-            for(const auto& throttle: slots)
-                for(const auto& slot: throttle.second) {
-                    CS.setLocoSpeed(slot.second, SPEED_EMGR); 
-                    wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+DELIM+"V"+CS.getLocoSpeed(slot.second));
-                }
-        }
-        if (wdt.timedOut2() && heartbeatsLost==1) {
-            WT_LOGI("timeout exceeded twice: closing connection" );
-            heartbeatsLost++;
-            cli->close();
-        }
-        
-    //}
+    if (wdt.timedOut() && heartbeatsLost==0) {
+        // stop loco
+        WT_LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
+        sendMessage("Timeout exceeded, locos stopped");
+        heartbeatsLost++;
+        for(const auto& throttle: slots)
+            for(const auto& slot: throttle.second) {
+                CS.setLocoSpeed(slot.second, SPEED_EMGR); 
+                wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+DELIM+"V-1");
+            }
+    }
+    if (wdt.timedOut2() && heartbeatsLost==1) {
+        WT_LOGI("timeout exceeded twice: closing connection" );
+        heartbeatsLost++;
+        cli->close();
+    }
+
 }
 
 void WiThrottleServer::ClientData::sendMessage(String msg, bool alert) {

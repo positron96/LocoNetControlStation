@@ -208,7 +208,14 @@ public:
     void setLocoSpeedMode(uint8_t slot, SpeedMode mode) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
+        if(dd.speedMode == mode) return;
         dd.speedMode = mode;
+        if(dd.refreshing)
+            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+    }
+
+    SpeedMode getLocoSpeedMode(uint8_t slot) {
+        return getSlot(slot).speedMode;
     }
 
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
@@ -266,17 +273,6 @@ public:
         return getSlot(slot).dir;
     }
 
-    /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
-    void setLocoSpeed(uint8_t slot, uint8_t spd) {
-        LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
-        if(dd.speed == spd) return;
-        dd.speed = spd;
-        if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
-    }
-
-
     /**
      * Updates slots that have not been used for a long time (PURGE_DELAY)
      */
@@ -292,9 +288,38 @@ public:
         }
     }
 
+    /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
+    void setLocoSpeed(uint8_t slot, uint8_t spd) {
+        LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
+        if(dd.speed == spd) return;
+        dd.speed = spd;
+        if(dd.refreshing)
+            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+    }
+
     /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
     uint8_t getLocoSpeed(uint8_t slot) {
         return getSlot(slot).speed;
+    }
+
+    void setLocoSpeedF(uint8_t slot, float spd) {
+        if(spd<0) setLocoSpeed(slot, SPEED_EMGR); 
+        else {
+            LocoData &dd = getSlot(slot);
+            int s = spd*getMaxSpeedVal(dd.speedMode);
+            if(s==0) setLocoSpeed(slot, SPEED_IDLE);
+            else setLocoSpeed(slot, s+1);
+        }
+    }
+
+    float getLocoSpeedF(uint8_t slot) {
+        uint8_t t = getLocoSpeed(slot);
+        if(t==SPEED_EMGR) return -1.0;
+        if(t==SPEED_IDLE) return 0.0;
+        t--;
+        LocoData &dd = getSlot(slot);
+        return (float)t/getMaxSpeedVal(dd.speedMode);
     }
 
     int16_t readCVProg(uint16_t cv) {
