@@ -353,7 +353,7 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
             heartbeatsLost++;
             for(const auto& throttle: slots)
                 for(const auto& slot: throttle.second) {
-                    CS.setLocoSpeed(slot.second, 1); // emgr
+                    CS.setLocoSpeed(slot.second, SPEED_EMGR); 
                     wifiPrintln(cli, String("M")+throttle.first+"A"+addr2str(slot.first)+DELIM+"V"+CS.getLocoSpeed(slot.second));
                 }
         }
