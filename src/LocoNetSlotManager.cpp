@@ -80,8 +80,8 @@ inline static SM int2SpeedMode(uint8_t sm) {
             sd.stat = speedMode2int(d.speedMode) | STAT1_SL_BUSY;
             if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
             sd.adr = addrLo(d.addr); 
-            sd.spd = d.speed; 
-            sd.dirf = d.dir ==1 ? DIRF_DIR : 0;
+            sd.spd = d.speed128; 
+            sd.dirf = d.dir==1 ? DIRF_DIR : 0;
             sd.dirf |= fn15swap(fns);
             sd.adr2 = addrHi(d.addr); 
             sd.snd = (fns & 0b111100000)>>5; 

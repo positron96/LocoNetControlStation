@@ -62,7 +62,7 @@ void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
     debugPrint();  
 }
 
-void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection){
+void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
@@ -81,8 +81,7 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, Speed
         uint8_t t=nB;
         b[nB++] = 0b0100'0000;
         if(tDirection==1) b[t] |= 0b0010'0000;
-        if(sm==SpeedMode::S14) b[t] |= tSpeed & 0b0000'1111; else
-        if(sm==SpeedMode::S28) b[t] |= (tSpeed & 1)<<4 | (tSpeed & 0b1'1110)>>1;
+        b[t] |= (tSpeed & 0b0001'1111); 
     }
     
     DCC_LOGI("iReg %d, addr %d, speed=%d(mode %d) %c", iReg, addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');

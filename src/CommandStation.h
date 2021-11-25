@@ -33,6 +33,7 @@ enum class TurnoutAction {
 
 constexpr uint8_t SPEED_IDLE = 0;
 constexpr uint8_t SPEED_EMGR = 1;
+constexpr uint8_t MAX_SPEED = 126;
 
 /** Puts bit 0 of arg to 5th place, shifts bits 1-5 to right */
 inline static uint8_t fn15swap(uint8_t normal) {
@@ -105,7 +106,7 @@ public:
     struct LocoData {
         using Fns = etl::bitset<N_FUNCTIONS>;
         LocoAddress addr;
-        uint8_t speed;
+        uint8_t speed128; ///< <0=stop, 1=emgr, 2..127 = speed 0..max
         SpeedMode speedMode;
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
@@ -114,6 +115,7 @@ public:
         bool allocated() const { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
         void kickWatchdog() { wdt.kick(); }
+        uint8_t dccSpeedByte();        
     };
 
     bool isSlotAllocated(uint8_t slot) const {
@@ -150,7 +152,7 @@ public:
         _slot.dir = 1;
         _slot.fn = LocoData::Fns();
         _slot.refreshing = false;
-        _slot.speed = 0;
+        _slot.speed128 = 0;
         _slot.speedMode = SpeedMode::S128;
         _slot.kickWatchdog();
         locoSlot[addr] = slot;
@@ -211,7 +213,7 @@ public:
         if(dd.speedMode == mode) return;
         dd.speedMode = mode;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
     SpeedMode getLocoSpeedMode(uint8_t slot) {
@@ -266,7 +268,7 @@ public:
         if(dd.dir==dir) return; 
         dd.dir = dir;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) { 
@@ -288,26 +290,25 @@ public:
         }
     }
 
-    /// Sets DCC-formatted speed (0-stop, 1-EMGR stop, 2-... moving speed)
+    /// Sets 128SS DCC speed (0-stop, 1-EMGR stop, 2-... moving speed)
     void setLocoSpeed(uint8_t slot, uint8_t spd) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
-        if(dd.speed == spd) return;
-        dd.speed = spd;
+        if(dd.speed128 == spd) return;
+        dd.speed128 = spd;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.speed, dd.speedMode, dd.dir);
+            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
-    /// Returns DCC-formatted speed (0-stop, 1-EMGR stop, ...)
+    /// Returns 128S DCC-formatted speed (0-stop, 1-EMGR stop, ...)
     uint8_t getLocoSpeed(uint8_t slot) {
-        return getSlot(slot).speed;
+        return getSlot(slot).speed128;
     }
 
     void setLocoSpeedF(uint8_t slot, float spd) {
         if(spd<0) setLocoSpeed(slot, SPEED_EMGR); 
         else {
-            LocoData &dd = getSlot(slot);
-            int s = spd*getMaxSpeedVal(dd.speedMode);
+            int s = spd*MAX_SPEED;
             if(s==0) setLocoSpeed(slot, SPEED_IDLE);
             else setLocoSpeed(slot, s+1);
         }
@@ -318,8 +319,7 @@ public:
         if(t==SPEED_EMGR) return -1.0;
         if(t==SPEED_IDLE) return 0.0;
         t--;
-        LocoData &dd = getSlot(slot);
-        return (float)t/getMaxSpeedVal(dd.speedMode);
+        return (float)t/MAX_SPEED;
     }
 
     int16_t readCVProg(uint16_t cv) {

@@ -78,6 +78,9 @@ public:
 
     virtual bool getPower()=0;
 
+    /**
+     * @param tSpeed must be in DCC format (e.g. for S28, bit order is 04321, for S14 F0 is included)
+     */
     void sendThrottle(int slot, LocoAddress addr, uint8_t tSpeed,  SpeedMode sm, uint8_t tDirection);
     void sendFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
     void sendFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);

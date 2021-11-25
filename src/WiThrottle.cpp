@@ -11,9 +11,7 @@
 #define TURNOUT_THROWN '4'
 
 #define DELIM "<;>"
-
-#define SPEED_MAX 126.0
-    
+   
 /*
 StringSumHelper & operator +(const StringSumHelper &lhs, const LocoAddress a) {
     return lhs + (a.isShort() ? 'S' : 'L') +a.addr();
@@ -55,8 +53,16 @@ int speedMode2int(SpeedMode sm) {
     }
 }
 
-int speed2int(float s) {
-    return s * SPEED_MAX;
+int speed2int(uint8_t s) {
+    if(s==SPEED_EMGR) return -1;
+    if(s==SPEED_IDLE) return 0;
+    return s-1; // 2..127 -> 1..126
+}
+
+uint8_t int2speed(int s) {
+    if(s<0) return SPEED_EMGR;
+    if(s==0) return SPEED_IDLE;
+    return s+1; // 1..126 -> 2..127
 }
 
 
@@ -270,7 +276,7 @@ void WiThrottleServer::ClientData::locoAdd(char th, String sLocoAddr) {
     for (int fKey=0; fKey<CommandStation::N_FUNCTIONS; fKey++) {
         wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"F"+(CS.getLocoFn(slot, fKey)?'1':'0')+String(fKey));
     }
-    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"V"+speed2int(CS.getLocoSpeedF(slot)) );
+    wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"V"+speed2int(CS.getLocoSpeed(slot)) );
     wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"R"+CS.getLocoDir(slot) );
     wifiPrintln(cli, String("M")+th+"A"+sLocoAddr+DELIM+"s"+speedMode2int(CS.getLocoSpeedMode(slot)) ); 
 
@@ -328,13 +334,13 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
     }
     else if (actionVal.startsWith("qV")) {
         //DEBUGS("query speed for loco "+String(dccLocoAddr) );
-        wifiPrintln(cli, String("M")+th+"A"+addr2str(iLocoAddr)+DELIM + "V"+speed2int(CS.getLocoSpeedF(slot)) );
+        wifiPrintln(cli, String("M")+th+"A"+addr2str(iLocoAddr)+DELIM + "V"+speed2int(CS.getLocoSpeed(slot)) );
         CS.kickSlot(slot);
     }
     else if (actionVal.startsWith("V")) {
         //DEBUGS("Sending velocity to addr "+String(dccLocoAddr) );
         int s = actionVal.substring(1).toInt();
-        CS.setLocoSpeedF(slot, s/SPEED_MAX);
+        CS.setLocoSpeed(slot, int2speed(s) );
     }
     else if (actionVal.startsWith("qR")) {
         //DEBUGS("query dir for loco "+String(dccLocoAddr) );
