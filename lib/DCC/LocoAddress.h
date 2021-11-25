@@ -31,6 +31,6 @@ public:
     bool operator < (const LocoAddress& a) const { return (num < a.num); }
     operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
 private:
-    LocoAddress(int16_t num): num(num) { }
+    LocoAddress(int16_t num): num{num} { }
     int16_t num;
 };
