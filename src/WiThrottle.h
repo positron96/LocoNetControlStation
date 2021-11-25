@@ -105,6 +105,8 @@ private:
 
         void sendMessage(String msg, bool alert=false);
 
+        void sendThrottleMsg(char th, char a, LocoAddress iLocoAddr, String resp);
+
     };
 
     etl::map<AsyncClient*, ClientData, MAX_CLIENTS> clients;
