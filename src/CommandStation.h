@@ -106,7 +106,8 @@ public:
     struct LocoData {
         using Fns = etl::bitset<N_FUNCTIONS>;
         LocoAddress addr;
-        uint8_t speed128; ///< <0=stop, 1=emgr, 2..127 = speed 0..max
+        //uint8_t speed128; ///< <0=stop, 1=emgr, 2..127 = speed 0..max
+        Speed speed;
         SpeedMode speedMode;
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
@@ -152,7 +153,7 @@ public:
         _slot.dir = 1;
         _slot.fn = LocoData::Fns();
         _slot.refreshing = false;
-        _slot.speed128 = 0;
+        _slot.speed = 0;
         _slot.speedMode = SpeedMode::S128;
         _slot.kickWatchdog();
         locoSlot[addr] = slot;
@@ -291,18 +292,18 @@ public:
     }
 
     /// Sets 128SS DCC speed (0-stop, 1-EMGR stop, 2-... moving speed)
-    void setLocoSpeed(uint8_t slot, uint8_t spd) {
+    void setLocoSpeed(uint8_t slot, Speed spd) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
-        if(dd.speed128 == spd) return;
-        dd.speed128 = spd;
+        if(dd.speed == spd) return;
+        dd.speed = spd;
         if(dd.refreshing)
             dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
     /// Returns 128S DCC-formatted speed (0-stop, 1-EMGR stop, ...)
     uint8_t getLocoSpeed(uint8_t slot) {
-        return getSlot(slot).speed128;
+        return getSlot(slot).speed.getSpeed128();
     }
 
     void setLocoSpeedF(uint8_t slot, float spd) {
