@@ -2,7 +2,7 @@
 
 image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
-Video demon:
+Video demo:
 
 image:https://img.youtube.com/vi/KVks68XLQuE/mqdefault.jpg[link=https://youtu.be/KVks68XLQuE]
 
@@ -16,7 +16,7 @@ Planned features are:
 * Loconet interface with routing from several sources:
 ** [x] Physical LocoNet bus
 ** [x] LbServer (LocoNet over TCP) over WiFi
-** [x] USB-Serial interface (not tested yet)
+** [x] USB-Serial interface (not tested)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
 * [ ] Stored turnout roster (partially done)
 * [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)+++
@@ -28,15 +28,45 @@ WiThrottle protocol is used to connect WiFi throttle to Command station and does
 
 ## Hardware
 
-The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module (that's one of the cheapest ESP32 board).
+The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module 
+(that's one of the cheapest ESP32 board).
 The board has L298N chip for DCC generation for both main and program tracks.
 
-LocoNet part uses LM393 comparator with resistors adapted for 3.3V levels.
-This circuitry is common in DIY LocoNet communityfootnote:[http://www.spcoast.com/pages/LocoShield.html]footnote:[https://images.beneluxspoor.net/bnls/LocoNet_Shield_Schema.png].
+LocoNet part uses LM393 comparator with resistors adapted for 3.3V VCC levels.
+This circuitry is common in DIY LocoNet projects{empty}footnote:[http://www.spcoast.com/pages/LocoShield.html]footnote:[https://images.beneluxspoor.net/bnls/LocoNet_Shield_Schema.png].
 
 The PCB is open-source and is available here: https://oshwlab.com/positron96/loconet-command-station.
 
-The project also works on breadboard with L298N board (a red one with current sensing pins broken out) and DIP versions of components.
+The project will also work on a breadboard with a L298N board (a red one with current sensing pins) 
+and DIP versions of components.
+Other available LocoNet breakout boards will also work. 
+They must operate at 3.3V.
+5V levels on ESP32 GPIOs are out of spec (though it'll probably work).
+
+## Pin functions
+
+These pins are used on ESP32 for the following purposes:
+
+* LocoNet
+** RX - 16 (IN)
+** TX - 17 (OUT)
+* DCC Main
+** Data   - 25 (OUT)
+** Enable - 32 (OUT)
+** Sense  - 36 (analog in only)
+* DCC Prog
+** Data   - 26 (OUT)
+** Enable - 33 (OUT)
+** Sense  - 39 (analog in only)
+* Auxiliary:
+** Mode LED    - 22 (OUT)
+** Mode button - 13 (IN)
+** User button - 15 (IN)
+
+Pins can be changed freely.
+
+Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+
 
 ## Code architecture:
 
@@ -89,19 +119,3 @@ The implementation is based on these libraries:
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
-
-## Pins
-
-Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
-
-* LocoNet
-** TX - OUT - 17
-** RX - IN - 16
-* DCC Main
-** Data - OUT - 25
-** Enable - OUT   - 32
-** Sense - Analog IN   - 36  in only
-* DCC Prog
-** Data - OUT     - 26  OK
-** Enable - OUT   - 33  OK
-** Sense - Analog In   - 39  in only
