@@ -25,8 +25,7 @@ LocoNetBus bus;
 //LocoNetESP32Uart locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
 //#include <LocoNetESP32Hybrid.h>
 //LocoNetESP32Hybrid locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
-#include <LocoNetESP32.h>
-LocoNetESP32 locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+
 LocoNetDispatcher parser(&bus);
 
 
@@ -80,9 +79,7 @@ void setup() {
     
     digitalWrite(PIN_LED, LOW);
 
-    locoNetPhy.begin();
-    //lSerial.begin();
-   
+    //lSerial.begin();   
     
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
         
@@ -192,7 +189,6 @@ void loop() {
             //Serial.printf("main(): readCVProg: %d\n", r);
             Serial.printf( "reporting sensor %d\n", v==HIGH) ;
             reportSensor(&bus, 1, v==HIGH);
-            Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
         inState = v;
 
