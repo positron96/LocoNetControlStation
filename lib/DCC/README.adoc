@@ -24,6 +24,7 @@ Slots 1..N are cycled packets that need to be sent to tracks regularly.
 These are commands for locomotive speed (repeating is needed in case locomotive looses contact with tracks, reboots and looses its stored speed data).
 
 When one slot finishes transmitting a packet and new packets have been written to other slot, the sending code moves to that slot. If there are no new slots written to, the code goes to next slot or rolls back to 1st slot (not 0th slot since 0th slot is for non-cycled packets).
+Each slot has a repeat count, so the packet in a slot is repeated a required number of times before moving to another slot (this should mostly be used for 0th slot).
 This logic is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. 
 The class interface is also based on those projects, though it's heavily modified.
 
