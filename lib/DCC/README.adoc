@@ -1,0 +1,31 @@
+# DCC waveform generation library
+
+The principle is this:
+
+The DCC standard requires that bit "1" be 58us HIGH, 58us LOW (55-61us), bit "0" must be at least 100us HIGH + at least 100us LOW. Maximum length of "0" bit pulses is 9900us (95-9900us to be precise). Varying "0" pulses allows to control analog locomotives (called zero-stretching)
+footnote:[https://www.nmra.org/sites/default/files/standards/sandrp/pdf/s-9.1_electrical_standards_for_digital_command_control_2021.pdf].
+
+`DCCESP32SignalGenerator` is a class that does signal generation on ESP32. 
+It starts a timer with 58us period. 
+If bit "1" is generated, each timer tick the output pin is toggled, giving pulses of 58us.
+If bit "0" is generated, the pin is toggled each 2 ticks, giving 116us pulse length, providing standard-compliant and simple implementation. 
+Only 1 timer is needed for several DCC tracks, here it is used for both main and programming tracks.
+The algorithm can be tweaked to do zero-stretching for analog loco control, but there are no plans for this. 
+
+The `IDCCChannel` class is an interface for classes implementing packet generation and sending logic.
+Currently there is 1 implementation for ESP32, `DCCESP32Channel`.
+It is almost completely architecture-agnostic, so can be ported to other acritectures easily.
+
+The DCC channel maintains a "RegisterList", a low-level structure (linked list) that contains a list of packets to be sent to tracks. 
+This list contains N+1 slots (0..N), N is a template parameter for `DCCESP32Channel` class.
+0-th slot is for non-cycled packets. 
+These packets are function toggle commands and CV-related packets.
+Slots 1..N are cycled packets that need to be sent to tracks regularly. 
+These are commands for locomotive speed (repeating is needed in case locomotive looses contact with tracks, reboots and looses its stored speed data).
+
+When one slot finishes transmitting a packet and new packets have been written to other slot, the sending code moves to that slot. If there are no new slots written to, the code goes to next slot or rolls back to 1st slot (not 0th slot since 0th slot is for non-cycled packets).
+This logic is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. 
+The class interface is also based on those projects, though it's heavily modified.
+
+The class also contains code for current sensing used for overcurrent-detection and reading CVs on programming track.
+This is ESP32-specific part of the code (though it uses `analogRead` function, so could be ported easily).

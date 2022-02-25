@@ -63,19 +63,19 @@ These pins are used on ESP32 for the following purposes:
 ** Mode button - 13 (IN)
 ** User button - 15 (IN)
 
-Pins can be changed freely.
+Pins are used as generic GPIO in/out/analog mode, so can be changed freely.
 
 Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
 
 ## Code architecture:
 
-* DCC.h/.cpp: packet generation for DCC bus. 
+* lib/DCC/DCC.h/.cpp: DCC packet generation link:lib/DCC[library]. 
 ** `IDCCChannel` - an interface for working with one track (main/programming).
 ** `DCCESP32Channel`- implementation of IDCCChannel. 
 Contains structures to store packets, switch between allocated slots. 
-A lot of architecture is derived from DCC++
-** `DCCESP32SignalGenerator` - a class that runs timer for DCC bit generation. 
+A lot of architecture is derived from DCC++.
+** `DCCESP32SignalGenerator` - a class that runs timer for DCC waveform generation. 
 Contains references for 2 instances of IDCCChannel, so for both tracks only one timer is used.
 
 * CommandStation.h/.cpp: an API for a command station.
@@ -89,12 +89,13 @@ Calls functions from CommandStation.h for actual access to locomotives and track
 * WiThrottle.h/.cpp: class for WiFi-based throttles (EngineDriver, WiThrottle and such).
 Calls functions from CommandStation.h for actual access to locomotives and tracks.
 
-* LbServer.h: LocoNet over TCP protocol implementation (for connecting to PC wirelessly over WiFi).
+* LbServer.h: http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html[LocoNet over TCP] protocol implementation (for PC to connect wirelessly over WiFi).
 Parses data from TCP, injects LocoNet packets into LocoNet bus, sends back result of sending packet over physical bus.
 Packets from the bus are sent to TCP.
 
 * LocoNetSerial: an implementation of LocoNet over UART (for connecting to PC with USB cable).
 Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited. 
+Not used at the moment, as serial port is used for debugging output.
 
 ### LocoNet routing
 
@@ -114,7 +115,7 @@ The implementation is based on these libraries:
 
  *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks. 
 
- * https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project]. Used for DCC packet generation, heavily modified. 
+ * link:lib/DCC[DCC] library is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project] (heavily modified). Used for DCC packet generation. 
 
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
 
