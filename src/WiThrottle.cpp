@@ -53,16 +53,16 @@ int speedMode2int(SpeedMode sm) {
     }
 }
 
-int speed2int(uint8_t s) {
+int speed2int(LocoSpeed s) {
     if(s==SPEED_EMGR) return -1;
     if(s==SPEED_IDLE) return 0;
-    return s-1; // 2..127 -> 1..126
+    return s.get128()-1; // 2..127 -> 1..126
 }
 
-uint8_t int2speed(int s) {
+LocoSpeed int2speed(int s) {
     if(s<0) return SPEED_EMGR;
     if(s==0) return SPEED_IDLE;
-    return s+1; // 1..126 -> 2..127
+    return LocoSpeed::from128(s+1); // 1..126 -> 2..127
 }
 
 

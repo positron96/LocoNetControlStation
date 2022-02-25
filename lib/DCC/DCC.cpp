@@ -13,15 +13,6 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
 #define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
-uint8_t getMaxSpeedVal(SpeedMode s) {
-    switch(s) {
-        case SpeedMode::S14: return 14;
-        case SpeedMode::S28: return 28;
-        case SpeedMode::S128: return 126;
-        default: return 0;
-    }
-}
-
 void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
 
     // copy first byte into what will become the checksum byte 

@@ -31,13 +31,15 @@ enum class TurnoutAction {
     STATES, TOGGLE
 };
 
-constexpr uint8_t SPEED_IDLE = 0;
-constexpr uint8_t SPEED_EMGR = 1;
-constexpr uint8_t MAX_SPEED = 126;
+/** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
+inline static uint8_t fn15toDcc(uint8_t normalByte) {
+    return (normalByte & 0x1)<<4 | (normalByte & 0b1'1110)>>1;
+}
 
-/** Puts bit 0 of arg to 5th place, shifts bits 1-5 to right */
-inline static uint8_t fn15swap(uint8_t normal) {
-    return (normal & 0b00001111)<<1 | (normal & 0b00010000)>>4;
+/** Puts bit 5 of arg to 0th place, shifts bits 1-4 to left */
+inline static uint8_t fn15fromDcc(uint8_t dccByte) {
+    return (dccByte & 0b0001'0000)>>4 | (dccByte & 0b0000'1111)<<1 ;
+    
 }
 
 class CommandStation {
@@ -107,7 +109,7 @@ public:
         using Fns = etl::bitset<N_FUNCTIONS>;
         LocoAddress addr;
         //uint8_t speed128; ///< <0=stop, 1=emgr, 2..127 = speed 0..max
-        Speed speed;
+        LocoSpeed speed;
         SpeedMode speedMode;
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
@@ -153,7 +155,7 @@ public:
         _slot.dir = 1;
         _slot.fn = LocoData::Fns();
         _slot.refreshing = false;
-        _slot.speed = 0;
+        _slot.speed = LocoSpeed{};
         _slot.speedMode = SpeedMode::S128;
         _slot.kickWatchdog();
         locoSlot[addr] = slot;
@@ -292,7 +294,7 @@ public:
     }
 
     /// Sets 128SS DCC speed (0-stop, 1-EMGR stop, 2-... moving speed)
-    void setLocoSpeed(uint8_t slot, Speed spd) {
+    void setLocoSpeed(uint8_t slot, LocoSpeed spd) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
         if(dd.speed == spd) return;
@@ -301,26 +303,17 @@ public:
             dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
-    /// Returns 128S DCC-formatted speed (0-stop, 1-EMGR stop, ...)
-    uint8_t getLocoSpeed(uint8_t slot) {
-        return getSlot(slot).speed.getSpeed128();
+    /// Returns 128SS DCC-formatted speed (0-stop, 1-EMGR stop, ...)
+    LocoSpeed getLocoSpeed(uint8_t slot) {
+        return getSlot(slot).speed;
     }
 
     void setLocoSpeedF(uint8_t slot, float spd) {
-        if(spd<0) setLocoSpeed(slot, SPEED_EMGR); 
-        else {
-            int s = spd*MAX_SPEED;
-            if(s==0) setLocoSpeed(slot, SPEED_IDLE);
-            else setLocoSpeed(slot, s+1);
-        }
+        setLocoSpeed(slot, LocoSpeed::fromFloat(spd) ); 
     }
 
     float getLocoSpeedF(uint8_t slot) {
-        uint8_t t = getLocoSpeed(slot);
-        if(t==SPEED_EMGR) return -1.0;
-        if(t==SPEED_IDLE) return 0.0;
-        t--;
-        return (float)t/MAX_SPEED;
+        return getLocoSpeed(slot).getFloat();
     }
 
     int16_t readCVProg(uint16_t cv) {

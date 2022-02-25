@@ -8,7 +8,7 @@
 #include <etl/bitset.h>
 
 #include "LocoAddress.h"
-#include "Speed.h"
+#include "LocoSpeed.h"
 
 constexpr float ADC_RESISTANCE = 0.1;
 constexpr float ADC_TO_MV = 3300.0/4096;
@@ -42,8 +42,6 @@ extern uint8_t resetPacket[3];
 enum class DCCFnGroup {
     F0_4, F5_8, F9_12, F13_20, F21_28
 };
-
-uint8_t getMaxSpeedVal(SpeedMode s);
 
 struct Packet {
     uint8_t buf[10];
