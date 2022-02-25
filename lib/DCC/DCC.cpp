@@ -88,7 +88,7 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
-            fn = (fn & 0x1)<<4 | (fn & 0x1E)<<1;
+            fn = (fn & 0x1)<<4 | (fn & 0b11110)>>1;
             sendFunction(iReg, addr,  0b10000000 | (fn & 0b00011111) );
             break;
         case DCCFnGroup::F5_8:
