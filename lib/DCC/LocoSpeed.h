@@ -17,37 +17,28 @@ public:
         return LocoSpeed{speed128};
     }
 
-    static LocoSpeed fromFloat(float speed) {
-        if(speed<0) return LocoSpeed::from128(DCC_SPEED_EMGR); 
-        else {
-            int s = ceil(speed*MAX_SPEED);
-            if(s==0) return LocoSpeed::from128(DCC_SPEED_IDLE);
-            else return LocoSpeed::from128(s+1);
-        }
-    }
+    static LocoSpeed fromFloat(float speed) ;
+
+    float getFloat() const ;
 
     uint8_t dccSpeedByte(SpeedMode speedMode) const;
 
     constexpr uint8_t get128() const { return speed128; }
-    constexpr float getFloat() const {
-        if(speed128==DCC_SPEED_EMGR ) return -1.0;
-        if(speed128==DCC_SPEED_IDLE ) return 0.0;
-        return (float)(speed128-1)/LocoSpeed::MAX_SPEED;
-    }
+
+    uint8_t getSpeedMode(SpeedMode mode) const;
 
     bool operator==(const LocoSpeed& rhs) const { return speed128 == rhs.speed128;  }
     bool operator< (const LocoSpeed& rhs) const { return speed128 < rhs.speed128; }
 
-    constexpr static uint8_t MAX_SPEED = 126;
-
     static uint8_t speedModeTo128(uint8_t s, SpeedMode mode);
 
 private:
+    constexpr static uint8_t MAX_SPEED_VAL = 126;
     uint8_t speed128;
     constexpr LocoSpeed(uint8_t speed128): speed128{speed128} {}
 };
 
-uint8_t getMaxSpeedVal(SpeedMode s);
+constexpr uint8_t getMaxSpeedVal(SpeedMode s);
 
 constexpr LocoSpeed SPEED_IDLE = LocoSpeed::from128(DCC_SPEED_IDLE);
 constexpr LocoSpeed SPEED_EMGR = LocoSpeed::from128(DCC_SPEED_EMGR);

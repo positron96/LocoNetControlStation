@@ -1,0 +1,8 @@
+{
+    "name": "DCC",
+    "version": "0.0.0",
+    "build": {
+        "srcDir": ".",
+        "extraScript": "extra-script.py"
+    }
+}
