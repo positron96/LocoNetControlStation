@@ -9,7 +9,9 @@ constexpr uint8_t DCC_SPEED_EMGR = 1;
 
 class LocoSpeed {
 public:
-    LocoSpeed(): LocoSpeed(0) {}    
+    constexpr LocoSpeed(): LocoSpeed(0) {} 
+
+    LocoSpeed(uint8_t speed, SpeedMode mode): LocoSpeed{speedModeTo128(speed, mode)} {}
 
     static constexpr LocoSpeed from128(uint8_t speed128) {
         return LocoSpeed{speed128};
@@ -37,6 +39,8 @@ public:
     bool operator< (const LocoSpeed& rhs) const { return speed128 < rhs.speed128; }
 
     constexpr static uint8_t MAX_SPEED = 126;
+
+    static uint8_t speedModeTo128(uint8_t s, SpeedMode mode);
 
 private:
     uint8_t speed128;
