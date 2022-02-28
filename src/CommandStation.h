@@ -32,14 +32,13 @@ enum class TurnoutAction {
 };
 
 /** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
-inline static uint8_t fn15toDcc(uint8_t normalByte) {
+inline static uint8_t moveBit1to5(uint8_t normalByte) {
     return (normalByte & 0x1)<<4 | (normalByte & 0b1'1110)>>1;
 }
 
 /** Puts bit 5 of arg to 0th place, shifts bits 1-4 to left */
-inline static uint8_t fn15fromDcc(uint8_t dccByte) {
+inline static uint8_t moveBit5to1(uint8_t dccByte) {
     return (dccByte & 0b0001'0000)>>4 | (dccByte & 0b0000'1111)<<1 ;
-    
 }
 
 class CommandStation {
@@ -247,13 +246,13 @@ public:
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
         // update bits (v=) and send function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFFFFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }  
+            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }  
 
-        CHECK_SEND(     0x1F, DCCFnGroup::F0_4);
-        CHECK_SEND(    0x1E0, DCCFnGroup::F5_8);
-        CHECK_SEND(   0x1E00, DCCFnGroup::F9_12);
-        CHECK_SEND( 0x1FE000, DCCFnGroup::F13_20);
-        CHECK_SEND(0x1FE0000, DCCFnGroup::F21_28);
+        CHECK_SEND(      0x1F, DCCFnGroup::F0_4);
+        CHECK_SEND(     0x1E0, DCCFnGroup::F5_8);
+        CHECK_SEND(    0x1E00, DCCFnGroup::F9_12);
+        CHECK_SEND( 0x1F'E000, DCCFnGroup::F13_20);
+        CHECK_SEND(0x1FE'0000, DCCFnGroup::F21_28);
         dd.fn = LocoData::Fns( v );
     }
 
@@ -293,7 +292,7 @@ public:
         }
     }
 
-    /// Sets 128SS DCC speed (0-stop, 1-EMGR stop, 2-... moving speed)
+    /// Sets speed
     void setLocoSpeed(uint8_t slot, LocoSpeed spd) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
@@ -303,7 +302,7 @@ public:
             dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
-    /// Returns 128SS DCC-formatted speed (0-stop, 1-EMGR stop, ...)
+    /// Returns speed
     LocoSpeed getLocoSpeed(uint8_t slot) {
         return getSlot(slot).speed;
     }

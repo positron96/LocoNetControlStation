@@ -12,7 +12,7 @@ void testLocoSpeed() {
     // test 14 speed steps
     for(uint8_t a = 0; a<16; a++) {
         LocoSpeed s = LocoSpeed{a, SpeedMode::S14};
-        uint8_t ret = s.getSpeedMode(SpeedMode::S14);
+        uint8_t ret = s.getDCC(SpeedMode::S14);
         //printf("in %d (%d) out %d\n", a, s.get128(), ret);
         TEST_ASSERT_EQUAL_MESSAGE(a, ret, "S14" );
     }
@@ -20,7 +20,7 @@ void testLocoSpeed() {
     // test 28 speed steps
     for(uint8_t a = 0; a<32; a++) {
         LocoSpeed s = LocoSpeed{a, SpeedMode::S28};
-        uint8_t ret = s.getSpeedMode(SpeedMode::S28);
+        uint8_t ret = s.getDCC(SpeedMode::S28);
         //printf("in %d (%d) out %d\n", a, s.get128(), ret);
         if(a==2) { TEST_ASSERT_MESSAGE(2==ret || 0==ret, "IDLE S28" );
         } else if(a==3) { TEST_ASSERT_MESSAGE(3==ret || 1==ret, "EMGR S28" );

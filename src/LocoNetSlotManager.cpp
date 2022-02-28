@@ -83,7 +83,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             sd.adr = addrLo(d.addr); 
             sd.spd = d.speed.get128(); 
             sd.dirf = d.dir==1 ? DIRF_DIR : 0;
-            sd.dirf |= fn15toDcc(fns);
+            sd.dirf |= moveBit1to5(fns);
             sd.adr2 = addrHi(d.addr); 
             sd.snd = (fns & 0b1'1110'0000)>>5; 
 
@@ -237,7 +237,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 1 : 0;
         CS.setLocoDir(slot, dir);
         // fn order in received byte is 04321, needs swapping
-        CS.setLocoFns(slot, 0b00011111, fn15fromDcc(v) );
+        CS.setLocoFns(slot, 0b0001'1111, moveBit5to1(v) );
     }
 
     void LocoNetSlotManager::processSnd(uint8_t slot, uint8_t snd) {
