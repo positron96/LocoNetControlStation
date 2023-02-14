@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
 //#include <esp_adc_cal.h>
+#include <esp_timer.h>
 
 #include <etl/map.h>
 #include <etl/bitset.h>
@@ -11,14 +12,15 @@
 #include "LocoSpeed.h"
 
 constexpr float ADC_RESISTANCE = 0.1;
-constexpr float ADC_TO_MV = 3300.0/4096;
+constexpr float ADC_MAX_MV = 1100;
+constexpr float ADC_TO_MV = ADC_MAX_MV/4096;
 constexpr float ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
 constexpr uint16_t MAX_CURRENT = 2000;
 
 #define DCC_DEBUG
 
 #ifdef DCC_DEBUG
-#define DCC_LOGD(...) 
+#define DCC_LOGD(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #define DCC_LOGD_ISR(...)
 #define DCC_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
 #define DCC_LOGI_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
@@ -90,7 +92,6 @@ public:
      * @param ch is 0-based.
      */
     void sendAccessory(uint16_t addr9, uint8_t ch, bool);
-    virtual uint16_t readCurrentAdc()=0;
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
@@ -100,7 +101,7 @@ public:
     void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
 
     bool checkOvercurrent() {
-        uint16_t v = readCurrentAdc();
+        uint16_t v = getCurrent();
         float mA = v * ADC_TO_MA;
         //if(v!=0) DCC_LOGI("%d, %d", v, (int)mA);
         if(mA>MAX_CURRENT) {
@@ -110,7 +111,15 @@ public:
         else return true;
     }
 
+    void resetMaxCurrent() { maxCurrent = 0; }
+    uint16_t getMaxCurrent() { return maxCurrent; }
+    uint16_t getCurrent() { return current; }
+    virtual void updateCurrent() = 0;
+
 protected:
+    volatile uint16_t current;
+    volatile uint16_t maxCurrent;
+
     virtual void timerFunc()=0;
     virtual bool loadPacket(int, uint8_t*, uint8_t, int)=0;
     
@@ -330,9 +339,9 @@ public:
         }
     };
 
-    uint16_t readCurrentAdc() override {        
-        //return esp_adc_cal_raw_to_voltage(analogRead(_sensePin), &adc_chars);
-        return analogRead(_sensePin);//*1093.0/4096;
+    void updateCurrent() override {
+        current = analogRead(_sensePin);
+        if(current > maxCurrent) maxCurrent = current;
     }
 
     void IRAM_ATTR timerFunc() override {
@@ -366,9 +375,6 @@ private:
     uint8_t _outputPin;    
     uint8_t _enPin;
     uint8_t _sensePin;
-
-    uint16_t current;
-
     //esp_adc_cal_characteristics_t adc_chars;
 
     RegisterList R;
@@ -420,10 +426,13 @@ public:
 private:
     hw_timer_t * _timer;
     volatile uint8_t _timerNum;
+    esp_timer_handle_t _adcTimer;
     IDCCChannel *main = nullptr;
     IDCCChannel *prog = nullptr;
 
     friend void timerCallback();
+    friend void adcTimerCallback(void*);
 
     void IRAM_ATTR timerFunc();
+    void IRAM_ATTR adcTimerFunc();
 };
