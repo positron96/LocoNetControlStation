@@ -1,6 +1,7 @@
 #include "WiThrottle.h"
 
 #include <etl/vector.h>
+#include <etl/to_arithmetic.h>
 
 #include "DCC.h"
 
@@ -11,7 +12,7 @@
 #define TURNOUT_THROWN '4'
 
 #define DELIM "<;>"
-   
+
 /*
 StringSumHelper & operator +(const StringSumHelper &lhs, const LocoAddress a) {
     return lhs + (a.isShort() ? 'S' : 'L') +a.addr();
@@ -22,10 +23,10 @@ String addr2str(const LocoAddress & a) {
     return (a.isShort() ? 'S' : 'L') + String(a.addr());
 }
 
-LocoAddress str2addr(String addr) {
-    uint16_t iLocoAddr = (uint16_t)addr.substring(1).toInt();
-    if (addr.charAt(0) == 'S') return LocoAddress::shortAddr((uint8_t)iLocoAddr);
-    if (addr.charAt(0) == 'L') return LocoAddress::longAddr(iLocoAddr);
+LocoAddress str2addr(etl::string_view addr) {
+    uint16_t iLocoAddr = etl::to_arithmetic<uint16_t>(addr.substr(1)).value();
+    if (addr[0] == 'S') return LocoAddress::shortAddr((uint8_t)iLocoAddr);
+    if (addr[0] == 'L') return LocoAddress::longAddr(iLocoAddr);
     return LocoAddress();
 }
 
@@ -38,7 +39,7 @@ char turnoutState2Chr(TurnoutState s) {
         case TurnoutState::THROWN : return TURNOUT_THROWN;
         case TurnoutState::CLOSED: return TURNOUT_CLOSED;
         case TurnoutState::UNKNOWN : return TURNOUT_UNKNOWN;
-        default: 
+        default:
             CS_DEBUGF("Unknown turnout state: %d", (int)s);
             return TURNOUT_UNKNOWN;
     }
@@ -73,7 +74,7 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
         return;
     }
     // here keepalives are built into protocol, no need for TCP keepalives
-    //cli->setKeepAlive(10000, 2); 
+    //cli->setKeepAlive(10000, 2);
     bool initNewClient = true;
     for(auto it = clients.cbegin(); it!=clients.cend(); ) {
         const auto &c = it->first;
@@ -86,20 +87,20 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
             cc.cli = cli;
             cc.updateHeartbeat();
             it = clients.erase(it); // onDisconnect(c) won't find a client and won't cleanup ClientData
-            c->close(); 
+            c->close();
             break;
         } else it++;
     }
-    if(initNewClient) clientStart(cli); 
+    if(initNewClient) clientStart(cli);
 
-    cli->setAckTimeout(HEARTBEAT_INTL*1000*3); 
-    WT_LOGI("onConnect: New client(%X): %s, now have %d clients", 
+    cli->setAckTimeout(HEARTBEAT_INTL*1000*3);
+    WT_LOGI("onConnect: New client(%X): %s, now have %d clients",
             (intptr_t)cli, cli->remoteIP().toString().c_str(), clients.size() );
 
     cli->onDisconnect([this](void*, AsyncClient* cli_) {
         WT_LOGI("onDisconnect: Client(%X) disconnected", (intptr_t)cli_ );
         auto it = clients.find(cli_);
-        if(it==clients.end() ) { 
+        if(it==clients.end() ) {
             WT_LOGI("Not clearing up client(%X), it is not registered", (intptr_t)cli_);
             return;
         }
@@ -109,13 +110,13 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
 
     cli->onData([this](void*, AsyncClient* cli_, void *data, size_t len) {
         auto it = clients.find(cli_);
-        if(it==clients.end() ) { 
+        if(it==clients.end() ) {
             // after sending Q(quit), the client might send other commands, ignore them
             WT_LOGI("Got some data from client(%X), but it is not recognised", (intptr_t)cli_);
             return;
         }
         ClientData &cc = it->second;
-        if(cc.heartbeatEnabled) { 
+        if(cc.heartbeatEnabled) {
             cc.updateHeartbeat();
         }
         for(size_t i=0; i<len; i++) {
@@ -134,16 +135,16 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
         }
     });
 
-    cli->onError([this](void*, AsyncClient* cli_, int8_t err) { 
-        WT_LOGI("onError(%X): %d", (intptr_t)cli_, err);  
+    cli->onError([this](void*, AsyncClient* cli_, int8_t err) {
+        WT_LOGI("onError(%X): %d", (intptr_t)cli_, err);
     });
-    cli->onTimeout([this](void*, AsyncClient* cli_, uint32_t time) { 
-        WT_LOGI("onTimeout(%X): %d", (intptr_t)cli_, time); 
-        cli_->close(); 
+    cli->onTimeout([this](void*, AsyncClient* cli_, uint32_t time) {
+        WT_LOGI("onTimeout(%X): %d", (intptr_t)cli_, time);
+        cli_->close();
     });
 }
 
-WiThrottleServer::WiThrottleServer(uint16_t port, const char* name) : 
+WiThrottleServer::WiThrottleServer(uint16_t port, const char* name) :
         port{port}, name{name}, server(port)
 {
     server.onClient([this](void*, AsyncClient* cli ){this->onNewClient(cli);}, nullptr);
@@ -171,53 +172,53 @@ void WiThrottleServer::loop() {
 }
 
 void WiThrottleServer::processCmd(ClientData & cc) {
-    String dataStr = cc.rx;
+    etl::string_view dataStr{cc.rx};
     WT_LOGI("RX '%s'(len %d)", cc.rx, dataStr.length());
-    switch(dataStr.charAt(0)) {
+    switch(dataStr[0]) {
     case '*': {
         if(dataStr.length()>1) {
-            switch(dataStr.charAt(1) ) {
+            switch(dataStr[1] ) {
                 case '+' : cc.heartbeatEnabled = true; cc.updateHeartbeat(); break;
                 case '-' : cc.heartbeatEnabled = false; break;
-                default: WT_LOGI("Unknown * cmd: %s", dataStr.c_str());
-            } 
+                default: WT_LOGI("Unknown * cmd: %s", dataStr.data());
+            }
         }
         WT_LOGI("Heartbeat is %s", cc.heartbeatEnabled?"ON":"OFF");
         break;
-    }             
+    }
     case 'P': {
-        if (dataStr.startsWith("PPA") ) {
-            turnPower(dataStr.charAt(3) );
-        } else if (dataStr.startsWith("PTA")) {
-            char action = dataStr.charAt(3);
-            int aAddr;
+        if (dataStr.starts_with("PPA") ) {
+            turnPower(dataStr[3]);
+        } else if (dataStr.starts_with("PTA")) {
+            char action = dataStr[3];
+            unsigned aAddr;
             bool named;
-            if(dataStr.substring(4,6)==TURNOUT_PREF) {
+            if(dataStr.substr(4,2)==TURNOUT_PREF) {
                 // named turnout
-                aAddr = dataStr.substring(6).toInt();
+                aAddr = etl::to_arithmetic<unsigned>(dataStr.substr(6)).value();
                 named = true;
             } else {
-                aAddr = dataStr.substring(4).toInt();
+                aAddr = etl::to_arithmetic<unsigned>(dataStr.substr(4)).value();
                 named = false;
             }
             accessoryToggle(aAddr, action, named, cc);
-        } else {}
+        }
         break;
     }
-    case 'N': { // device name        
-        char* remoteName = cc.rx+1;
-        WT_LOGI("Device name: '%s'",  remoteName);
+    case 'N': { // device name
+        auto remoteName = dataStr.substr(1);
+        WT_LOGI("Device name: '%s'",  remoteName.data());
         break;
     }
     case 'H': {
-        if(dataStr.charAt(1)=='U') {
-            char* hwId = cc.rx+2;
-            WT_LOGI("Hardware ID: '%s'", hwId );
-            cc.hwId = hwId;            
+        if(dataStr[1]=='U') {
+            auto hwId = dataStr.substr(2);
+            WT_LOGI("Hardware ID: '%s'", hwId.data() );
+            cc.hwId = String(hwId.data());
             // kill other clients with same name (assume it's reconnect from same device)
             for (auto &p: clients) {
                 if(&p.second == &cc) continue;
-                if(p.second.hwId == cc.hwId 
+                if(p.second.hwId == cc.hwId
                     && p.first->getRemoteAddress() == cc.cli->getRemoteAddress()
                 ) {
                     WT_LOGI("There is already a client with this name!");
@@ -228,16 +229,20 @@ void WiThrottleServer::processCmd(ClientData & cc) {
         break;
     }
     case 'M': {
-        char th = dataStr.charAt(1);
+        char th = dataStr[1];
         if(cc.slots.count(th)==0) {
             WT_LOGI("Throttle '%c' unknown, skipping", th);
             break;
         }
-        char action = dataStr.charAt(2);
-        String actionData = dataStr.substring(3);
-        int delimiter = actionData.indexOf(DELIM);
-        String actionKey = actionData.substring(0, delimiter);
-        String actionVal = actionData.substring(delimiter+3);
+        char action = dataStr[2];
+        auto actionData = dataStr.substr(3);
+        size_t delimiter = actionData.find(DELIM);
+        if(delimiter == -1) {
+            WT_LOGI("Malformed M command");
+            break;
+        }
+        auto actionKey = actionData.substr(0, delimiter);
+        auto actionVal = actionData.substr(delimiter+3);
         if (action == '+') {
             cc.locoAdd(th, actionKey);
         } else if (action == '-') {
@@ -258,7 +263,6 @@ void WiThrottleServer::processCmd(ClientData & cc) {
 }
 
 void WiThrottleServer::clientStart(AsyncClient *cli) {
-    
     ClientData cc;
     WT_LOGI( "New client " );
 
@@ -288,7 +292,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
 
 void WiThrottleServer::clientStop(ClientData &client) {
     WT_LOGI("Client stopping");
-    
+
     for(const auto& thrSlots: client.slots) {
         for(const auto& slots: thrSlots.second) {
             CS.releaseLocoSlot(slots.second);
@@ -298,11 +302,11 @@ void WiThrottleServer::clientStop(ClientData &client) {
     client.heartbeatEnabled = false;
     AsyncClient *cli = client.cli;
     // this method should be called only from onDisconnected, so this should be false
-    if(cli->connected() ) cli->stop(); 
+    if(cli->connected() ) cli->stop();
     clients.erase(cli);
 }
 
-void WiThrottleServer::ClientData::locoAdd(char th, String sLocoAddr) {
+void WiThrottleServer::ClientData::locoAdd(char th, etl::string_view sLocoAddr) {
     LocoAddress addr = str2addr(sLocoAddr);
     AddrToSlotMap &slotmap = slots[th];
     if(slotmap.available()==0 && slotmap.find(addr)==slotmap.end() ) {
@@ -315,20 +319,20 @@ void WiThrottleServer::ClientData::locoAdd(char th, String sLocoAddr) {
     slotmap[addr] = slot;
 
     sendThrottleMsg(th,'+',addr, "");
-    for (int fKey=0; fKey<CommandStation::N_FUNCTIONS; fKey++) {
+    for (uint8_t fKey=0; fKey<CommandStation::N_FUNCTIONS; fKey++) {
         sendThrottleMsg(th,'A',addr, String("F")+(CS.getLocoFn(slot, fKey)?'1':'0')+String(fKey) );
     }
     sendThrottleMsg(th,'A',addr, String("V")+speed2int(CS.getLocoSpeed(slot)) );
     sendThrottleMsg(th,'A',addr, String("R")+CS.getLocoDir(slot) );
-    sendThrottleMsg(th,'A',addr, String("s")+speedMode2int(CS.getLocoSpeedMode(slot)) ); 
+    sendThrottleMsg(th,'A',addr, String("s")+speedMode2int(CS.getLocoSpeedMode(slot)) );
 
     //DEBUGS("loco add thr="+String(th)+"; addr"+String(sLocoAddr) );
 
     CS.setLocoSlotRefresh(slot, true);
 }
 
-void WiThrottleServer::ClientData::locosRelease(char th, String sLocoAddr) {
-    if(sLocoAddr=="*") { 
+void WiThrottleServer::ClientData::locosRelease(char th, etl::string_view sLocoAddr) {
+    if(sLocoAddr=="*") {
         etl::vector<LocoAddress, MAX_LOCOS_PER_THROTTLE> tmp;
         for(const auto& slot: slots[th]) {
             tmp.push_back(slot.first);
@@ -345,7 +349,7 @@ void WiThrottleServer::ClientData::locosRelease(char th, String sLocoAddr) {
 void WiThrottleServer::ClientData::locoRelease(char th, LocoAddress addr) {
     String sAddr = addr;
     WT_LOGI("loco release thr=%c; addr=%s", th, sAddr.c_str() );
-    sendThrottleMsg(th,'-',addr, "" ); 
+    sendThrottleMsg(th,'-',addr, "" );
 
     auto &throttle = slots[th];
     auto it = throttle.find(addr);
@@ -359,9 +363,9 @@ void WiThrottleServer::ClientData::locoRelease(char th, LocoAddress addr) {
 }
 
 
-void WiThrottleServer::ClientData::locosAction(char th, String sLocoAddr, String actionVal) {
-    if(sLocoAddr=="*") { 
-        for(const auto& slot: slots[th]) 
+void WiThrottleServer::ClientData::locosAction(char th, etl::string_view sLocoAddr, etl::string_view actionVal) {
+    if(sLocoAddr=="*") {
+        for(const auto& slot: slots[th])
             locoAction(th, slot.first, actionVal);
     } else {
         LocoAddress iLocoAddr = str2addr(sLocoAddr);
@@ -369,27 +373,27 @@ void WiThrottleServer::ClientData::locosAction(char th, String sLocoAddr, String
     }
 }
 
-void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, String actionVal) {
+void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, etl::string_view actionVal) {
     auto &throttle = slots[th];
     auto it = throttle.find(iLocoAddr);
     if(it == throttle.end()) {
-        WT_LOGI("No loco '%s' in this throttle", ((String)iLocoAddr).c_str());
+        WT_LOGI("No loco '%s' in this throttle", String(iLocoAddr).c_str());
         return;
     }
     uint8_t slot = it->second;
 
-    WT_LOGI("loco action thr=%c; addr=%s; action=%s", th, String(iLocoAddr).c_str(), actionVal.c_str() );
-    switch(actionVal.charAt(0) ) {
-        case 'F': 
-            if(actionVal.charAt(1)=='1'){
-                int fKey = actionVal.substring(2).toInt();
+    WT_LOGI("loco action thr=%c; addr=%s; action=%s", th, String(iLocoAddr).c_str(), actionVal.data() );
+    switch(actionVal[0] ) {
+        case 'F':
+            if(actionVal[1]=='1'){
+                uint8_t fKey = etl::to_arithmetic<uint8_t>(actionVal.substr(2)).value();
                 bool newVal = ! CS.getLocoFn(slot, fKey);
                 CS.setLocoFn(slot, fKey, newVal );
                 sendThrottleMsg(th, 'A', iLocoAddr, (newVal?"F1":"F0")+String(fKey) );
             }
             break;
         case 'q':
-            switch(actionVal.charAt(1)) {
+            switch(actionVal[1]) {
                 case 'V':
                     //DEBUGS("query speed for loco "+String(dccLocoAddr) );
                     sendThrottleMsg(th,'A', iLocoAddr, String("V")+speed2int(CS.getLocoSpeed(slot)) );
@@ -401,16 +405,16 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
             }
             CS.kickSlot(slot);
             break;
-        case 'V': 
+        case 'V':
             {
                 //DEBUGS("Sending velocity to addr "+String(dccLocoAddr) );
-                int s = actionVal.substring(1).toInt();
+                int s = etl::to_arithmetic<int>(actionVal.substr(1)).value();
                 CS.setLocoSpeed(slot, int2speed(s) );
             }
             break;
         case 'R':
             //DEBUGS("Sending dir to addr "+String(dccLocoAddr) );
-            CS.setLocoDir(slot, actionVal.substring(1).toInt() );
+            CS.setLocoDir(slot, etl::to_arithmetic<uint8_t>(actionVal.substr(1)).value() );
             break;
         case 'X': // EMGR stop
             CS.setLocoSpeed(slot, SPEED_EMGR);
@@ -428,14 +432,14 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, St
 
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
-    
+
     if (wdt.timedOut() && heartbeatsLost==0) {
         // stop loco
         WT_LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
         heartbeatsLost++;
         for(const auto& throttle: slots)
             for(const auto& slot: throttle.second) {
-                CS.setLocoSpeed(slot.second, SPEED_EMGR); 
+                CS.setLocoSpeed(slot.second, SPEED_EMGR);
                 sendThrottleMsg(throttle.first, 'A', slot.first, "V-1" );
             }
         sendMessage("Timeout exceeded, locos stopped");
@@ -459,7 +463,7 @@ void WiThrottleServer::ClientData::sendThrottleMsg(char th, char cmd, LocoAddres
     wifiPrintln(cli, String(tt)+addr2str(iLocoAddr)+DELIM + resp);
 }
 
-void WiThrottleServer::accessoryToggle(int aAddr, char action, bool isNamed, ClientData &cc) {
+void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed, ClientData &cc) {
 
     WT_LOGI("Turnout addr=%d(named: %c) action=%c", aAddr, isNamed?'Y':'N', action );
 
@@ -468,15 +472,15 @@ void WiThrottleServer::accessoryToggle(int aAddr, char action, bool isNamed, Cli
         case 'T':  a = TurnoutAction::THROWN;  break;
         case 'C':  a = TurnoutAction::CLOSED;  break;
         case '2':  a = TurnoutAction::TOGGLE;  break;
-        default: 
+        default:
             cc.sendMessage("Unknown turnout command!", true);
             return;
     }
     TurnoutState newStat = CS.turnoutAction(aAddr, isNamed, a);
 
-    if(newStat==TurnoutState::UNKNOWN) cc.sendMessage("Could not change turnout!", true); 
-    char cStat = turnoutState2Chr(newStat); 
-    
+    if(newStat==TurnoutState::UNKNOWN) cc.sendMessage("Could not change turnout!", true);
+    char cStat = turnoutState2Chr(newStat);
+
     for (auto p: clients) {
         wifiPrintln(p.first, String("PTA")+cStat+(isNamed?TURNOUT_PREF:"")+aAddr);
     }

@@ -1,24 +1,26 @@
 /**
  * Based on https://github.com/positron96/withrottle
- * 
+ *
  * Also, see JMRI sources, start at https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrit/withrottle/DeviceServer.java
- * 
+ *
  * Official documentation: https://www.jmri.org/help/en/package/jmri/jmrit/withrottle/Protocol.shtml
  */
 
 #pragma once
 
-#include <WiFi.h>
-#include <WiFiServer.h>
-#include <ESPmDNS.h>
-#include <etl/map.h>
-#include <etl/utility.h>
-#include <AsyncTCP.h>
-#include "esp_task_wdt.h"
-
 #include "CommandStation.h"
 #include "Watchdog.h"
 
+#include <WiFi.h>
+#include <WiFiServer.h>
+#include <ESPmDNS.h>
+#include <AsyncTCP.h>
+
+#include <esp_task_wdt.h>
+
+#include <etl/map.h>
+#include <etl/utility.h>
+#include <etl/string_view.h>
 
 #define WT_DEBUG
 
@@ -42,7 +44,7 @@ public:
         server.end();
     }
 
-    
+
     void notifyPowerStatus(AsyncClient *c=nullptr) {
         bool v = CS.getPowerState();
         powerStatus = v ? '1' : '0';
@@ -83,7 +85,7 @@ private:
         using AddrToSlotMap = etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
         etl::map< char, AddrToSlotMap, MAX_THROTTLES_PER_CLIENT> slots;
-        uint8_t slot(char thr, LocoAddress addr) { 
+        uint8_t slot(char thr, LocoAddress addr) {
             auto it = slots.find(thr);
             if(it == slots.end()) return 0;
             auto iit = it->second.find(addr);
@@ -91,13 +93,13 @@ private:
             return iit->second;
         }
 
-        void locoAdd(char th, String sLocoAddr);
+        void locoAdd(char th, etl::string_view sLocoAddr);
 
-        void locosRelease(char th, String sLocoAddr);
+        void locosRelease(char th, etl::string_view  sLocoAddr);
         void locoRelease(char th, LocoAddress addr);
 
-        void locosAction(char th, String sLocoAddr, String actionVal);
-        void locoAction(char th, LocoAddress addr, String actionVal);
+        void locosAction(char th, etl::string_view sLocoAddr, etl::string_view actionVal);
+        void locoAction(char th, LocoAddress addr, etl::string_view actionVal);
 
         void checkHeartbeat();
         void updateHeartbeat() {
@@ -112,7 +114,7 @@ private:
     };
 
     etl::map<AsyncClient*, ClientData, MAX_CLIENTS> clients;
-    
+
     void onNewClient(AsyncClient* cli);
 
     void processCmd(ClientData &cc);
@@ -143,5 +145,5 @@ private:
 
     void clientStop(ClientData &c);
 
-    void accessoryToggle(int aAddr, char aStatus, bool namedTurnout, ClientData &cc);
+    void accessoryToggle(unsigned aAddr, char aStatus, bool namedTurnout, ClientData &cc);
 };
