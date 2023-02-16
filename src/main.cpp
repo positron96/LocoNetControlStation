@@ -72,7 +72,7 @@ void ledUpdate();
 void setup() {
 
     Serial.begin(115200);
-    Serial.println("Ultimate LocoNet Command Station");
+    Serial.println(CS_NAME);
 
     pinMode(PIN_BT, INPUT_PULLUP);
     pinMode(PIN_BT2, INPUT_PULLUP);

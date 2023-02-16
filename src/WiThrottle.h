@@ -78,6 +78,8 @@ private:
         char rx[RX_SIZE];
         size_t rxpos = 0;
 
+        String hwId;
+
         using AddrToSlotMap = etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)
         etl::map< char, AddrToSlotMap, MAX_THROTTLES_PER_CLIENT> slots;
@@ -110,7 +112,8 @@ private:
     };
 
     etl::map<AsyncClient*, ClientData, MAX_CLIENTS> clients;
-    //ClientData clientData[MAX_CLIENTS];
+    
+    void onNewClient(AsyncClient* cli);
 
     void processCmd(ClientData &cc);
 
