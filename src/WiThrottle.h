@@ -139,13 +139,11 @@ private:
         char lf = '\n';
         c->add(&lf, 1);
         c->send();
-        //WT_LOGI("WTTXl %s", v.c_str() );
-        //Serial.printf(ARDUHAL_LOG_FORMAT(I, "WTTXl %s"), v.c_str());
+        //WT_LOGI("TX '%s'", v.c_str() );
     }
     static void wifiPrint(AsyncClient *c, String v) {
         c->write(v.c_str(), v.length() );
         //WT_LOGI("WFTX  %s", v.c_str() );
-        //Serial.println("WTTX "+v);
     }
 
     void clientStart(AsyncClient *cli) ;

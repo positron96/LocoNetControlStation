@@ -1,17 +1,7 @@
 #include "LocoNetSlotManager.h"
 
-#define LNSM_DEBUG
-
-
-#ifdef LNSM_DEBUG
-#define LNSM_LOGD(...) 
-#define LNSM_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
-#define LNSM_LOGW(format, ...) log_printf(ARDUHAL_LOG_FORMAT(W, format), ##__VA_ARGS__)
-#else
-#define LNSM_LOGD(...) 
-#define LNSM_LOGI(...) 
-#define LNSM_LOGW(...) 
-#endif
+#define LOG_LEVEL  LEVEL_INFO
+#include "log.h"
 
 /// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
@@ -39,7 +29,7 @@ inline static uint8_t speedMode2int(SpeedMode sm) {
         case SM::S28: return DEC_MODE_28;
         case SM::S14: return DEC_MODE_14;
     }
-    LNSM_LOGW("bad speed mode: %d", (int)sm);
+    LOGW("bad speed mode: %d", (int)sm);
     return DEC_MODE_128;
 }
 
@@ -49,7 +39,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
     if(sm == DEC_MODE_128) return SM::S128;
     if(sm == DEC_MODE_14) return SM::S14;
     if(sm == DEC_MODE_28) return SM::S28;
-    LNSM_LOGW("bad speed mode bits: %x", (int)sm);
+    LOGW("bad speed mode bits: %x", (int)sm);
     return SM::S128;
 }
 
@@ -97,7 +87,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         if(CS.getPowerState()) sd.trk |= GTRK_POWER;
     }
 
-    #define LNSM_LOGI_SLOT(TAG, I, S) LNSM_LOGI( TAG \
+    #define LOGI_SLOT(TAG, I, S) LOGI( TAG \
         " slot %d: ADDR=%d STAT=%02X(%s) ID=%02X%02X", I, \
         ADDR(S.adr2, S.adr), S.stat, LOCO_STAT(S.stat), S.id1, S.id2 )
 
@@ -113,12 +103,12 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             case OPC_LOCO_ADR: {
                 int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
                 if(slot<=0) {
-                    LNSM_LOGI("OPC_LOCO_ADR for addr %d, no available slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
+                    LOGI("OPC_LOCO_ADR for addr %d, no available slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
                     sendLack(OPC_LOCO_ADR);
                     break;
                 }
                 
-                LNSM_LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
                 sendSlotData(slot);
                 break;
             }
@@ -127,7 +117,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
                     sendLack(OPC_MOVE_SLOTS);
                 } else {
                     uint8_t slot = msg->ss.slot;
-                    LNSM_LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", slot );
+                    LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", slot );
                     CS.setLocoSlotRefresh(slot, true); // enable refresh
                     sendSlotData(slot);
                 }
@@ -182,14 +172,14 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
                 e.id1 = m.id1;
                 e.id2 = m.id2;
 
-                LNSM_LOGI_SLOT("OPC_WR_SL_DATA", slot, m);
+                LOGI_SLOT("OPC_WR_SL_DATA", slot, m);
 
                 break;
             }
             case OPC_RQ_SL_DATA: {
                 uint8_t slot = msg->sr.slot;
                 if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;} 
-                LNSM_LOGI("OPC_RQ_SL_DATA slot %d", slot);
+                LOGI("OPC_RQ_SL_DATA slot %d", slot);
                 sendSlotData(slot);
                 break;
             }
@@ -221,7 +211,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         LnMsg ret;
         fillSlotMsg(slot, ret.sd);
 
-        LNSM_LOGI_SLOT("Sending", slot, (ret.sd));
+        LOGI_SLOT("Sending", slot, (ret.sd));
         
         writeChecksum(ret);
         _ln->broadcast(ret, this);
@@ -233,20 +223,20 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
     }
 
     void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
-        LNSM_LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
-        uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 1 : 0;
+        LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
+        uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 0 : 1;
         CS.setLocoDir(slot, dir);
         // fn order in received byte is 04321, needs swapping
         CS.setLocoFns(slot, 0b0001'1111, moveBit5to1(v) );
     }
 
     void LocoNetSlotManager::processSnd(uint8_t slot, uint8_t snd) {
-        LNSM_LOGI("OPC_LOCO_SND slot %d snd %02x", slot, snd);
+        LOGI("OPC_LOCO_SND slot %d snd %02x", slot, snd);
         CS.setLocoFns(slot, 0x1E0, snd << 5 );
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {
-        LNSM_LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
+        LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
 
         auto newSpeedMode = int2SpeedMode(stat);
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
@@ -262,13 +252,13 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
     }
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {
-        LNSM_LOGI("OPC_LOCO_SPD slot %d spd %d", slot, spd);
+        LOGI("OPC_LOCO_SPD slot %d spd %d", slot, spd);
         CS.setLocoSpeed(slot, LocoSpeed::from128(spd) );
     }
 
 void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint8_t value ) {
 
-    LNSM_LOGI("pstat=%02xh, val=%d", pstat, value);
+    LOGI("pstat=%02xh, val=%d", pstat, value);
 
     ret.command = OPC_SL_RD_DATA;
     ret.mesg_size = 14;
@@ -292,14 +282,14 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
     if(read) {
         switch(mode) {
             case DIR_BYTE_ON_SRVC_TRK: {
-                LNSM_LOGI("Read byte on prog CV%d", cv);
+                LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 1); // ack ok
                 int16_t ret = CS.readCVProg(cv);
                 sendProgData(msg, (ret>=0) ? 0 : PSTAT_READ_FAIL, ret>=0?ret:0);
                 break;
             }
             case SRVC_TRK_RESERVED: {// make it a verify command.
-                LNSM_LOGI("Verify byte on prog CV%d==%d", cv, val);
+                LOGI("Verify byte on prog CV%d==%d", cv, val);
                 sendLack(PROG_LACK, 1); // ack ok
                 bool ret = CS.verifyCVProg(cv, val);
                 sendProgData(msg, ret?0:PSTAT_READ_FAIL, val);
@@ -312,7 +302,7 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
     } else { // write
         switch(mode) {
             case DIR_BYTE_ON_SRVC_TRK: {
-                LNSM_LOGI("Write byte on prog CV%d=%d", cv, val);
+                LOGI("Write byte on prog CV%d=%d", cv, val);
                 sendLack(PROG_LACK, 1); // ack ok
                 bool ret = CS.writeCvProg(cv, val);
                 sendProgData(msg, ret?0:PSTAT_WRITE_FAIL, val);
@@ -323,7 +313,7 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
                 bool ret = CS.writeCvProgBit(cv, 0, val);
                 break;*/
             case OPS_BYTE_NO_FEEDBACK:
-                LNSM_LOGI("Read byte on prog CV%d", cv);            
+                LOGI("Read byte on prog CV%d", cv);            
                 sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
                 CS.writeCvMain(lnAddr(addr), cv, val);
                 break;
