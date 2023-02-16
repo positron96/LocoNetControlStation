@@ -31,9 +31,9 @@ inline static uint8_t addrHi(const LocoAddress &addr) {
 }
 
 using LocoData = CommandStation::LocoData;
-using SM = SpeedMode;
 
-inline static uint8_t speedMode2int(SM sm) {
+inline static uint8_t speedMode2int(SpeedMode sm) {
+    using SM = SpeedMode;
     switch(sm) {
         case SM::S128: return DEC_MODE_128;
         case SM::S28: return DEC_MODE_28;
@@ -43,7 +43,8 @@ inline static uint8_t speedMode2int(SM sm) {
     return DEC_MODE_128;
 }
 
-inline static SM int2SpeedMode(uint8_t sm) {
+inline static SpeedMode int2SpeedMode(uint8_t sm) {
+    using SM = SpeedMode;
     sm &= DEC_MODE_MASK;
     if(sm == DEC_MODE_128) return SM::S128;
     if(sm == DEC_MODE_14) return SM::S14;
@@ -80,11 +81,11 @@ inline static SM int2SpeedMode(uint8_t sm) {
             sd.stat = speedMode2int(d.speedMode) | STAT1_SL_BUSY;
             if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
             sd.adr = addrLo(d.addr); 
-            sd.spd = d.speed; 
-            sd.dirf = d.dir ==1 ? DIRF_DIR : 0;
-            sd.dirf |= fn15swap(fns);
+            sd.spd = d.speed.get128(); 
+            sd.dirf = d.dir==1 ? DIRF_DIR : 0;
+            sd.dirf |= moveBit1to5(fns);
             sd.adr2 = addrHi(d.addr); 
-            sd.snd = (fns & 0b111100000)>>5; 
+            sd.snd = (fns & 0b1'1110'0000)>>5; 
 
             const LnSlotData & e = extra[slot];
             sd.ss2 = e.ss2; 
@@ -235,7 +236,8 @@ inline static SM int2SpeedMode(uint8_t sm) {
         LNSM_LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
         uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 1 : 0;
         CS.setLocoDir(slot, dir);
-        CS.setLocoFns(slot, 0b00011111, fn15swap(v) );  // fn order in this byte is 04321
+        // fn order in received byte is 04321, needs swapping
+        CS.setLocoFns(slot, 0b0001'1111, moveBit5to1(v) );
     }
 
     void LocoNetSlotManager::processSnd(uint8_t slot, uint8_t snd) {
@@ -261,7 +263,7 @@ inline static SM int2SpeedMode(uint8_t sm) {
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {
         LNSM_LOGI("OPC_LOCO_SPD slot %d spd %d", slot, spd);
-        CS.setLocoSpeed(slot, spd);
+        CS.setLocoSpeed(slot, LocoSpeed::from128(spd) );
     }
 
 void LocoNetSlotManager::sendProgData(progTaskMsg ret, uint8_t pstat, uint8_t value ) {

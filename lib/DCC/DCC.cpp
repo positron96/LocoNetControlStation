@@ -11,11 +11,9 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
 #define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds
 #define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
-#define  ACK_SAMPLE_THRESHOLD      500      /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
+#define  ACK_SAMPLE_THRESHOLD      2       /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
-
-void IDCCChannel::copyPacket(uint8_t *src, uint8_t nBytes, int nRepeat, Packet *dst) {
-    uint8_t *buf = dst->buf;
+void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
 
     // copy first byte into what will become the checksum byte 
     // XOR remaining bytes into checksum byte 
@@ -33,29 +31,29 @@ void IDCCChannel::copyPacket(uint8_t *src, uint8_t nBytes, int nRepeat, Packet *
     buf[6] = src[2]<<7;                     // src[2], bit 0
     
     if(nBytes == 3) {
-        dst->nBits = 49;
+        nBits = 49;
     } else {
         buf[6] |= src[3]>>2;    // src[3], bits 7-2
         buf[7] =  src[3]<<6;    // src[3], bit 1-0
         if(nBytes==4) {
-            dst->nBits = 58;
+            nBits = 58;
         } else {
             buf[7] |= src[4]>>3;  // src[4], bits 7-3
             buf[8] =  src[4]<<5;   // src[4], bits 2-0
             if(nBytes==5) {
-                dst->nBits = 67;
+                nBits = 67;
             } else {
                 buf[8] |= src[5]>>4;   // src[5], bits 7-4
                 buf[9] =  src[5]<<4;   // src[5], bits 3-0
-                dst->nBits = 76;
+                nBits = 76;
             } 
         } 
     }
-    dst->nRepeat = nRepeat; 
-    dst->debugPrint();  
+    nRepeat = repeatCount; 
+    debugPrint();  
 }
 
-void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection){
+void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
     uint8_t b[5];                         // save space for checksum byte
     uint8_t nB = 0;
 
@@ -67,15 +65,14 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, Speed
     b[nB++] = lowByte(iAddr);
     if(sm==SpeedMode::S128) {
         // Advanced Operations Instruction: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf #200
-        b[nB++] = 0b00111111; 
+        b[nB++] = 0b0011'1111; 
         b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
     } else {
         // basic packet: https://www.nmra.org/sites/default/files/s-92-2004-07.pdf #35
         uint8_t t=nB;
-        b[nB++] = 0b01000000;
-        if(tDirection==1) b[t] |= 0b00100000;
-        if(sm==SpeedMode::S14) b[t] |= tSpeed & 0b00001111;
-        if(sm==SpeedMode::S28) b[t] |= (tSpeed & 1)<<4 | (tSpeed & 0b11110)>>1;
+        b[nB++] = 0b0100'0000;
+        if(tDirection==1) b[t] |= 0b0010'0000;
+        b[t] |= (tSpeed & 0b0001'1111); 
     }
     
     DCC_LOGI("iReg %d, addr %d, speed=%d(mode %d) %c", iReg, addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
@@ -88,24 +85,24 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
     switch(group) {
         case DCCFnGroup::F0_4: 
             // move FL(F0) to 5th bit
-            fn = (fn & 0x1)<<4 | (fn & 0x1E)<<1;
-            sendFunction(iReg, addr,  0b10000000 | (fn & 0b00011111) );
+            fn = (fn & 0x1)<<4 | (fn & 0b1'1110)>>1;
+            sendFunction(iReg, addr,  0b1000'0000 | (fn & 0b0001'1111) );
             break;
         case DCCFnGroup::F5_8:
             fn >>= 5;
-            sendFunction(iReg, addr,  0b10110000 | (fn & 0b00001111) );
+            sendFunction(iReg, addr,  0b1011'0000 | (fn & 0b0000'1111) );
             break;
         case DCCFnGroup::F9_12:
             fn >>= 9;
-            sendFunction(iReg, addr,  0b10100000 | (fn & 0b00001111) );
+            sendFunction(iReg, addr,  0b1010'0000 | (fn & 0b0000'1111) );
             break;
         case DCCFnGroup::F13_20:
             fn >>= 13; 
-            sendFunction(iReg, addr,  0b11011110, (uint8_t)fn );
+            sendFunction(iReg, addr,  0b1101'1110, (uint8_t)fn );
             break;
         case DCCFnGroup::F21_28:
             fn >>= 21; 
-            sendFunction(iReg, addr,  0b11011111, (uint8_t)fn );
+            sendFunction(iReg, addr,  0b1101'1111, (uint8_t)fn );
             break;
         default:
             break;
@@ -124,7 +121,7 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
 
     b[nB++] = lowByte(iAddr);
 
-    if ( (fByte & 0b11000000) == 0b10000000) {// this is a request for functions FL,F1-F12  
+    if ( (fByte & 0b1100'0000) == 0b1000'0000) {// this is a request for functions FL,F1-F12  
         b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
     } else {                             // this is a request for functions F13-F28
         b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
@@ -164,11 +161,11 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
-    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represent throw/close
-    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b01110000 )
+    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represents throw/close
+    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
         | (ch & 0x3) << 1 
         | (thrown?0x1:0) 
-        | 0b10000000   ;
+        | 0b1000'0000   ;
 
     loadPacket(0, b, 2, 4);
 }
@@ -178,29 +175,23 @@ uint IDCCChannel::getBaselineCurrent() {
 
     // collect baseline current
     for (int j = 0; j < ACK_BASE_COUNT; j++) {
-        uint16_t v = readCurrentAdc();
+        uint16_t v = getCurrent();
         baseline += v;
+        delayMicroseconds(500);
     }
     baseline /= ACK_BASE_COUNT;
+    DCC_LOGD("Baseline %d", baseline);
     return baseline;
 }
 
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
 bool IDCCChannel::checkCurrentResponse(uint baseline) {
     bool ret = false;
-    float c = 0;
     int max = 0;
-    uint32_t to = millis()+ACK_SAMPLE_MILLIS;
-    while(millis()<to) {    
-        int v = readCurrentAdc();
-        v-= baseline;
-        c = v*ACK_SAMPLE_SMOOTHING + c*(1.0 - ACK_SAMPLE_SMOOTHING);
-        if(c>max) { max=(int)c; }
-        if (c>ACK_SAMPLE_THRESHOLD) {
-            ret = true;
-        }
-    }
-    DCC_LOGD("result is %d, last value:%d, max: %d, baseline: %d", ret?1:0, max, baseline);
+    delay(ACK_SAMPLE_MILLIS);
+    max = getMaxCurrent();
+    ret = max - baseline > ACK_SAMPLE_THRESHOLD;
+    DCC_LOGD("result is %d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }
 
@@ -221,7 +212,7 @@ int16_t IDCCChannel::readCVProg(int cv) {
 		packet[2] = 0xE8 | i;
 
 		loadPacket(0, resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
-
+        resetMaxCurrent();
 		loadPacket(0, packet, 3, 5);               // NMRA recommends 5 verify packets
 		loadPacket(0, resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
@@ -247,7 +238,8 @@ bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
 
     loadPacket(0, resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
     loadPacket(0, resetPacket, 2, 3); 
-    int baseline = getBaselineCurrent();
+    uint baseline = getBaselineCurrent();
+    resetMaxCurrent();
 	loadPacket(0, packet, 3, 5);         // NMRA recommends 5 verify packets
 	loadPacket(0, resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
@@ -257,7 +249,7 @@ bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
 
 bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
     uint8_t packet[4];
-    int baseline;
+    uint baseline;
 
     cv--;                              // actual CV addresses are cv-1 (0-1023)
 
@@ -275,6 +267,7 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
     packet[0]=0x74 | (highByte(cv)&0x03);   // set-up to re-verify entire byte
 
     loadPacket(0,resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    resetMaxCurrent();
     loadPacket(0,packet,3,5);               // NMRA recommends 5 verfy packets
     loadPacket(0,resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
 
@@ -284,7 +277,7 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
 
 bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     uint8_t packet[4];
-    int baseline;
+    uint baseline;
     
     cv--;                              // actual CV addresses are cv-1 (0-1023)
     bValue &= 0x1;
@@ -304,6 +297,7 @@ bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     bitClear(packet[2],4);              // change instruction code from Write Bit to Verify Bit
 
     loadPacket(0,resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    resetMaxCurrent();
     loadPacket(0,packet,3,5);               // NMRA recommends 5 verfy packets
     loadPacket(0,resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
         
@@ -374,6 +368,10 @@ void IRAM_ATTR timerCallback() {
     _inst->timerFunc();
 }
 
+void adcTimerCallback(void* arg) {
+    ((DCCESP32SignalGenerator*)arg)->adcTimerFunc();
+}
+
 
 DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum) 
     : _timer(nullptr),  _timerNum(timerNum)
@@ -390,6 +388,10 @@ void DCCESP32SignalGenerator::begin() {
     timerAlarmWrite(_timer, 10, true);
     timerAlarmEnable(_timer);
     timerStart(_timer);
+
+    esp_timer_create_args_t cfg{adcTimerCallback, this, ESP_TIMER_TASK, "adc"};
+    esp_timer_create(&cfg, &_adcTimer);
+    esp_timer_start_periodic(_adcTimer, 1000);  // 1ms
 }
 
 void DCCESP32SignalGenerator::end() {
@@ -398,6 +400,8 @@ void DCCESP32SignalGenerator::end() {
         timerEnd(_timer);
         _timer = nullptr;
     }
+    esp_timer_stop(_adcTimer);
+    esp_timer_delete(_adcTimer);
     if (main!=nullptr) main->end();
     if (prog!=nullptr) prog->end();
 }
@@ -407,4 +411,9 @@ void DCCESP32SignalGenerator::timerFunc() {
     if (main!=nullptr) main->timerFunc();
     if (prog!=nullptr) prog->timerFunc();
 
+}
+
+void DCCESP32SignalGenerator::adcTimerFunc() {
+    if (main!=nullptr) main->updateCurrent();
+    if (prog!=nullptr) prog->updateCurrent();
 }

@@ -3,21 +3,24 @@
 #include <Arduino.h>
 #include <esp32-hal-timer.h>
 //#include <esp_adc_cal.h>
+#include <esp_timer.h>
 
 #include <etl/map.h>
 #include <etl/bitset.h>
 
 #include "LocoAddress.h"
+#include "LocoSpeed.h"
 
 constexpr float ADC_RESISTANCE = 0.1;
-constexpr float ADC_TO_MV = 3300.0/4096;
+constexpr float ADC_MAX_MV = 1100;
+constexpr float ADC_TO_MV = ADC_MAX_MV/4096;
 constexpr float ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
 constexpr uint16_t MAX_CURRENT = 2000;
 
 #define DCC_DEBUG
 
 #ifdef DCC_DEBUG
-#define DCC_LOGD(...) 
+#define DCC_LOGD(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
 #define DCC_LOGD_ISR(...)
 #define DCC_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
 #define DCC_LOGI_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
@@ -42,8 +45,6 @@ enum class DCCFnGroup {
     F0_4, F5_8, F9_12, F13_20, F21_28
 };
 
-enum class SpeedMode { S14, S28, S128 };
-
 struct Packet {
     uint8_t buf[10];
     uint8_t nBits;
@@ -59,6 +60,8 @@ struct Packet {
         DCC_DEBUGF_ISR("packet (%d): '%s'", nBits, ttt );
         */
     }
+
+    void setData(uint8_t *src, uint8_t nBytes, int nRepeat);
 };
 
 class IDCCChannel {
@@ -74,6 +77,9 @@ public:
 
     virtual bool getPower()=0;
 
+    /**
+     * @param tSpeed must be in DCC format (e.g. for S28, bit order is 04321, for S14 F0 is included)
+     */
     void sendThrottle(int slot, LocoAddress addr, uint8_t tSpeed,  SpeedMode sm, uint8_t tDirection);
     void sendFunctionGroup(int slot, LocoAddress addr, DCCFnGroup group, uint32_t fn);
     void sendFunction(int slot, LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
@@ -86,7 +92,6 @@ public:
      * @param ch is 0-based.
      */
     void sendAccessory(uint16_t addr9, uint8_t ch, bool);
-    virtual uint16_t readCurrentAdc()=0;
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
@@ -96,7 +101,7 @@ public:
     void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
 
     bool checkOvercurrent() {
-        uint16_t v = readCurrentAdc();
+        uint16_t v = getCurrent();
         float mA = v * ADC_TO_MA;
         //if(v!=0) DCC_LOGI("%d, %d", v, (int)mA);
         if(mA>MAX_CURRENT) {
@@ -106,10 +111,18 @@ public:
         else return true;
     }
 
+    void resetMaxCurrent() { maxCurrent = 0; }
+    uint16_t getMaxCurrent() { return maxCurrent; }
+    uint16_t getCurrent() { return current; }
+    virtual void updateCurrent() = 0;
+
 protected:
+    volatile uint16_t current;
+    volatile uint16_t maxCurrent;
+
     virtual void timerFunc()=0;
     virtual bool loadPacket(int, uint8_t*, uint8_t, int)=0;
-    static void copyPacket(uint8_t *src, uint8_t len, int repeat, Packet *dst);
+    
 private:
     friend class DCCESP32SignalGenerator;
 
@@ -123,10 +136,8 @@ class DCCESP32Channel: public IDCCChannel {
 public:
 
     DCCESP32Channel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin): 
-        _outputPin(outputPin), _enPin(enPin), _sensePin(sensePin)
+        _outputPin{outputPin}, _enPin{enPin}, _sensePin{sensePin}
     {
-        R.timerPeriodsLeft=1; // first thing a timerfunc does is decrement this, so make it not underflow
-        R.timerPeriodsHalf=2; // some sane nonzero value
     }
 
 
@@ -149,7 +160,7 @@ public:
 
         // during loadPacket there is time when new index is enabled for refresh, but urgentPacket is not yet loaded.
         for(size_t i=1; i<=SLOT_COUNT; i++) {
-            copyPacket(idlePacket, 2, 0, &R.packets[i]);
+            R.packets[i].setData(idlePacket, 2, 0);
         }
         loadPacket(1, idlePacket, 2, 0);
     }
@@ -190,6 +201,9 @@ public:
             maxIdx = 0;
             urgentPacket = nullptr;
             currentBit = 0;
+
+            timerPeriodsLeft = 1; // first thing a timerfunc does is decrement this, so make it not underflow
+            timerPeriodsHalf = 2; // some sane nonzero value.
         } 
 
         ~RegisterList() {}
@@ -268,14 +282,66 @@ public:
             return arrIdx;
         }
 
-        void bindNewPacket(size_t idx) {
+        void prepareNewPacket(size_t idx, uint8_t *packetData, uint8_t nBytes, int nRepeat) {
+            newPacket.setData(packetData, nBytes, nRepeat);
+            // newPacket will be copied to idx when new packet is starting to be sent
             urgentPacket = &packets[idx];
+        }
+
+        bool loadReg(int iReg, uint8_t *b, uint8_t nBytes, int nRepeat) {
+            //DCC_DEBUGF("reg=%d len=%d, repeat=%d", iReg, nBytes, nRepeat);
+
+            // force slot to be between 0 and maxNumRegs, inclusive
+            //iReg = iReg % (SLOT_COUNT+1);
+
+            // pause while there is a Register already waiting to be updated -- urgentPacket will be reset to NULL by timer when prior Register updated fully processed
+            int t = 1000;
+            while(!newPacketVacant() && --t>0) delay(1);
+            if(t==0) {
+                DCC_LOGW("timeout for slot %d", iReg );
+                return false;
+            }
+            //DCC_DEBUGF("Loading into slot %d, took %d ms", iReg, 1000-t );
+
+            size_t arrIdx;
+            if(iReg==0) {
+                arrIdx = 0;
+            } else {
+                arrIdx = findOrAllocateIdx(iReg);
+                if(arrIdx==0) return false;
+            }
+
+            prepareNewPacket(arrIdx, b, nBytes, nRepeat);
+            return true;
+        }
+
+        void unloadReg(size_t iReg) {
+            const auto it = regToIdxMap.find(iReg);
+            if(it==regToIdxMap.end()) {
+                DCC_LOGW("Did not find slot for reg %d", iReg);
+                return;
+            }
+
+            size_t idx = it->second;
+            DCC_LOGI("unloading idx %d for reg %d", idx, iReg);
+            if(regToIdxMap.size()==1) {
+                // if it's last last idx, remove it and load Idle packet into idx 1
+                loadReg(1, idlePacket, 2, 0);
+                DCC_LOGI(" only 1 idx remaining, filled as idlePacket");
+                if(idx==1) return; // don't unload idx 1 if it's the only one left
+            }
+            
+            regToIdxMap.erase(iReg);
+            indicesTaken[idx] = false;
+            for(int i=1; i<=SLOT_COUNT; i++) {
+                if (indicesTaken[i]) { maxIdx = i; break; }
+            }
         }
     };
 
-    uint16_t readCurrentAdc() override {        
-        //return esp_adc_cal_raw_to_voltage(analogRead(_sensePin), &adc_chars);
-        return analogRead(_sensePin);//*1093.0/4096;
+    void updateCurrent() override {
+        current = analogRead(_sensePin);
+        if(current > maxCurrent) maxCurrent = current;
     }
 
     void IRAM_ATTR timerFunc() override {
@@ -297,58 +363,11 @@ public:
 protected:
 
     bool loadPacket(int iReg, uint8_t *b, uint8_t nBytes, int nRepeat) override {
-
-        //DCC_DEBUGF("reg=%d len=%d, repeat=%d", iReg, nBytes, nRepeat);
-
-        // force slot to be between 0 and maxNumRegs, inclusive
-        //iReg = iReg % (SLOT_COUNT+1);
-
-        // pause while there is a Register already waiting to be updated -- urgentPacket will be reset to NULL by timer when prior Register updated fully processed
-        int t=1000;
-        while(!R.newPacketVacant() && --t>0) delay(1);
-        if(t==0) {
-            DCC_LOGW("timeout for slot %d", iReg );
-            return false;
-        }
-        //DCC_DEBUGF("Loading into slot %d, took %d ms", iReg, 1000-t );
-
-        size_t arrIdx;
-        if(iReg==0) {
-            arrIdx = 0;
-        } else {
-            arrIdx = R.findOrAllocateIdx(iReg);
-            if(arrIdx==0) return false;
-        }
-
-        Packet *p = &R.newPacket;
-        copyPacket(b, nBytes, nRepeat, p);
-        R.bindNewPacket(arrIdx);
-
-        return true;
-
+        return R.loadReg(iReg, b, nBytes, nRepeat);
     }
 
     void unloadSlot(uint8_t iReg) override {
-        const auto it = R.regToIdxMap.find(iReg);
-        if(it==R.regToIdxMap.end()) {
-            DCC_LOGW("Did not find slot for reg %d", iReg);
-            return;
-        }
-
-        size_t idx = it->second;
-        DCC_LOGI("unloading idx %d for reg %d", idx, iReg);
-        if(R.regToIdxMap.size()==1) {
-            // if it's last last idx, remove it and load Idle packet into idx 1
-            loadPacket(1, idlePacket, 2, 0);
-            DCC_LOGI(" only 1 idx remaining, filled as idlePacket");
-            if(idx==1) return; // don't unload idx 1 if it's the only one left
-        }
-        
-        R.regToIdxMap.erase(iReg);
-        R.indicesTaken[idx] = false;
-        for(int i=R.regToIdxMap.capacity()-1; i>0; i--) {
-            if (R.indicesTaken[i]) { R.maxIdx = i; break; }
-        }
+        R.unloadReg(iReg);
     }
 
 private:
@@ -356,9 +375,6 @@ private:
     uint8_t _outputPin;    
     uint8_t _enPin;
     uint8_t _sensePin;
-
-    uint16_t current;
-
     //esp_adc_cal_characteristics_t adc_chars;
 
     RegisterList R;
@@ -410,10 +426,13 @@ public:
 private:
     hw_timer_t * _timer;
     volatile uint8_t _timerNum;
+    esp_timer_handle_t _adcTimer;
     IDCCChannel *main = nullptr;
     IDCCChannel *prog = nullptr;
 
     friend void timerCallback();
+    friend void adcTimerCallback(void*);
 
     void IRAM_ATTR timerFunc();
+    void IRAM_ATTR adcTimerFunc();
 };
