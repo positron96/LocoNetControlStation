@@ -70,10 +70,17 @@ private:
 
     AsyncServer server;
 
+    enum class Heartbeat {
+        Alive,
+        SoftTimeout, ///< stop all locos after soft timeout
+        HardTimeout,  ///< disconnect client after hard timeout
+        Dead  ///< no need to check anything, it should be cleaned up soon
+    };
+
     struct ClientData {
         AsyncClient *cli;
         bool heartbeatEnabled;
-        uint8_t heartbeatsLost=0;
+        Heartbeat heartbeat = Heartbeat::Alive;
         Watchdog<HEARTBEAT_INTL*1000+5000, 500, HEARTBEAT_INTL*1000*2+5000> wdt;
 
         constexpr static size_t RX_SIZE = 100;
@@ -104,7 +111,7 @@ private:
         void checkHeartbeat();
         void updateHeartbeat() {
             wdt.kick();
-            heartbeatsLost = 0;
+            heartbeat = Heartbeat::Alive;
         }
 
         void sendMessage(String msg, bool alert=false);

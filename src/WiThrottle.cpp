@@ -63,7 +63,7 @@ int speed2int(LocoSpeed s) {
 LocoSpeed int2speed(int s) {
     if(s<0) return SPEED_EMGR;
     if(s==0) return SPEED_IDLE;
-    return LocoSpeed::from128(s+1); // 1..126 -> 2..127
+    return LocoSpeed::from128((uint8_t)(s+1)); // 1..126 -> 2..127
 }
 
 
@@ -86,7 +86,7 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
             cc.rxpos = 0;
             cc.cli = cli;
             cc.updateHeartbeat();
-            it = clients.erase(it); // onDisconnect(c) won't find a client and won't cleanup ClientData
+            it = clients.erase(it); // onDisconnect(c) won't find the client and won't cleanup ClientData
             c->close();
             break;
         } else it++;
@@ -127,9 +127,10 @@ void WiThrottleServer::onNewClient(AsyncClient* cli) {
                 cc.rxpos = 0;
             } else {
                 if (cc.rxpos<ClientData::RX_SIZE) {
-                    cc.rx[cc.rxpos++] = c;
+                    cc.rx[cc.rxpos] = c;
+                    cc.rxpos++;
                 } else {
-                    WT_LOGI("Input buffer overflow, dropping char");
+                    WT_LOGI("Input buffer overflow, dropping char '%c'", c);
                 }
             }
         }
@@ -215,15 +216,21 @@ void WiThrottleServer::processCmd(ClientData & cc) {
             auto hwId = dataStr.substr(2);
             WT_LOGI("Hardware ID: '%s'", hwId.data() );
             cc.hwId = String(hwId.data());
-            // kill other clients with same name (assume it's reconnect from same device)
-            for (auto &p: clients) {
-                if(&p.second == &cc) continue;
-                if(p.second.hwId == cc.hwId
-                    && p.first->getRemoteAddress() == cc.cli->getRemoteAddress()
-                ) {
-                    WT_LOGI("There is already a client with this name!");
-                    p.second.heartbeatsLost = 2;
-                }
+            // kill other clients with same ID (assume it's reconnect from same device)
+            const auto cli = cc.cli;
+            for(auto it = clients.cbegin(); it!=clients.cend(); ) {
+                const auto &c = it->first;
+                if(c == cli) continue;
+                if(it->second.hwId == hwId.data()) {
+                    WT_LOGI(" There is a client(%X) with this ID already. Should not happen!", (intptr_t)c);
+                    cc = it->second;  // copy ClientData
+                    cc.rxpos = 0;
+                    cc.cli = cli;
+                    cc.updateHeartbeat();
+                    it = clients.erase(it); // onDisconnect(c) won't find the client and won't cleanup ClientData
+                    c->close();
+                    break;
+                } else it++;
             }
         }
         break;
@@ -433,10 +440,10 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, et
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
 
-    if (wdt.timedOut() && heartbeatsLost==0) {
+    if (wdt.timedOut() && heartbeat==Heartbeat::Alive) {
         // stop loco
         WT_LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
-        heartbeatsLost++;
+        heartbeat = Heartbeat::SoftTimeout;
         for(const auto& throttle: slots)
             for(const auto& slot: throttle.second) {
                 CS.setLocoSpeed(slot.second, SPEED_EMGR);
@@ -444,9 +451,9 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
             }
         sendMessage("Timeout exceeded, locos stopped");
     }
-    if ((wdt.timedOut2() && heartbeatsLost==1) || (heartbeatsLost==2)) {
+    if ((wdt.timedOut2() && heartbeat==Heartbeat::SoftTimeout)) {
         WT_LOGI("timeout exceeded twice: closing connection" );
-        heartbeatsLost=3;
+        heartbeat = Heartbeat::HardTimeout;
         cli->close();
     }
 
