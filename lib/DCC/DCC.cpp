@@ -5,7 +5,7 @@
 
 #include "DCC.h"
 
-uint8_t idlePacket[3] = {0xFF, 0x00, 0}; 
+uint8_t idlePacket[3] = {0xFF, 0x00, 0};
 uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
@@ -15,13 +15,13 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
 void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
 
-    // copy first byte into what will become the checksum byte 
-    // XOR remaining bytes into checksum byte 
-    src[nBytes] = src[0];                        
-    for(int i=1; i<nBytes; i++)              
+    // copy first byte into what will become the checksum byte
+    // XOR remaining bytes into checksum byte
+    src[nBytes] = src[0];
+    for(int i=1; i<nBytes; i++)
         src[nBytes]^=src[i];
     nBytes++;  // increment number of bytes in packet to include checksum byte
-        
+
     buf[0] = 0xFF;                        // first 8 bits of 22-bit preamble
     buf[1] = 0xFF;                        // second 8 bits of 22-bit preamble
     buf[2] = 0xFC | bitRead(src[0],7);      // last 6 bits of 22-bit preamble + data start bit + src[0], bit 7
@@ -29,7 +29,7 @@ void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
     buf[4] = src[1];                        // src[1], all bits
     buf[5] = src[2]>>1;                     // start bit + src[2], bits 7-1
     buf[6] = src[2]<<7;                     // src[2], bit 0
-    
+
     if(nBytes == 3) {
         nBits = 49;
     } else {
@@ -46,11 +46,11 @@ void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
                 buf[8] |= src[5]>>4;   // src[5], bits 7-4
                 buf[9] =  src[5]<<4;   // src[5], bits 3-0
                 nBits = 76;
-            } 
-        } 
+            }
+        }
     }
-    nRepeat = repeatCount; 
-    debugPrint();  
+    nRepeat = repeatCount;
+    debugPrint();
 }
 
 void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
@@ -65,25 +65,25 @@ void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, Speed
     b[nB++] = lowByte(iAddr);
     if(sm==SpeedMode::S128) {
         // Advanced Operations Instruction: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf #200
-        b[nB++] = 0b0011'1111; 
-        b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7); 
+        b[nB++] = 0b0011'1111;
+        b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7);
     } else {
         // basic packet: https://www.nmra.org/sites/default/files/s-92-2004-07.pdf #35
         uint8_t t=nB;
         b[nB++] = 0b0100'0000;
         if(tDirection==1) b[t] |= 0b0010'0000;
-        b[t] |= (tSpeed & 0b0001'1111); 
+        b[t] |= (tSpeed & 0b0001'1111);
     }
-    
+
     DCC_LOGI("iReg %d, addr %d, speed=%d(mode %d) %c", iReg, addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
-    
+
     loadPacket(iReg, b, nB, 0);
 }
 
 void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
     DCC_LOGI("iReg %d, addr %d, group=%d fn=%08x", iReg, addr, (uint8_t)group, fn);
     switch(group) {
-        case DCCFnGroup::F0_4: 
+        case DCCFnGroup::F0_4:
             // move FL(F0) to 5th bit
             fn = (fn & 0x1)<<4 | (fn & 0b1'1110)>>1;
             sendFunction(iReg, addr,  0b1000'0000 | (fn & 0b0001'1111) );
@@ -97,21 +97,21 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
             sendFunction(iReg, addr,  0b1010'0000 | (fn & 0b0000'1111) );
             break;
         case DCCFnGroup::F13_20:
-            fn >>= 13; 
+            fn >>= 13;
             sendFunction(iReg, addr,  0b1101'1110, (uint8_t)fn );
             break;
         case DCCFnGroup::F21_28:
-            fn >>= 21; 
+            fn >>= 21;
             sendFunction(iReg, addr,  0b1101'1111, (uint8_t)fn );
             break;
         default:
             break;
-    }     
+    }
 
 }
 void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
     // save space for checksum byte
-    uint8_t b[5]; 
+    uint8_t b[5];
     uint8_t nB = 0;
     uint16_t iAddr = addr.addr();
 
@@ -121,8 +121,8 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
 
     b[nB++] = lowByte(iAddr);
 
-    if ( (fByte & 0b1100'0000) == 0b1000'0000) {// this is a request for functions FL,F1-F12  
-        b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12  
+    if ( (fByte & 0b1100'0000) == 0b1000'0000) {// this is a request for functions FL,F1-F12
+        b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12
     } else {                             // this is a request for functions F13-F28
         b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
         b[nB++] = eByte;
@@ -130,7 +130,7 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
 
     DCC_LOGI("iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
 
-    /* 
+    /*
     NMRA DCC norm ask for two DCC packets instead of only one:
     "Command Stations that generate these packets, and which are not periodically refreshing these functions,
     must send at least two repetitions of these commands when any function state is changed."
@@ -155,16 +155,16 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     /*
     first byte is of the form 10AAAAAA, where AAAAAA represent
     6 least significant bits of accessory address (9-bit. Here we have 14-bit address, so take bits 2-7) */
-    b[0] = ( addr9 & 0x3F) | 0x80;      
+    b[0] = ( addr9 & 0x3F) | 0x80;
     /*
-    "The most significant bits of the 9-bit address are bits 4-6 of the second data byte. 
+    "The most significant bits of the 9-bit address are bits 4-6 of the second data byte.
     By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
     // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represents throw/close
     b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
-        | (ch & 0x3) << 1 
-        | (thrown?0x1:0) 
+        | (ch & 0x3) << 1
+        | (thrown?0x1:0)
         | 0b1000'0000   ;
 
     loadPacket(0, b, 2, 4);
@@ -232,12 +232,12 @@ bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
 
     cv--;
 
-    packet[0] = 0x74 | (highByte(cv) & 0x03); 
+    packet[0] = 0x74 | (highByte(cv) & 0x03);
     packet[1] = lowByte(cv);
 	packet[2] = bValue;
 
     loadPacket(0, resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
-    loadPacket(0, resetPacket, 2, 3); 
+    loadPacket(0, resetPacket, 2, 3);
     uint baseline = getBaselineCurrent();
     resetMaxCurrent();
 	loadPacket(0, packet, 3, 5);         // NMRA recommends 5 verify packets
@@ -273,18 +273,18 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
 
     return checkCurrentResponse(baseline);
 
-} 
+}
 
 bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     uint8_t packet[4];
     uint baseline;
-    
+
     cv--;                              // actual CV addresses are cv-1 (0-1023)
     bValue &= 0x1;
     bNum &= 0x7;
-    
+
     packet[0] = 0x78 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[1] = lowByte(cv);  
+    packet[1] = lowByte(cv);
     packet[2] = 0xF0 | bValue<<3 | bNum;
 
     loadPacket(0,resetPacket,2,1);
@@ -300,7 +300,7 @@ bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     resetMaxCurrent();
     loadPacket(0,packet,3,5);               // NMRA recommends 5 verfy packets
     loadPacket(0,resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
-        
+
     return checkCurrentResponse(baseline);
 
 }
@@ -313,7 +313,7 @@ void IDCCChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
     cv--;
 
     uint16_t iAddr = addr.addr();
-    if( addr.isLong() )    
+    if( addr.isLong() )
         packet[nB++]=highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
 
     packet[nB++] = lowByte(iAddr);
@@ -329,24 +329,24 @@ void IDCCChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t
     uint8_t b[6];                      // save space for checksum byte
 
     byte nB=0;
-    
+
     cv--;
-    
+
     bValue &= 0x1;
     bNum &= 0x3;
 
     uint16_t iAddr = addr.addr();
-    if( addr.isLong() )  
+    if( addr.isLong() )
         b[nB++] = highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
-  
+
     b[nB++]=lowByte(iAddr);
     b[nB++]=0xE8 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
     b[nB++]=lowByte(cv);
     b[nB++]=0xF0 | bValue<<3 | bNum;
-    
+
     loadPacket(0,b,nB,4);
-  
-} 
+
+}
 
 
 
@@ -373,8 +373,8 @@ void adcTimerCallback(void* arg) {
 }
 
 
-DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum) 
-    : _timer(nullptr),  _timerNum(timerNum)
+DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum)
+    : _timerNum(timerNum)
 {
     _inst = this;
 }
@@ -407,7 +407,7 @@ void DCCESP32SignalGenerator::end() {
 }
 
 void DCCESP32SignalGenerator::timerFunc() {
-    
+
     if (main!=nullptr) main->timerFunc();
     if (prog!=nullptr) prog->timerFunc();
 
