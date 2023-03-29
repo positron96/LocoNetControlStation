@@ -120,3 +120,21 @@ The implementation is based on these libraries:
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
+
+
+## Journal
+
+### 2023-02
+
+**Beware that CV reading/writing may not work for your decoder.**
+
+It appears that ADC on my esp32 changed its parameters over the year. 
+It now does not detect decoder responses when reading/writing CVs.
+I tested with one particular decoder, the voltage over the shunt resistor is around 30mV, the resistor is 0.1 Ohm, so the current is 0.3A, which is within NMRA specs for basic acknowledge. 
+However, the ESP32 shows non-zero readings only starting from around 80 mV, and ADC readings are around 2-8. 
+This is actually within specs of ESP32 that https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/api-reference/peripherals/adc.html#adc-attenuation[state] that measurable readings start from 100 mV.
+Somehow it did work much better before, as I have the ADC threshold in the code at 500 before.
+I had to lower it to 2, so now the CV reading somewhat works, but not reliably.
+
+In the future version, a proper amplifier needs to be adde to the schematic.
+I am looking at this TI https://www.ti.com/product/INA180[INA180].
