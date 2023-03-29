@@ -66,7 +66,7 @@ private:
     constexpr static int MAX_THROTTLES_PER_CLIENT = 6;
     constexpr static int MAX_LOCOS_PER_THROTTLE = 2;
 
-    constexpr static millis_t HEARTBEAT_INTL = 30; ///< in seconds
+    constexpr static millis_t HEARTBEAT_INTL = 20; ///< in seconds
 
     AsyncServer server;
 
@@ -125,6 +125,8 @@ private:
     void onNewClient(AsyncClient* cli);
 
     void processCmd(ClientData &cc);
+
+    void notifyHearbeatStatus(ClientData &c);
 
     char powerStatus = '0';
 

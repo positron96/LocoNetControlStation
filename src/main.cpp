@@ -130,6 +130,13 @@ void setup() {
     CS.setDccProg(&dccProg);
     CS.setLocoNetBus(&bus);
 
+    ledTimer = timerController.register_timer(
+        TimerType::callback_type::create<ledUpdate>(),
+        LED_INTL_NORMAL, true);
+    checkCurrentTimer = timerController.register_timer(
+        TimerType::callback_type::create<checkCurrent>(),
+        1, true);
+
 
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
@@ -141,6 +148,7 @@ void setup() {
         Serial.println("WiFi AP started.");
         Serial.println("IP address: ");
         Serial.println(WiFi.softAPIP());
+        ledStartBlinking(LED_INTL_NORMAL/2);
     } else {
         WiFiManager wifiManager;
         wifiManager.setConfigPortalTimeout(300); // 5 min
@@ -153,6 +161,7 @@ void setup() {
         Serial.println("WiFi connected.");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
+        ledStartBlinking();
     }
 
     MDNS.begin("ESP32Server");
@@ -167,17 +176,8 @@ void setup() {
     lbServer.begin();
     withrottleServer.begin();
 
-    ledTimer = timerController.register_timer(
-        TimerType::callback_type::create<ledUpdate>(),
-        LED_INTL_NORMAL, true);
     timerController.enable(true);
-
-    checkCurrentTimer = timerController.register_timer(
-        TimerType::callback_type::create<checkCurrent>(),
-        1, true);
     timerController.start(checkCurrentTimer);
-
-    ledStartBlinking();
 
 }
 

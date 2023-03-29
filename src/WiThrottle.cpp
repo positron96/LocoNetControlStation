@@ -169,6 +169,10 @@ void WiThrottleServer::loop() {
     }
 }
 
+void WiThrottleServer::notifyHearbeatStatus(ClientData &c) {
+    wifiPrintln(c.cli, "*" + String(HEARTBEAT_INTL));
+}
+
 void WiThrottleServer::processCmd(ClientData & cc) {
     etl::string_view dataStr{cc.rx};
     LOGD("RX '%s'(len %d)", cc.rx, dataStr.length());
@@ -180,8 +184,8 @@ void WiThrottleServer::processCmd(ClientData & cc) {
                 case '-' : cc.heartbeatEnabled = false; break;
                 default: LOGW("Unknown * cmd: %s", dataStr.data());
             }
+            LOGI("Heartbeat is %s", cc.heartbeatEnabled?"ON":"OFF");
         }
-        LOGI("Heartbeat is %s", cc.heartbeatEnabled?"ON":"OFF");
         break;
     }
     case 'P': {
@@ -206,6 +210,7 @@ void WiThrottleServer::processCmd(ClientData & cc) {
     case 'N': { // device name
         auto remoteName = dataStr.substr(1);
         LOGI("Device name: '%s'",  remoteName.data());
+        notifyHearbeatStatus(cc);
         break;
     }
     case 'H': {
@@ -219,7 +224,7 @@ void WiThrottleServer::processCmd(ClientData & cc) {
                 const auto &c = it->first;
                 if(c == cli) {it++; continue;}
                 if(it->second.hwId == hwId.data()) {
-                    LOGW(" There is a client(%X) with this ID already. Should not happen!", (intptr_t)c);
+                    LOGW(" There is a client(%X) with this ID already. Kicking it!", (intptr_t)c);
                     cc = it->second;  // copy ClientData
                     cc.rxpos = 0;
                     cc.cli = cli;
@@ -280,12 +285,14 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     }
     // wifiPrintln(cli, "PW8888"); // Web port
     wifiPrintln(cli, "");
-    wifiPrintln(cli, "*"+String(HEARTBEAT_INTL));
+    
 
     cc.rxpos = 0;
     cc.cli = cli;
     cc.heartbeatEnabled = false;
     cc.updateHeartbeat();
+
+    notifyHearbeatStatus(cc);
 
     clients[cli] = cc;
 }
