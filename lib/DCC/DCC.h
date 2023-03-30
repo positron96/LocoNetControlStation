@@ -120,6 +120,8 @@ public:
     uint16_t getCurrent() const { return current; }
     virtual void updateCurrent() = 0;
 
+    virtual ~IDCCChannel() = default;
+
 protected:
     std::atomic<uint16_t> current;
     std::atomic<uint16_t> maxCurrent;
@@ -130,8 +132,8 @@ protected:
 private:
     friend class DCCESP32SignalGenerator;
 
-    uint getBaselineCurrent();
-    bool checkCurrentResponse(uint baseline);
+    uint getBaselineCurrent() const;
+    bool checkCurrentResponse(uint baseline) const;
 
 };
 
@@ -188,33 +190,27 @@ public:
         Packet packets[SLOT_COUNT+1];
         etl::bitset<SLOT_COUNT+1> indicesTaken;
         etl::map<uint, size_t, SLOT_COUNT> regToIdxMap;
-        volatile Packet *currentPacket;
-        size_t maxIdx;
-        volatile Packet *urgentPacket;
+        Packet * volatile currentPacket;
+        size_t maxIdx = 0;
+        Packet * volatile urgentPacket = nullptr;
         /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
-        volatile uint8_t timerPeriodsHalf;
+        volatile uint8_t timerPeriodsHalf = 1; // first thing a timerfunc does is decrement this, so make it not underflow
         /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
-        volatile uint8_t timerPeriodsLeft;
+        volatile uint8_t timerPeriodsLeft = 2; // some sane nonzero value.
         Packet newPacket;
         //int8_t newSlot;
 
-        volatile uint8_t currentBit;
+        volatile uint8_t currentBit = 0;
 
-        RegisterList() {
-            currentPacket = &packets[0];
-            maxIdx = 0;
-            urgentPacket = nullptr;
-            currentBit = 0;
+        RegisterList(): currentPacket{&packets[0]} {
 
-            timerPeriodsLeft = 1; // first thing a timerfunc does is decrement this, so make it not underflow
-            timerPeriodsHalf = 2; // some sane nonzero value.
         }
 
-        ~RegisterList() {}
+        ~RegisterList() = default;
 
-        inline bool newPacketVacant() { return urgentPacket==nullptr;}
+        inline bool newPacketVacant() const { return urgentPacket==nullptr;}
 
-        inline bool currentBitValue() {
+        inline bool currentBitValue() const {
             return (currentPacket->buf[currentBit/8] & 1<<(7-currentBit%8) )!= 0;
         }
 
@@ -223,7 +219,7 @@ public:
         inline void advanceCurrentPacket() {
             if (urgentPacket != nullptr) {
                 currentPacket = urgentPacket;
-                *(Packet*)currentPacket = newPacket;  // this copies packet into packet array
+                *currentPacket = newPacket;  // this copies packet into packet array
                 urgentPacket = nullptr;
                 // flip active and update Packets
                 //Packet * p = currentPacket->flip();
@@ -430,7 +426,7 @@ public:
 
 private:
     hw_timer_t * _timer = nullptr;
-    volatile uint8_t _timerNum;
+    uint8_t _timerNum;
     esp_timer_handle_t _adcTimer;
     IDCCChannel *main = nullptr;
     IDCCChannel *prog = nullptr;
