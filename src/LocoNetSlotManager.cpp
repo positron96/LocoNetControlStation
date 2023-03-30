@@ -83,7 +83,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             sd.id2 = e.id2;
         }        
        
-        sd.trk = GTRK_IDLE | GTRK_MLOK1; // POWER ON & Loconet 1.1 by default; 
+        sd.trk = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default; 
         if(CS.getPowerState()) sd.trk |= GTRK_POWER;
     }
 

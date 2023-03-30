@@ -311,7 +311,7 @@ SLOTs without using the Master to allocate Locomotive addresses
 
 Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in the "DISPATCH" mode. 
 In this case a BT2 operating in its normal mode will request a DISPATCH SLOT that has been prepared by a supervisor type device.
-This is included for Club type operations where simpler throttles with limited capabilities are given to Engineers (Operators) by the Hostler or Dispatcher.
+This is included for club-type operations where simpler throttles with limited capabilities are given to Engineers (Operators) by the Hostler or Dispatcher.
 
 To DISPATCH PUT a slot, perform a SLOT MOVE to Slot 0. In this case the Destination Slot 0 is not copied to, but the source SLOT number is marked by the system as the DISPATCH slot.
 This is only a "one-deep stack".
@@ -440,8 +440,10 @@ If <SRC> slot is not in IN_USE state, clear SRC.
 SPECIAL CASES:
 
 * If SRC=0 (DISPATCH Get), return back SLOT READ DATA of DISPATCH Slot. 
-* IF SRC=DEST (NULL move) then SRC(=DEST) is set slot state to IN_USE, if legal move. 
-* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<OPC_SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> if move legal. 
+* IF SRC=DEST (NULL move) then SRC(=DEST) slot state is set to IN_USE (if move is legal). 
+* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<OPC_SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> (if move is legal). 
+
+NOTE: Probably <SRC> slot needs to be returned if DEST=0.
 
 Return Fail <<OPC_LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`. 
 It's illegal to move to/from slots 120/127.
@@ -593,15 +595,15 @@ SLOT DATA READ, 10 bytes data / 14 byte MSG
 
 If STAT2.2=0, EX1/EX2 encodes an ID#
 
-if STAT2.2=1, the STAT.3=0 means EX1/EX2 are ALIAS
+if STAT2.2=1, the STAT2.3=0 means EX1/EX2 are ALIAS
 
 ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
 
 [horizontal]
  00/00:: means NO ID being used
- 01/00 to 7F/01:: ID shows PC usage. Lo nibble is TYP PC# (PC can use hi values)
+ 01/00 to 7F/01:: slot is used by PC. Low nibble is typically a PC number (PC can use high values)
  00/02 to 7F/03:: SYSTEM reserved
- 00/04 to 7F/7E:: NORMAL throttle RANGE
+ 00/04 to 7F/7E:: normal range for throttles
 
 
 |[[OPC_PEER_XFER]]_OPC_PEER_XFER_ |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO 
@@ -731,7 +733,7 @@ D2 GTRK_MLOK1:: 1=This Master implements LocoNet 1.1 capability, 0=Master is DT2
 D1 GTRK_IDLE:: 0=track is paused, B'cast EMERG STOP.
 D0 GTRK_POWER:: 1=DCC packets are on in master, global power up
 
-6. [[arg_slot_stat2]]SLOT STATUS2:
+6. [[arg_slot_ss2]]SLOT STATUS2:
 [horizontal]
 D3:: 1=expansion IN ID1/2, 0=ENCODED alias
 D2:: 1=expansion ID1/2 is NOT ID usage
@@ -756,6 +758,8 @@ D1-SL_SND2:: F6
 D0-SL_SND1:: F5 1 = SLOT Sound 1 function 1 active (accessory 2)
 
 9. [[arg_slot_id1]]EXPANSION RESERVED ID1: 7 bit ls ID code written by THROTTLE/PC when STAT2.4=1
+
+NOTE: This could be STAT2.3 instead of STAT2.4 (as STAT2.4 is not mentioned anywhere, while STAT2.3 seems to mean "treat ID fields as ID")
 
 10. [[arg_slot_id2]]EXPANSION RESERVED ID2: 7 bit ms ID code written by THROTTLE/PC when STAT2.4=1
 
