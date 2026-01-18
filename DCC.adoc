@@ -1,4 +1,4 @@
-# This is a short memo about DCC packets
+# A short memo about DCC packets
 
 *Documentation:*
 
@@ -70,28 +70,29 @@ CCCD-DDDD
 1011-DDDD                    - F8,F7,F6,F5
 1010-DDDD                    - F12,F11,F10,F9
 110G-GGGG                    - Feature expansion instruction
-    0-0000 0 DLLL-LLLL 0 HHHH-HHHH - Binary state control (long) (2.3.6.1). States 1-15 reserved for RailCom
-    0-0001 0 CC               - Time/Date (2.3.6.2)  ! Address must be 0
+   0-0000 0 DLLL-LLLL 0 HHHH-HHHH - Binary state control (long) (2.3.6.1). States 1-15 reserved for RailCom
+   0-0001 0 CC               - Time/Date (2.3.6.2)  ! Address must be 0
             00MM-MMMM 0 WWWH-HHHH 0 U0BB-BBBB  - Time
             010T-TTTT 0 MMMM-YYYY 0 YYYY-YYYY  - Date
-    1-1101 0 DLLL-LLLL        - Binary state control (short) (2.3.6.4)
-                                States 1-15 are reserved for RailCom
-    0-0010 0 MMMM-MMMM 0 MMMM-MMMM  - System time (2.3.6.3) ms since startup. ! Address must be 0
-    1-1110 0 DDDD-DDDD       - F20..F13 (2.3.6.5, TN-4.0.5)
-    1-1111 0 DDDD-DDDD       - F28..F21 (2.3.6.6)
-    1-1000 0 DDDD-DDDD       - F36..F29 (2.3.6.7)
-111                         - CV access (2.3.7.1)
+   1-1101 0 DLLL-LLLL        - Binary state control (short) (2.3.6.4)
+                               States 1-15 are reserved for RailCom
+   0-0010 0 MMMM-MMMM 0 MMMM-MMMM  - System time (2.3.6.3) ms since startup. ! Address must be 0
+   1-1110 0 DDDD-DDDD       - F20..F13 (2.3.6.5, TN-4.0.5)
+   1-1111 0 DDDD-DDDD       - F28..F21 (2.3.6.6)
+   1-1000 0 DDDD-DDDD       - F36..F29 (2.3.6.7)
+111                          - CV access (2.3.7.1)
 1111-GGGG 0 DDDD-DDDD 0 DDDD-DDDD - CV access (short)
+                             Allow to write ~6 pre-defined CVs (e.g. CV17+CV18)
 1110-GGVV 0 VVVV-VVVV 0 DDDD-DDDD - CV access (long)
-      01 - Verify byte
-      11 - Write byte
-      10 - Bit manipulation (verify/write one bit)
+     01 - Verify byte
+     11 - Write byte
+     10 - Bit manipulation (verify/write one bit)
 
 
-Basic Accessory Decoder Packet
-==============================
+Accessory Decoder Packet
+========================
 
-PPP 0 10AA-AAAA 0 1aaa-CDDR 0- Basic Accessory Decoder Packet Format (9/11-bit address) S-9.2.1#420
+PPP 0 10AA-AAAA 0 1aaa-CDDR 0 - Basic Accessory Decoder Packet Format (9/11-bit address) S-9.2.1#420
                    aaa                    - high bits of address, in 1's complement
                        C                  - activate or deactivate
                         DD                - output pair or 2 lowest bits of 11-bit address
@@ -107,5 +108,8 @@ PPP 0 10AA-AAAA 0 0aaa-0AA1 0 000X-XXXX  - Extended Accessory Decoder Control Pa
 PPP 0 1011-1111 0 1000-CDDD 0 EEEE-EEEE 1 - broadcast for basic accessory decoders  S-9.2.1#447
 
 PPP 0 1011-1111 0 0000-0111 0 000X-XXXX 0 EEEE-EEEE 1 - broadcast for extended accessory decoders  S-9.2.1#456
+
+PPP 0 10AA-AAAA 0 0aaa-1AAT 0 EEEEEEEE 1  - NOP for basic/extended accessory decoder. Ignored by non-RailCom decoders.
+                          T               - 0=basic, 1=extended
 
 ```
