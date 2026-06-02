@@ -60,8 +60,6 @@ public:
 
     virtual void end()=0;
 
-    virtual void unloadSlot(const LocoAddress addr) = 0;
-
     virtual void setPower(bool v)=0;
 
     virtual bool getPower()=0;
@@ -89,6 +87,8 @@ public:
     void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);
     void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
 
+    void unloadSlot(const LocoAddress addr) { packets.clear_loco(addr); }
+
     bool checkOvercurrent() {
         uint16_t v = getCurrent();
         float mA = v * ADC_TO_MA;
@@ -114,7 +114,15 @@ protected:
     dcc::BasePacketList &packets;
 
     virtual void timerFunc()=0;
-    virtual bool loadPacket(etl::span<uint8_t>, size_t, size_t);
+
+    /** Tries to load a packet for a specified duration. */
+    bool loadPacket(etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
+        for(size_t i=0; i<timeout_ms; i++) {
+            if (packets.put_generic_packet(packet, nRepeat)) return true;
+            delay(1);
+        }
+        return false;
+    }
 
     uint getBaselineCurrent() const;
     bool checkCurrentResponse(uint baseline) const;

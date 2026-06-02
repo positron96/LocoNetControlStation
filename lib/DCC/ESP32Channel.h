@@ -71,22 +71,6 @@ public:
         //current = readCurrentAdc();
     }
 
-
-protected:
-
-    /** Tries to load a packet for a specified duration. */
-    bool loadPacket(etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) override {
-        for(size_t i=0; i<timeout_ms; i++) {
-            if (packets.put_generic_packet(packet, nRepeat)) return true;
-            delay(1);
-        }
-        return false;
-    }
-
-    void unloadSlot(const LocoAddress addr) override {
-        packets.clear_loco(addr);
-    }
-
 private:
 
     uint8_t _outputPin;
