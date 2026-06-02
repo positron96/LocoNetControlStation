@@ -23,13 +23,19 @@
 #define CS_DEBUGF
 #endif
 
-#define  STATES    CLOSED,THROWN
 enum class TurnoutState {
-    STATES, UNKNOWN
+    CLOSED,THROWN, UNKNOWN
 };
+inline TurnoutState toggleTurnout(const TurnoutState s) {
+    return s==TurnoutState::THROWN ? TurnoutState::CLOSED : TurnoutState::THROWN;
+}
+
 enum class TurnoutAction {
-    STATES, TOGGLE
+    CLOSE, THROW, TOGGLE
 };
+inline TurnoutState actionToState(const TurnoutAction s) {
+    return s==TurnoutAction::THROW ? TurnoutState::THROWN : TurnoutState::CLOSED;
+}
 
 /** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
 inline static uint8_t moveBit1to5(uint8_t normalByte) {
@@ -253,6 +259,7 @@ public:
         CHECK_SEND(    0x1E00, DCCFnGroup::F9_12);
         CHECK_SEND( 0x1F'E000, DCCFnGroup::F13_20);
         CHECK_SEND(0x1FE'0000, DCCFnGroup::F21_28);
+        #undef CHECK_SEND
         dd.fn = LocoData::Fns( v );
     }
 
@@ -285,9 +292,9 @@ public:
             uint8_t slot = i.second;
             LocoData &dd = getSlot(slot);
             if(dd.refreshing && dd.wdt.timedOut()) {
-                CS_DEBUGF("slot %d timed out, current %lds, last update was at %lds", slot,
-                     millis()/1000, dd.wdt.getLastUpdate()/1000 );
-                setLocoSlotRefresh(slot, false);
+                    CS_DEBUGF("slot %d timed out, current %lds, last update was at %lds", slot,
+                        millis()/1000, dd.wdt.getLastUpdate()/1000 );
+                    setLocoSlotRefresh(slot, false);
             }
         }
     }
@@ -369,9 +376,9 @@ public:
             auto t = turnoutData.find(aAddr);
             if(t != turnoutData.end() ) {
                 if (action==TurnoutAction::TOGGLE) {
-                    newState = t->second.tStatus==TurnoutState::THROWN ? TurnoutState::CLOSED : TurnoutState::THROWN;
+                    newState = toggleTurnout(t->second.tStatus);
                 } else {  // throw or close
-                    newState = (TurnoutState)(int)action;
+                    newState = actionToState(action);
                 }
 
                 //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
@@ -387,7 +394,7 @@ public:
                 CS_DEBUGF("Trying to toggle numeric turnout");
                 newState = TurnoutState::THROWN;
             } else {  // throw or close
-                newState = (TurnoutState)(int)action;
+                newState = actionToState(action);
             }
 
             if(turnoutData.available()>0) {

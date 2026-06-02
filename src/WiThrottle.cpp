@@ -478,8 +478,8 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
 
     TurnoutAction a;
     switch(action) {
-        case 'T':  a = TurnoutAction::THROWN;  break;
-        case 'C':  a = TurnoutAction::CLOSED;  break;
+        case 'T':  a = TurnoutAction::THROW;  break;
+        case 'C':  a = TurnoutAction::CLOSE;  break;
         case '2':  a = TurnoutAction::TOGGLE;  break;
         default:
             cc.sendMessage("Unknown turnout command!", true);

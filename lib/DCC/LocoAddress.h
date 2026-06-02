@@ -6,16 +6,16 @@
 
 /**
  * Represents a DCC address.
- * Can be either short (or basic or promary) or long (or extended).
+ * Can be either short (or basic or primary) or long (or extended).
  * By DCC standard, short addresses are in range 1--127, long addresses are in range 1--10239.
- * Other systems can limit address range 
+ * Other systems can limit address range
  * (e.g. LocoNet has extended address range of 128--9983, i.e. a numeric value uniquely identifies address type).
  * Use static creation methods to create appropriate address.
  * Address 0 is treated as invalid.
- * 
+ *
  * Internally, the address is stored as int16_t, the signum specifies short(positive)/long(negative).
- * This class is small and can be chaply passed by value.
- */ 
+ * This class is small and can be cheaply passed by value.
+ */
 class LocoAddress {
 public:
     LocoAddress() : num(0) {}
