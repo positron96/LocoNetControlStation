@@ -170,7 +170,7 @@ void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     loadPacket(0, b, 2, 4);
 }
 
-uint IDCCChannel::getBaselineCurrent() {
+uint IDCCChannel::getBaselineCurrent() const {
     uint baseline = 0;
 
     // collect baseline current
@@ -185,7 +185,7 @@ uint IDCCChannel::getBaselineCurrent() {
 }
 
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
-bool IDCCChannel::checkCurrentResponse(uint baseline) {
+bool IDCCChannel::checkCurrentResponse(uint baseline) const {
     bool ret = false;
     int max = 0;
     delay(ACK_SAMPLE_MILLIS);
