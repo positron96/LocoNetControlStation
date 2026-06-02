@@ -2,6 +2,7 @@
 
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
+#include "packet.hpp"
 
 #include <esp32-hal-timer.h>
 //#include <esp_adc_cal.h>
@@ -50,24 +51,6 @@ enum class DCCFnGroup {
     F0_4, F5_8, F9_12, F13_20, F21_28
 };
 
-struct Packet {
-    uint8_t buf[10];
-    uint8_t nBits;
-    int8_t nRepeat;
-    void debugPrint() const {
-        /*
-        char ttt[50]; ttt[0]='\0';
-        char *pos=ttt;
-        uint8_t nBytes = nBits/8; if (nBytes*8!=nBits) nBytes++;
-        for(int i=0; i<nBytes; i++) {
-            pos += sprintf(pos, "%02x ", buf[i]);
-        }
-        DCC_DEBUGF_ISR("packet (%d): '%s'", nBits, ttt );
-        */
-    }
-
-    void setData(uint8_t *src, uint8_t nBytes, int nRepeat);
-};
 
 class IDCCChannel {
 
@@ -188,18 +171,18 @@ public:
 
     /** Define a series of registers that can be sequentially accessed over a loop to generate a repeating series of DCC Packets. */
     struct RegisterList {
-        Packet packets[SLOT_COUNT+1];
+        RawPacket packets[SLOT_COUNT+1];
         etl::bitset<SLOT_COUNT+1> indicesTaken;
         etl::map<uint, size_t, SLOT_COUNT> regToIdxMap;
-        Packet * volatile currentPacket;
+        RawPacket * volatile currentPacket;
         size_t maxIdx = 0;
-        Packet * volatile urgentPacket = nullptr;
+        RawPacket * volatile urgentPacket = nullptr;
+
         /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
         volatile uint8_t timerPeriodsHalf = 1; // first thing a timerfunc does is decrement this, so make it not underflow
         /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
         volatile uint8_t timerPeriodsLeft = 2; // some sane nonzero value.
-        Packet newPacket;
-        //int8_t newSlot;
+        RawPacket newPacket;
 
         volatile uint8_t currentBit = 0;
 

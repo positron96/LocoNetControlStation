@@ -13,71 +13,13 @@ uint8_t resetPacket[3] = {0x00, 0x00, 0};
 #define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
 #define  ACK_SAMPLE_THRESHOLD      2       /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
-void Packet::setData(uint8_t *src, uint8_t nBytes, int repeatCount) {
-
-    // copy first byte into what will become the checksum byte
-    // XOR remaining bytes into checksum byte
-    src[nBytes] = src[0];
-    for(int i=1; i<nBytes; i++)
-        src[nBytes]^=src[i];
-    nBytes++;  // increment number of bytes in packet to include checksum byte
-
-    buf[0] = 0xFF;                        // first 8 bits of 22-bit preamble
-    buf[1] = 0xFF;                        // second 8 bits of 22-bit preamble
-    buf[2] = 0xFC | bitRead(src[0],7);      // last 6 bits of 22-bit preamble + data start bit + src[0], bit 7
-    buf[3] = src[0]<<1;                     // src[0], bits 6-0 + data start bit
-    buf[4] = src[1];                        // src[1], all bits
-    buf[5] = src[2]>>1;                     // start bit + src[2], bits 7-1
-    buf[6] = src[2]<<7;                     // src[2], bit 0
-
-    if(nBytes == 3) {
-        nBits = 49;
-    } else {
-        buf[6] |= src[3]>>2;    // src[3], bits 7-2
-        buf[7] =  src[3]<<6;    // src[3], bit 1-0
-        if(nBytes==4) {
-            nBits = 58;
-        } else {
-            buf[7] |= src[4]>>3;  // src[4], bits 7-3
-            buf[8] =  src[4]<<5;   // src[4], bits 2-0
-            if(nBytes==5) {
-                nBits = 67;
-            } else {
-                buf[8] |= src[5]>>4;   // src[5], bits 7-4
-                buf[9] =  src[5]<<4;   // src[5], bits 3-0
-                nBits = 76;
-            }
-        }
-    }
-    nRepeat = repeatCount;
-    debugPrint();
-}
 
 void IDCCChannel::sendThrottle(int iReg, LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
-    uint8_t b[5];                         // save space for checksum byte
-    uint8_t nB = 0;
-
-    uint16_t iAddr = addr.addr();
-    if ( addr.isLong() ) {
-        b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
-    }
-
-    b[nB++] = lowByte(iAddr);
-    if(sm==SpeedMode::S128) {
-        // Advanced Operations Instruction: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf #200
-        b[nB++] = 0b0011'1111;
-        b[nB++] = (tSpeed & 0x7F) | ( (tDirection & 0x1) << 7);
-    } else {
-        // basic packet: https://www.nmra.org/sites/default/files/s-92-2004-07.pdf #35
-        uint8_t t=nB;
-        b[nB++] = 0b0100'0000;
-        if(tDirection==1) b[t] |= 0b0010'0000;
-        b[t] |= (tSpeed & 0b0001'1111);
-    }
+    auto t = make_speed_dir_packet(addr, tSpeed, sm, tDirection);
 
     DCC_LOGI("iReg %d, addr %d, speed=%d(mode %d) %c", iReg, addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
 
-    loadPacket(iReg, b, nB, 0);
+    loadPacket(iReg, t.data(), t.size(), 0);
 }
 
 void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group, uint32_t fn) {
@@ -110,23 +52,7 @@ void IDCCChannel::sendFunctionGroup(int iReg, LocoAddress addr, DCCFnGroup group
 
 }
 void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
-    // save space for checksum byte
-    uint8_t b[5];
-    uint8_t nB = 0;
-    uint16_t iAddr = addr.addr();
-
-    if (addr.isLong()) {
-        b[nB++] = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
-    }
-
-    b[nB++] = lowByte(iAddr);
-
-    if ( (fByte & 0b1100'0000) == 0b1000'0000) {// this is a request for functions FL,F1-F12
-        b[nB++] = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12
-    } else {                             // this is a request for functions F13-F28
-        b[nB++] = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
-        b[nB++] = eByte;
-    }
+    auto b = make_fn_packet(addr, fByte, eByte);
 
     DCC_LOGI("iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
 
@@ -136,7 +62,7 @@ void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_
     must send at least two repetitions of these commands when any function state is changed."
     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     */
-    loadPacket(0, b, nB, 4);
+    loadPacket(0, b.data(), b.size(), 4);
 
 }
 
@@ -150,24 +76,9 @@ void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
 void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
     DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
 
-    uint8_t b[3];     // save space for checksum byte
+    auto b = make_accessory_packet(addr9, ch, thrown);
 
-    /*
-    first byte is of the form 10AAAAAA, where AAAAAA represent
-    6 least significant bits of accessory address (9-bit. Here we have 14-bit address, so take bits 2-7) */
-    b[0] = ( addr9 & 0x3F) | 0x80;
-    /*
-    "The most significant bits of the 9-bit address are bits 4-6 of the second data byte.
-    By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
-    https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
-    */
-    // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represents throw/close
-    b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
-        | (ch & 0x3) << 1
-        | (thrown?0x1:0)
-        | 0b1000'0000   ;
-
-    loadPacket(0, b, 2, 4);
+    loadPacket(0, b.data(), b.size(), 4);
 }
 
 uint IDCCChannel::getBaselineCurrent() const {

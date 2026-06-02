@@ -4,5 +4,9 @@
     "build": {
         "srcDir": ".",
         "extraScript": "extra-script.py"
+    },
+    "dependencies": {
+        "Embedded Template Library": "*"
     }
+
 }
