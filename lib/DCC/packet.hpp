@@ -18,7 +18,13 @@ namespace dcc {
 
 
     constexpr size_t ACCESSORY_PACKET_REPEATS = 4; // repeat accessory packets this number of times
-    constexpr size_t FN_PACKET_REPEATS = 4; // repeat function packets this number of times
+
+    // NMRA DCC norm asks for >1 packets if not refreshed (for F13-...):
+    // "Command Stations that generate these packets, and which are not periodically refreshing these functions,
+    // must send at least two repetitions of these commands when any function state is changed."
+    // https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
+    // DCC++ uses 4.
+    constexpr size_t FN_PACKET_REPEATS = 4;
 
 
     constexpr size_t fn_group_index(const fn_group fg) {
@@ -32,7 +38,7 @@ namespace dcc {
         }
     }
 
-    inline size_t encode_dcc(const etl::span<uint8_t> src, etl::span<uint8_t> dst, size_t preamble_bits) {
+    inline size_t encode_dcc(const etl::span<const uint8_t> src, etl::span<uint8_t> dst, size_t preamble_bits) {
         uint8_t crc = src[0];
         size_t len = src.size();
         for(int i=1; i<len; i++)
@@ -50,15 +56,19 @@ namespace dcc {
         return s.size_bits();
     }
 
-    constexpr size_t MAX_RAW_PACKET_BYTES = 10;
-
     struct PacketBits {
+        static constexpr size_t MAX_RAW_PACKET_BYTES = 10;
+
         etl::array<uint8_t, MAX_RAW_PACKET_BYTES> buf;
         uint8_t len;
-        static PacketBits from_bytes(const etl::span<uint8_t> src, size_t preamble_len = 0) {
+        static PacketBits from_bytes(const etl::span<const uint8_t> src, size_t preamble_len = 0) {
             PacketBits p;
             p.len = encode_dcc(src, p.buf, preamble_len);
             return p;
+        }
+
+        uint8_t bit_at(size_t idx) const {
+            return (buf[idx / 8] >> (7 - (idx % 8))) & 0x1;
         }
     };
 

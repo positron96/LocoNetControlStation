@@ -69,7 +69,7 @@ namespace dcc {
             return true;
         }
 
-        bool put_generic_packet(etl::span<uint8_t> bytes, uint8_t nRepeats, int priority = 0) {
+        bool put_generic_packet(const etl::span<const uint8_t> bytes, uint8_t nRepeats, int priority = 0) {
             if(queue_packets.full()) return false;
             QueueItem item{
                 .priority = priority,

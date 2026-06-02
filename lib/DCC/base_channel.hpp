@@ -74,6 +74,10 @@ public:
      *
      */
     void sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
+
+    /** Sends a function group command to a locomotive.
+     * Can either put it in a refreshing slot or only send once.
+     */
     void sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn);
 
     /**
@@ -107,8 +111,11 @@ public:
     }
 
     void resetMaxCurrent() { maxCurrent = 0; }
+    /** Max current encountered so far after resetMaxCurrent() was called. */
     uint16_t getMaxCurrent() const { return maxCurrent; }
+    /**  Current consumption. */
     uint16_t getCurrent() const { return current; }
+    /** Reads current consumption and updates internal state. */
     virtual void updateCurrent() = 0;
 
     virtual ~BaseChannel() = default;
@@ -120,7 +127,8 @@ protected:
     BasePacketList &packets;
 
     /** Tries to load a packet for a specified duration. */
-    bool loadPacket(etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
+    bool loadPacket(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
+        //TODO: original code probably waited until packet appeared on tracks, while this just waits for space in queue.
         for(size_t i=0; i<timeout_ms; i++) {
             if (packets.put_generic_packet(packet, nRepeat)) return true;
             delay(1);

@@ -22,12 +22,6 @@ void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, boo
 
     DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr, sp.get128(), (int)sm, fwd?'F':'B');
     packets.put_loco_speed_dir_packet(addr, sp, sm, fwd);
-    // auto t = make_speed_dir_packet(addr, tSpeed, sm, tDirection);
-
-    // add packet into register
-    // mark iReg to refresh next
-
-    //loadPacket(addr, t.data(), t.size(), 0);
 }
 
 void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {
@@ -35,68 +29,13 @@ void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t f
 
     packets.put_loco_fn_packet(addr, group, fn);
 
-    // switch(group) {
-    //     case fn_group::F0_4:
-    //         // move FL(F0) to 5th bit
-    //         fn = (fn & 0x1)<<4 | (fn & 0b1'1110)>>1;
-    //         sendFunction(iReg, addr,  0b1000'0000 | (fn & 0b0001'1111) );
-    //         break;
-    //     case fn_group::F5_8:
-    //         fn >>= 5;
-    //         sendFunction(iReg, addr,  0b1011'0000 | (fn & 0b0000'1111) );
-    //         break;
-    //     case fn_group::F9_12:
-    //         fn >>= 9;
-    //         sendFunction(iReg, addr,  0b1010'0000 | (fn & 0b0000'1111) );
-    //         break;
-    //     case fn_group::F13_20:
-    //         fn >>= 13;
-    //         sendFunction(iReg, addr,  0b1101'1110, (uint8_t)fn );
-    //         break;
-    //     case fn_group::F21_28:
-    //         fn >>= 21;
-    //         sendFunction(iReg, addr,  0b1101'1111, (uint8_t)fn );
-    //         break;
-    //     default:
-    //         break;
-    // }
-
 }
-
-// void IDCCChannel::sendFunction(int iReg, LocoAddress addr, uint8_t fByte, uint8_t eByte) {
-//     auto b = make_fn_packet(addr, fByte, eByte);
-
-//     DCC_LOGI("iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
-
-//     /*
-//     NMRA DCC norm ask for two DCC packets instead of only one:
-//     "Command Stations that generate these packets, and which are not periodically refreshing these functions,
-//     must send at least two repetitions of these commands when any function state is changed."
-//     https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
-//     */
-//     loadPacket(0, b.data(), b.size(), 4);
-
-// }
 
 void BaseChannel::sendAccessory(uint16_t addr11, bool thrown) {
     DCC_LOGI("addr11=%d, %c", addr11, thrown?'T':'C');
-    // if(addr11>0) {
-    //     addr11--;
-    // }
-    // sendAccessory( (addr11>>2) + 1U, addr11 & 0x3, thrown);
 
     packets.put_accessory_packet(addr11, thrown);
 }
-
-// void IDCCChannel::sendAccessory(uint16_t addr9, uint8_t ch, bool thrown) {
-//     DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
-
-//     packets.put_accessory_packet()
-
-//     auto b = make_accessory_packet(addr9, ch, thrown);
-
-//     loadPacket(0, b.data(), b.size(), ACCESSORY_PACKET_REPEATS);
-// }
 
 uint BaseChannel::getBaselineCurrent() const {
     uint baseline = 0;

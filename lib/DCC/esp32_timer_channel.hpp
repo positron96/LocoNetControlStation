@@ -110,13 +110,8 @@ private:
         current_bit++;
     }
 
-    inline bool current_bit_value() const {
-        return (currentPacket.packet.buf[current_bit/8] & 1<<(7-current_bit%8) )!= 0;
-    }
-
-
     inline void set_bit_timings() {
-        if ( current_bit_value() ) {
+        if ( currentPacket.packet.bit_at(current_bit) != 0 ) {
             /* For "1" bit, we need 1 58us timer tick for each signal level */
             DCC_LOGD_ISR("bit %d (0x%02x) = 1", current_bit, currentPacket.packet.buf[current_bit/8] );
             timerPeriodsHalf = 1;
