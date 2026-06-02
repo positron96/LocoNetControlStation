@@ -31,13 +31,11 @@ LocoNetBus bus;
 LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
 
+#define CS_NAME "ESP32CommandStation"
 
-#define LBSERVER_TCP_PORT  1234
-LbServer lbServer(LBSERVER_TCP_PORT, &bus);
+LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
-
-#define CS_NAME "ESP32CommandStation"
 
 #define PIN_LED  22
 
