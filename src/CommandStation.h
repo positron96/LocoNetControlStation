@@ -196,7 +196,7 @@ public:
             // no need to load, it will load itself on setLocoSpeed
             dd.kickWatchdog();
         } else {
-            dccMain->unloadSlot(slot);
+            dccMain->unloadSlot(dd.addr);
         }
     }
 
@@ -221,7 +221,7 @@ public:
         if(dd.speedMode == mode) return;
         dd.speedMode = mode;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
+            dccMain->sendThrottle(dd.addr, dd.speed, dd.speedMode, dd.dir > 0);
     }
 
     SpeedMode getLocoSpeedMode(uint8_t slot) {
@@ -242,7 +242,7 @@ public:
         else if(fn<13) fg = DCCFnGroup::F9_12;
         else if(fn<21) fg = DCCFnGroup::F13_20;
         else           fg = DCCFnGroup::F21_28;
-        dccMain->sendFunctionGroup(slot, dd.addr, fg, ifn);
+        dccMain->sendFunctionGroup(dd.addr, fg, ifn);
     }
 
     void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
@@ -252,7 +252,7 @@ public:
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
         // update bits (v=) and send function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }
+            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(dd.addr, FG, v ); }
 
         CHECK_SEND(      0x1F, DCCFnGroup::F0_4);
         CHECK_SEND(     0x1E0, DCCFnGroup::F5_8);
@@ -277,7 +277,7 @@ public:
         if(dd.dir==dir) return;
         dd.dir = dir;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
+            dccMain->sendThrottle(dd.addr, dd.speed, dd.speedMode, dd.dir);
     }
 
     uint8_t getLocoDir(uint8_t slot) {
@@ -306,7 +306,7 @@ public:
         if(dd.speed == spd) return;
         dd.speed = spd;
         if(dd.refreshing)
-            dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
+            dccMain->sendThrottle(dd.addr, dd.speed, dd.speedMode, dd.dir);
     }
 
     /// Returns speed

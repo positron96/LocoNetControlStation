@@ -1,4 +1,6 @@
 #include <DCC.h>
+#include <ESP32Channel.h>
+#include <ESP32SignalGenerator.h>
 
 #include "CommandStation.h"
 
@@ -50,8 +52,10 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
 
-DCCESP32Channel<10> dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE);
-DCCESP32Channel<2> dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE);
+dcc::PacketList<10> dcc_packets_main;
+dcc::DCCESP32Channel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+dcc::PacketList<2> dcc_packets_prog;
+dcc::DCCESP32Channel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
 DCCESP32SignalGenerator dccTimer(1); //timer1
 
 LocoNetSlotManager slotMan(&bus);

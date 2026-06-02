@@ -7,29 +7,55 @@
 #include <etl/array.h>
 #include <etl/bit_stream.h>
 
+#include <cstdint>
+#include <cstdlib>
+
+enum class DCCFnGroup {
+    F0_4, F5_8, F9_12, F13_20, F21_28
+};
+
+
+constexpr size_t ACCESSORY_PACKET_REPEATS = 4; // repeat accessory packets this number of times
+constexpr size_t FN_PACKET_REPEATS = 4; // repeat function packets this number of times
+
+
+constexpr size_t fn_group_index(const DCCFnGroup fg) {
+    switch(fg) {
+        case DCCFnGroup::F0_4: return 0;
+        case DCCFnGroup::F5_8: return 1;
+        case DCCFnGroup::F9_12: return 2;
+        case DCCFnGroup::F13_20: return 3;
+        case DCCFnGroup::F21_28: return 4;
+        default: return 0;
+    }
+}
+
 inline size_t encode_dcc(const etl::span<uint8_t> src, etl::span<uint8_t> dst) {
     uint8_t crc = src[0];
     size_t len = src.size();
     for(int i=1; i<len; i++)
         crc ^= src[i];
 
-    etl::bit_stream s(dst.data(), dst.size());
-    s.put(0xFFFFFFFF, 22);  // 22-bit preamble
+    // don't care about endianness, we don't write multi-bytes
+    etl::bit_stream_writer s(dst.data(), dst.size(), etl::endian::native);
+    s.write(0xFFFFFFFF, 22);  // 22-bit preamble
     for(size_t i=0; i<len; i++) {
-        s.put(0, 1); // data start bit
-        s.put(src[i], 8);
+        s.write(0, 1); // data start bit
+        s.write(src[i], 8);
     }
-    s.put(0, 1); // data start bit
-    s.put(crc, 8);
-    return s.bits();
+    s.write(0, 1); // data start bit
+    s.write(crc, 8);
+    return s.size_bits();
 }
+
+constexpr size_t MAX_RAW_PACKET_BYTES = 10;
 
 /**
  * DCC Packet with all the preambles, start bits etc.
  * Basically represents a sequence of bits.
  */
 struct RawPacket {
-    etl::array<uint8_t, 10> buf;
+    etl::array<uint8_t, MAX_RAW_PACKET_BYTES> buf;
     uint8_t nBits;
     int8_t nRepeat;
     void debugPrint() const {
@@ -51,6 +77,23 @@ struct RawPacket {
     }
 };
 
+namespace dcc {
+    struct PacketBits {
+        etl::array<uint8_t, MAX_RAW_PACKET_BYTES> buf;
+        uint8_t len;
+        static PacketBits from_bytes(const etl::span<uint8_t> src) {
+            PacketBits p;
+            p.len = encode_dcc(src, p.buf);
+            return p;
+        }
+    };
+
+    struct PacketWithRepeats {
+        PacketBits packet;
+        uint8_t nRepeats;
+    };
+}
+
 template <typename It>
 constexpr inline It encode_address(const LocoAddress addr, It out) {
     uint16_t iAddr = addr.addr();
@@ -61,7 +104,6 @@ constexpr inline It encode_address(const LocoAddress addr, It out) {
     *out++ = lowByte(iAddr);
     return out;
 }
-
 
 inline etl::array<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
     etl::array<uint8_t, 4> data;
@@ -81,6 +123,10 @@ inline etl::array<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, uint8_t tS
     // DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
 
     return data;
+}
+
+inline etl::array<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, LocoSpeed speed, SpeedMode mode, bool fwd) {
+    return make_speed_dir_packet(addr, speed.getDCCByte(mode), mode, fwd ? 1 : 0);
 }
 
 inline auto make_fn_packet(LocoAddress addr, uint8_t fByte, uint8_t eByte) {
@@ -149,6 +195,17 @@ inline auto make_f29_f36_packet(LocoAddress addr, uint32_t fns) {
     return data;
 }
 
+inline auto make_fn_packet(LocoAddress addr, DCCFnGroup fg, uint32_t fns) {
+    switch(fg) {
+        case DCCFnGroup::F0_4:   return make_f0_f4_packet(addr, fns);
+        case DCCFnGroup::F5_8:   return make_f5_f8_packet(addr, fns);
+        case DCCFnGroup::F9_12:  return make_f9_f12_packet(addr, fns);
+        case DCCFnGroup::F13_20: return make_f13_f20_packet(addr, fns);
+        case DCCFnGroup::F21_28: return make_f21_f28_packet(addr, fns);
+        default:                return make_f0_f4_packet(addr, 0); // should not happen, return something valid
+    }
+}
+
 inline auto make_accessory_packet(uint16_t addr9, uint8_t ch, bool thrown) {
     // DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
 
@@ -170,4 +227,8 @@ inline auto make_accessory_packet(uint16_t addr9, uint8_t ch, bool thrown) {
         | 0b1000'0000   ;
 
     return b;
+}
+
+inline auto make_accessory_packet(uint16_t addr11, bool thrown) {
+    return make_accessory_packet((addr11>>2) + 1U, addr11 & 0x3, thrown);
 }

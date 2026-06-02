@@ -28,7 +28,12 @@ public:
     /** Returns numeric value of this address. */
     uint16_t addr() const { return abs(num); }
     bool isValid() const { return num!=0; }
-    bool operator < (const LocoAddress& a) const { return (num < a.num); }
+    bool operator < (const LocoAddress& a) const {
+        // long address must be "larger" than short one
+        size_t key = (isShort() ? num : -num + 128);
+        size_t aKey = (a.isShort() ? a.num : -a.num + 128);
+        return (key < aKey);
+    }
     operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
 private:
     LocoAddress(int16_t num): num{num} { }
