@@ -1,4 +1,4 @@
-#include "ESP32SignalGenerator.h"
+#include "esp32_timer.hpp"
 
 namespace dcc {
 
@@ -12,7 +12,7 @@ void ESP32TimerChannel::PacketSlot::initPackets(){
 } */
 
 
-static DCCESP32SignalGenerator * _inst = nullptr;
+static ESP32Timer * _inst = nullptr;
 
 
 void IRAM_ATTR timerCallback() {
@@ -20,17 +20,17 @@ void IRAM_ATTR timerCallback() {
 }
 
 void adcTimerCallback(void* arg) {
-    ((DCCESP32SignalGenerator*)arg)->adcTimerFunc();
+    ((ESP32Timer*)arg)->adcTimerFunc();
 }
 
 
-DCCESP32SignalGenerator::DCCESP32SignalGenerator(uint8_t timerNum)
+ESP32Timer::ESP32Timer(uint8_t timerNum)
     : _timerNum(timerNum)
 {
     _inst = this;
 }
 
-void DCCESP32SignalGenerator::begin() {
+void ESP32Timer::begin() {
     if (main!=nullptr) main->begin();
     if (prog!=nullptr) prog->begin();
 
@@ -45,7 +45,7 @@ void DCCESP32SignalGenerator::begin() {
     esp_timer_start_periodic(_adcTimer, 1000);  // 1ms
 }
 
-void DCCESP32SignalGenerator::end() {
+void ESP32Timer::end() {
     if(_timer!=nullptr) {
         timerStop(_timer);
         timerEnd(_timer);
@@ -57,14 +57,14 @@ void DCCESP32SignalGenerator::end() {
     if (prog!=nullptr) prog->end();
 }
 
-void DCCESP32SignalGenerator::timerFunc() {
+void ESP32Timer::timerFunc() {
 
     if (main!=nullptr) main->timerFunc();
     if (prog!=nullptr) prog->timerFunc();
 
 }
 
-void DCCESP32SignalGenerator::adcTimerFunc() {
+void ESP32Timer::adcTimerFunc() {
     if (main!=nullptr) main->updateCurrent();
     if (prog!=nullptr) prog->updateCurrent();
 }

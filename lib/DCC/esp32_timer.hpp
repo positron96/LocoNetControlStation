@@ -1,16 +1,23 @@
 #pragma once
 
 #include "base_channel.hpp"
+#include "esp32_timer_channel.hpp"
 
 namespace dcc {
 
-class DCCESP32SignalGenerator {
+/**
+ * ESP32-based timer for DCC handling.
+ *
+ * Uses a hardware timer for outputting bits to track,
+ *  and a half-software timer for checking for current consumption regularly.
+ */
+class ESP32Timer {
 
 public:
-    explicit DCCESP32SignalGenerator(uint8_t timerNum = 1);
+    explicit ESP32Timer(uint8_t timerNum = 1);
 
-    void setProgChannel(BaseChannel * ch) { prog = ch;}
-    void setMainChannel(BaseChannel * ch) { main = ch;}
+    void setProgChannel(ESP32TimerChannel * ch) { prog = ch;}
+    void setMainChannel(ESP32TimerChannel * ch) { main = ch;}
 
     /**
      * Starts half-bit timer.
@@ -25,8 +32,8 @@ private:
     hw_timer_t * _timer = nullptr;
     uint8_t _timerNum;
     esp_timer_handle_t _adcTimer;
-    BaseChannel *main = nullptr;
-    BaseChannel *prog = nullptr;
+    ESP32TimerChannel *main = nullptr;
+    ESP32TimerChannel *prog = nullptr;
 
     friend void timerCallback();
     friend void adcTimerCallback(void*);

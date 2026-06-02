@@ -5,7 +5,12 @@
 
 namespace dcc {
 
-
+/**
+ * A DCC channel that outputs DCC waveform using ESP32 timer.
+ *
+ * Use in conjunction with ESP32Timer.
+ *
+ */
 class ESP32TimerChannel: public BaseChannel {
 public:
 
@@ -57,7 +62,7 @@ public:
         if(c > maxCurrent) maxCurrent = c;
     }
 
-    void IRAM_ATTR timerFunc() override {
+    void IRAM_ATTR timerFunc() {
         timerPeriodsLeft = timerPeriodsLeft - 1;
         //DCC_DEBUGF_ISR("ESP32TimerChannel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);
         if(timerPeriodsLeft == timerPeriodsHalf) {

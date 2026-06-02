@@ -50,7 +50,12 @@ extern uint8_t idlePacket[3];
 extern uint8_t resetPacket[3];
 extern PacketBits idle_packet_bits;
 
-
+/**
+ * A (abstract) class that manages one DCC track.
+ *
+ * It outputs DCC waveforms and reads current consumption
+ *   for both CV operations and overpower protection.
+ */
 class BaseChannel {
 
 public:
@@ -70,7 +75,7 @@ public:
      */
     void sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
     void sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn);
-    //void sendFunction(LocoAddress addr, uint8_t fByte, uint8_t eByte=0);
+
     /**
      * @param addr11 is 1-based.
      */
@@ -114,8 +119,6 @@ protected:
 
     BasePacketList &packets;
 
-    virtual void timerFunc()=0;
-
     /** Tries to load a packet for a specified duration. */
     bool loadPacket(etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
         for(size_t i=0; i<timeout_ms; i++) {
@@ -129,7 +132,7 @@ protected:
     bool checkCurrentResponse(uint baseline) const;
 
 private:
-    friend class DCCESP32SignalGenerator;
+    friend class ESP32Timer;
 };
 
 }

@@ -1,6 +1,6 @@
 #include <DCC.h>
-#include <ESP32Channel.h>
-#include <ESP32SignalGenerator.h>
+#include <esp32_timer_channel.hpp>
+#include <esp32_timer.hpp>
 
 #include "CommandStation.h"
 
@@ -27,10 +27,6 @@ LocoNetBus bus;
 
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17
-//#include <LocoNetESP32UART.h>
-//LocoNetESP32Uart locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
-//#include <LocoNetESP32Hybrid.h>
-//LocoNetESP32Hybrid locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
 #include <LocoNetStreamESP32.h>
 LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
@@ -53,10 +49,10 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 #define DCC_PROG_PIN_SENSE 39
 
 dcc::PacketList<10> dcc_packets_main;
-dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
 dcc::PacketList<2> dcc_packets_prog;
+dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
 dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
-dcc::DCCESP32SignalGenerator dccTimer(1); //timer1
+dcc::ESP32Timer dccTimer(1); //timer1
 
 LocoNetSlotManager slotMan(&bus);
 
@@ -238,19 +234,6 @@ void loop() {
         nextInRead = millis() + 10;
     }
 
-    /*
-    if(Serial.available()) {
-        Serial.read();
-        ESP32TimerChannel<10>::RegisterList *r = dccMain.getReg();
-        Packet *p = r->currentPacket;
-        while(r->currentPacket == p) {
-            dccMain.timerFunc();
-            delay(1);
-            if(r->currentBit==1) break;
-        }
-    }
-    */
-
 }
 
 void checkCurrent() {
@@ -265,10 +248,6 @@ void checkCurrent() {
         Serial.println("Overcurrent on prog");
     }
 
-    //uint32_t v = dccMain.readCurrentAdc();
-    //cur = cur*0.9 + v*0.1;
-    //if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
-    //dccMain.timerFunc();
 }
 
 
