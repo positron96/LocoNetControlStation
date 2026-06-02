@@ -9,7 +9,7 @@
 
 #include "WiThrottle.h"
 
-#include <LocoNetESP32.h>
+#include <LocoNetStream.h>
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -29,8 +29,8 @@ LocoNetBus bus;
 //LocoNetESP32Uart locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
 //#include <LocoNetESP32Hybrid.h>
 //LocoNetESP32Hybrid locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
-//#include <LocoNetESP32.h>
-LocoNetESP32 locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+#include <LocoNetStreamESP32.h>
+LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
 
 
@@ -89,7 +89,7 @@ void setup() {
 
     digitalWrite(PIN_LED, LOW);
 
-    locoNetPhy.begin();
+    locoNetPhy.start();
     //lSerial.begin();
 
 

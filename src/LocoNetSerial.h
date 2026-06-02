@@ -1,6 +1,6 @@
 #pragma once
 
-#include <LocoNet.h>
+#include <LocoNet2.h>
 #include <Stream.h>
 
 class LocoNetSerial: public LocoNetConsumer {
@@ -29,7 +29,7 @@ public:
         for(int j=0; j<ln; j++) {
             stream->write(msg.data[j]);
         }
-        return LN_DONE;
+        return LN_IDLE;
     }
 
 private:

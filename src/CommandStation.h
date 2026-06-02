@@ -1,7 +1,7 @@
 #pragma once
 /**
  * Contains all the stuff related to command station.
- * I.e. high-level DCC generation, turnout list and their respective 
+ * I.e. high-level DCC generation, turnout list and their respective
  * settings.
  */
 
@@ -10,7 +10,7 @@
 
 #include "DCC.h"
 #include "LocoAddress.h"
-#include <LocoNet.h>
+#include <LocoNet2.h>
 
 #include "Watchdog.h"
 
@@ -49,9 +49,9 @@ public:
     static constexpr uint8_t MAX_SLOTS = 10;
 
     static constexpr millis_t PURGE_DELAY = 200*1000; //200s
-    
-    CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) { 
-        loadTurnouts();  
+
+    CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) {
+        loadTurnouts();
     }
 
     void setDccMain(IDCCChannel * ch) { dccMain = ch; }
@@ -62,16 +62,16 @@ public:
         if( dccMain!=nullptr ) dccMain->setPower(v);
     }
 
-    bool getPowerState() const { 
-        return dccMain!=nullptr ? dccMain->getPower() 
-             //: dccProg!=nullptr ? dccProg->getPower() 
-             : false; 
+    bool getPowerState() const {
+        return dccMain!=nullptr ? dccMain->getPower()
+             //: dccProg!=nullptr ? dccProg->getPower()
+             : false;
     }
 
 
     /* Define turnout object structures */
     struct TurnoutData {
-        uint16_t addr11;	
+        uint16_t addr11;
         int userTag;
         TurnoutState tStatus;
     };
@@ -81,13 +81,13 @@ public:
     TurnoutMap turnoutData;
 
     uint16_t getTurnoutCount() { return turnoutData.size(); }
-    
+
     void loadTurnouts() {
         turnoutData[6] = { 6, 0, TurnoutState::CLOSED };
         turnoutData[7] = { 7, 1, TurnoutState::CLOSED };
         turnoutData[10] = { 10, 2, TurnoutState::UNKNOWN };
         turnoutData[11] = { 11, 3, TurnoutState::THROWN };
-        
+
         /*sendDCCppCmd("T");
         waitForDCCpp();
         int t = 0;
@@ -117,7 +117,7 @@ public:
         bool allocated() const { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
         void kickWatchdog() { wdt.kick(); }
-        uint8_t dccSpeedByte();        
+        uint8_t dccSpeedByte();
     };
 
     bool isSlotAllocated(uint8_t slot) const {
@@ -172,9 +172,9 @@ public:
     void releaseLocoSlot(uint8_t slot) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
         uint8_t i = slot-1;
-        CS_DEBUGF("releasing slot %d", slot); 
+        CS_DEBUGF("releasing slot %d", slot);
         setLocoSlotRefresh(slot, false);
-        locoSlot.erase( slots[i].addr );        
+        locoSlot.erase( slots[i].addr );
         slots[i].deallocate();
     }
 
@@ -183,9 +183,9 @@ public:
         LocoData &dd = getSlot(slot);
         if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
         if(dd.refreshing == refresh) return;
-        CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N'); 
+        CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N');
         dd.refreshing = refresh;
-        
+
         if(refresh) {
             // no need to load, it will load itself on setLocoSpeed
             dd.kickWatchdog();
@@ -229,7 +229,7 @@ public:
 
         dd.fn[fn] = val;
         DCCFnGroup fg;
-        
+
         uint32_t ifn = dd.fn.value<uint32_t>();
         if     (fn<5)  fg = DCCFnGroup::F0_4;
         else if(fn<9)  fg = DCCFnGroup::F5_8;
@@ -246,7 +246,7 @@ public:
         // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
         // update bits (v=) and send function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }  
+            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(slot, dd.addr, FG, v ); }
 
         CHECK_SEND(      0x1F, DCCFnGroup::F0_4);
         CHECK_SEND(     0x1E0, DCCFnGroup::F5_8);
@@ -267,13 +267,13 @@ public:
     void setLocoDir(uint8_t slot, uint8_t dir) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
-        if(dd.dir==dir) return; 
+        if(dd.dir==dir) return;
         dd.dir = dir;
         if(dd.refreshing)
             dccMain->sendThrottle(slot, dd.addr, dd.dccSpeedByte(), dd.speedMode, dd.dir);
     }
 
-    uint8_t getLocoDir(uint8_t slot) { 
+    uint8_t getLocoDir(uint8_t slot) {
         return getSlot(slot).dir;
     }
 
@@ -308,7 +308,7 @@ public:
     }
 
     void setLocoSpeedF(uint8_t slot, float spd) {
-        setLocoSpeed(slot, LocoSpeed::fromFloat(spd) ); 
+        setLocoSpeed(slot, LocoSpeed::fromFloat(spd) );
     }
 
     float getLocoSpeedF(uint8_t slot) {
@@ -373,7 +373,7 @@ public:
                 } else {  // throw or close
                     newState = (TurnoutState)(int)action;
                 }
-                
+
                 //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
                 //dccMain.sendAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
                 t->second.tStatus = newState;
@@ -400,7 +400,7 @@ public:
         // send to DCC
         dccMain->sendAccessory(aAddr, newState==TurnoutState::THROWN);
         // send to LocoNet
-        // FIXME: this is a dirty hack. 
+        // FIXME: this is a dirty hack.
         // If LocoNet calls this function, it will be bounced back to bus.
         // Fortunately, right now, accessory commands from LocoNet do not get propagated to DCC
         // and this command is only called from WiThrottle code.
@@ -408,7 +408,7 @@ public:
             LnMsg ttt = makeSwRec(aAddr, true, newState==TurnoutState::THROWN);
             locoNet->broadcast(ttt);
         }
-        
+
         //sendDCCppCmd("a "+String(addr)+" "+sub+" "+int(newStat) );
 
         return newState;

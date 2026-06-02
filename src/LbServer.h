@@ -8,7 +8,7 @@
 #include <AsyncTCP.h>
 
 #include <ln_opc.h>
-#include <LocoNet.h>
+#include <LocoNet2.h>
 #include <etl/queue.h>
 #include <etl/set.h>
 
@@ -20,7 +20,7 @@
 #define LB_LOGD(format, ...)  //do{ log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__); }while(0)
 #else
 #define LB_LOGI(...)
-#define LB_LOGD(...) 
+#define LB_LOGD(...)
 #endif
 
 
@@ -55,12 +55,12 @@ public:
                     processRx( ((char*)data)[i], cli);
             });
 
-            cli->onError([this](void*, AsyncClient* cli, int8_t err) { 
-                LB_LOGI("onError(%X): %d", (intptr_t)cli, err);  
+            cli->onError([this](void*, AsyncClient* cli, int8_t err) {
+                LB_LOGI("onError(%X): %d", (intptr_t)cli, err);
             });
-            cli->onTimeout([this](void*, AsyncClient* cli, uint32_t time) { 
-                LB_LOGI("onTimeout(%X): %d", (intptr_t)cli, time); 
-                cli->close(); 
+            cli->onTimeout([this](void*, AsyncClient* cli, uint32_t time) {
+                LB_LOGI("onTimeout(%X): %d", (intptr_t)cli, time);
+                cli->close();
             });
 
         }, nullptr);
@@ -87,7 +87,7 @@ public:
 
     LN_STATUS onMessage(const lnMsg& msg) override {
         if( !txQueue.full() && !clients.empty() ) txQueue.push(msg);
-        return LN_DONE;
+        return LN_IDLE;
     }
 
 private:
@@ -119,13 +119,13 @@ private:
                         LB_LOGD("LbServer::loop adding byte %02x from chars '%c' '%c' (pos %d)", val, lbStr[i-2], lbStr[i-1], i);
                         LnMsg *msg = lbBuf.addByte(val);
                         if(msg!=nullptr) {
-                            
+
                             sendMessage(*msg); // echo
                             LN_STATUS ret = bus->broadcast(*msg, this);
 
-                            if(ret==LN_DONE) cli->write("SENT OK\n"); else
+                            if(ret==LN_IDLE) cli->write("SENT OK\n"); else
                             if(ret==LN_RETRY_ERROR) cli->write("SENT ERROR LN_RETRY_ERROR\n"); else
-                            cli->write("SENT ERROR generic\n"); 
+                            cli->write("SENT ERROR generic\n");
                             break;
                         }
                     }
@@ -140,7 +140,7 @@ private:
     }
 
     void sendMessage(const LnMsg &msg) {
-        
+
         char ttt[LB_BUF_SIZE] = "RECEIVE";
         uint t = strlen(ttt);
         uint8_t ln = msg.length();

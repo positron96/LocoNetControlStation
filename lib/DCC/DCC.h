@@ -6,6 +6,7 @@
 #include <esp32-hal-timer.h>
 //#include <esp_adc_cal.h>
 #include <esp_timer.h>
+#include <driver/gpio.h>
 
 #include <etl/map.h>
 #include <etl/bitset.h>
@@ -214,7 +215,7 @@ public:
             return (currentPacket->buf[currentBit/8] & 1<<(7-currentBit%8) )!= 0;
         }
 
-        inline uint8_t currentIdx() { return currentPacket-&packets[0]; }
+        inline uint8_t currentIdx() const { return currentPacket-&packets[0]; }
 
         inline void advanceCurrentPacket() {
             if (urgentPacket != nullptr) {
@@ -223,7 +224,7 @@ public:
                 urgentPacket = nullptr;
                 // flip active and update Packets
                 //Packet * p = currentPacket->flip();
-                DCC_LOGD_ISR("advance to urgentPacket %d",  currentIdx() );
+                //DCC_LOGD_ISR("advance to urgentPacket %d",  currentIdx() );
                 //currentPacket->debugPrint();
             } else {
                 // ELSE simply move to next Register
@@ -346,13 +347,13 @@ public:
     }
 
     void IRAM_ATTR timerFunc() override {
-        R.timerPeriodsLeft--;
+        R.timerPeriodsLeft = R.timerPeriodsLeft - 1;
         //DCC_DEBUGF_ISR("DCCESP32Channel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);
         if(R.timerPeriodsLeft == R.timerPeriodsHalf) {
-            digitalWrite(_outputPin, HIGH );
+            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 1);
         }
         if(R.timerPeriodsLeft == 0) {
-            digitalWrite(_outputPin, LOW );
+            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 0);
             nextBit();
         }
 
@@ -380,7 +381,7 @@ private:
 
     RegisterList R;
 
-    void IRAM_ATTR nextBit() {
+    void nextBit() {
         auto p = R.currentPacket;
         //DCC_DEBUGF_ISR("nextBit: currentPacket=%d, activePacket=%d, cbit=%d, bits=%d", R.currentIdx(),  R.currentPacket->activeIdx(), R.currentBit, p->nBits );
 
@@ -399,7 +400,7 @@ private:
 
         R.setBitTimings();
 
-        R.currentBit++;
+        R.currentBit = R.currentBit + 1;
     }
 
     //void IRAM_ATTR timerFunc();
@@ -434,6 +435,6 @@ private:
     friend void timerCallback();
     friend void adcTimerCallback(void*);
 
-    void IRAM_ATTR timerFunc();
-    void IRAM_ATTR adcTimerFunc();
+    void timerFunc();
+    void adcTimerFunc();
 };
