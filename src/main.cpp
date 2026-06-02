@@ -7,7 +7,7 @@
 #include "LocoNetSlotManager.h"
 
 #include "LocoNetSerial.h"
-#include "LbServer.h"
+#include "LocoNetTCPServer.h"
 
 #include "WiThrottle.h"
 
