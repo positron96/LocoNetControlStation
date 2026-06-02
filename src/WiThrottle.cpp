@@ -285,7 +285,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     }
     // wifiPrintln(cli, "PW8888"); // Web port
     wifiPrintln(cli, "");
-    
+
 
     cc.rxpos = 0;
     cc.cli = cli;
@@ -309,7 +309,7 @@ void WiThrottleServer::clientStop(ClientData &client) {
     client.heartbeatEnabled = false;
     AsyncClient *cli = client.cli;
     // this method should be called only from onDisconnected, so this should be false
-    if(cli->connected() ) cli->stop();
+    if(cli->connected() ) cli->close();
     clients.erase(cli);
 }
 
