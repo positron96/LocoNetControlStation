@@ -1,11 +1,12 @@
 #include "ESP32SignalGenerator.h"
 
+namespace dcc {
 
 
 //char _msg[1024];
 //char _buf[100];
 /*
-void DCCESP32Channel::PacketSlot::initPackets(){
+void ESP32TimerChannel::PacketSlot::initPackets(){
     activePacket = packet;
     updatePacket = packet+1;
 } */
@@ -33,10 +34,10 @@ void DCCESP32SignalGenerator::begin() {
     if (main!=nullptr) main->begin();
     if (prog!=nullptr) prog->begin();
 
-    _timer = timerBegin(_timerNum, 464, true);
-    timerAttachInterrupt(_timer, timerCallback, true);
-    timerAlarmWrite(_timer, 10, true);
-    timerAlarmEnable(_timer);
+    (void)_timerNum;
+    _timer = timerBegin(1000000 / 58); // 58us
+    timerAttachInterrupt(_timer, timerCallback);
+    timerAlarm(_timer, 10, true, 0);
     timerStart(_timer);
 
     esp_timer_create_args_t cfg{adcTimerCallback, this, ESP_TIMER_TASK, "adc"};
@@ -46,7 +47,7 @@ void DCCESP32SignalGenerator::begin() {
 
 void DCCESP32SignalGenerator::end() {
     if(_timer!=nullptr) {
-        if(timerStarted(_timer) ) { timerStop(_timer); }
+        timerStop(_timer);
         timerEnd(_timer);
         _timer = nullptr;
     }
@@ -66,4 +67,6 @@ void DCCESP32SignalGenerator::timerFunc() {
 void DCCESP32SignalGenerator::adcTimerFunc() {
     if (main!=nullptr) main->updateCurrent();
     if (prog!=nullptr) prog->updateCurrent();
+}
+
 }

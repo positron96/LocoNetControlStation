@@ -50,7 +50,7 @@ namespace dcc {
             return true;
         }
 
-        bool put_loco_fn_packet(const LocoAddress addr, DCCFnGroup fg, uint32_t data) {
+        bool put_loco_fn_packet(const LocoAddress addr, fn_group fg, uint32_t data) {
             auto bytes = make_fn_packet(addr, fg, data);
 
             size_t idx = fn_group_index(fg) + 1;

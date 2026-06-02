@@ -8,7 +8,8 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 
-#include "DCC.h"
+#include "base_channel.hpp"
+#include "packet.hpp"
 #include "LocoAddress.h"
 #include <LocoNet2.h>
 
@@ -60,8 +61,8 @@ public:
         loadTurnouts();
     }
 
-    void setDccMain(IDCCChannel * ch) { dccMain = ch; }
-    void setDccProg(IDCCChannel * ch) { dccProg = ch; }
+    void setDccMain(dcc::BaseChannel * ch) { dccMain = ch; }
+    void setDccProg(dcc::BaseChannel * ch) { dccProg = ch; }
     void setLocoNetBus(LocoNetBus *bus) { locoNet = bus; }
 
     void setPowerState(bool v) {
@@ -234,14 +235,15 @@ public:
         if(dd.fn[fn] == val) return;
 
         dd.fn[fn] = val;
-        DCCFnGroup fg;
+        using dcc::fn_group;
+        fn_group fg;
 
         uint32_t ifn = dd.fn.value<uint32_t>();
-        if     (fn<5)  fg = DCCFnGroup::F0_4;
-        else if(fn<9)  fg = DCCFnGroup::F5_8;
-        else if(fn<13) fg = DCCFnGroup::F9_12;
-        else if(fn<21) fg = DCCFnGroup::F13_20;
-        else           fg = DCCFnGroup::F21_28;
+        if     (fn<5)  fg = fn_group::F0_4;
+        else if(fn<9)  fg = fn_group::F5_8;
+        else if(fn<13) fg = fn_group::F9_12;
+        else if(fn<21) fg = fn_group::F13_20;
+        else           fg = fn_group::F21_28;
         dccMain->sendFunctionGroup(dd.addr, fg, ifn);
     }
 
@@ -253,12 +255,12 @@ public:
         // update bits (v=) and send function group
         #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
             { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(dd.addr, FG, v ); }
-
-        CHECK_SEND(      0x1F, DCCFnGroup::F0_4);
-        CHECK_SEND(     0x1E0, DCCFnGroup::F5_8);
-        CHECK_SEND(    0x1E00, DCCFnGroup::F9_12);
-        CHECK_SEND( 0x1F'E000, DCCFnGroup::F13_20);
-        CHECK_SEND(0x1FE'0000, DCCFnGroup::F21_28);
+        using dcc::fn_group;
+        CHECK_SEND(      0x1F, fn_group::F0_4);
+        CHECK_SEND(     0x1E0, fn_group::F5_8);
+        CHECK_SEND(    0x1E00, fn_group::F9_12);
+        CHECK_SEND( 0x1F'E000, fn_group::F13_20);
+        CHECK_SEND(0x1FE'0000, fn_group::F21_28);
         #undef CHECK_SEND
         dd.fn = LocoData::Fns( v );
     }
@@ -422,8 +424,8 @@ public:
     }
 
 private:
-    IDCCChannel * dccMain;
-    IDCCChannel * dccProg;
+    dcc::BaseChannel * dccMain;
+    dcc::BaseChannel * dccProg;
     LocoNetBus* locoNet;
 
     etl::map<LocoAddress, uint8_t, MAX_SLOTS> locoSlot;

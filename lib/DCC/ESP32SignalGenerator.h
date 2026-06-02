@@ -1,15 +1,16 @@
 #pragma once
 
-#include "DCC.h"
+#include "base_channel.hpp"
 
+namespace dcc {
 
 class DCCESP32SignalGenerator {
 
 public:
     explicit DCCESP32SignalGenerator(uint8_t timerNum = 1);
 
-    void setProgChannel(IDCCChannel * ch) { prog = ch;}
-    void setMainChannel(IDCCChannel * ch) { main = ch;}
+    void setProgChannel(BaseChannel * ch) { prog = ch;}
+    void setMainChannel(BaseChannel * ch) { main = ch;}
 
     /**
      * Starts half-bit timer.
@@ -24,8 +25,8 @@ private:
     hw_timer_t * _timer = nullptr;
     uint8_t _timerNum;
     esp_timer_handle_t _adcTimer;
-    IDCCChannel *main = nullptr;
-    IDCCChannel *prog = nullptr;
+    BaseChannel *main = nullptr;
+    BaseChannel *prog = nullptr;
 
     friend void timerCallback();
     friend void adcTimerCallback(void*);
@@ -33,3 +34,5 @@ private:
     void IRAM_ATTR timerFunc();
     void IRAM_ATTR adcTimerFunc();
 };
+
+}

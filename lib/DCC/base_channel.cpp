@@ -3,12 +3,14 @@
  * @see On extended packets: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
  */
 
-#include "DCC.h"
+#include "base_channel.hpp"
+
+namespace dcc {
 
 uint8_t idlePacket[3] = {0xFF, 0x00, 0};
 uint8_t resetPacket[3] = {0x00, 0x00, 0};
 
-dcc::PacketBits idle_packet_bits = dcc::PacketBits::from_bytes(idlePacket);
+PacketBits idle_packet_bits = PacketBits::from_bytes(idlePacket);
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
 #define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds
@@ -16,7 +18,7 @@ dcc::PacketBits idle_packet_bits = dcc::PacketBits::from_bytes(idlePacket);
 #define  ACK_SAMPLE_THRESHOLD      2       /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
 
 
-void IDCCChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
+void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
     DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr, sp.get128(), (int)sm, fwd?'F':'B');
     packets.put_loco_speed_dir_packet(addr, sp, sm, fwd);
@@ -28,30 +30,30 @@ void IDCCChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, boo
     //loadPacket(addr, t.data(), t.size(), 0);
 }
 
-void IDCCChannel::sendFunctionGroup(LocoAddress addr, DCCFnGroup group, uint32_t fn) {
+void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {
     DCC_LOGI("addr %d, group=%d fn=%08x", addr, (uint8_t)group, fn);
 
     packets.put_loco_fn_packet(addr, group, fn);
 
     // switch(group) {
-    //     case DCCFnGroup::F0_4:
+    //     case fn_group::F0_4:
     //         // move FL(F0) to 5th bit
     //         fn = (fn & 0x1)<<4 | (fn & 0b1'1110)>>1;
     //         sendFunction(iReg, addr,  0b1000'0000 | (fn & 0b0001'1111) );
     //         break;
-    //     case DCCFnGroup::F5_8:
+    //     case fn_group::F5_8:
     //         fn >>= 5;
     //         sendFunction(iReg, addr,  0b1011'0000 | (fn & 0b0000'1111) );
     //         break;
-    //     case DCCFnGroup::F9_12:
+    //     case fn_group::F9_12:
     //         fn >>= 9;
     //         sendFunction(iReg, addr,  0b1010'0000 | (fn & 0b0000'1111) );
     //         break;
-    //     case DCCFnGroup::F13_20:
+    //     case fn_group::F13_20:
     //         fn >>= 13;
     //         sendFunction(iReg, addr,  0b1101'1110, (uint8_t)fn );
     //         break;
-    //     case DCCFnGroup::F21_28:
+    //     case fn_group::F21_28:
     //         fn >>= 21;
     //         sendFunction(iReg, addr,  0b1101'1111, (uint8_t)fn );
     //         break;
@@ -76,7 +78,7 @@ void IDCCChannel::sendFunctionGroup(LocoAddress addr, DCCFnGroup group, uint32_t
 
 // }
 
-void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
+void BaseChannel::sendAccessory(uint16_t addr11, bool thrown) {
     DCC_LOGI("addr11=%d, %c", addr11, thrown?'T':'C');
     // if(addr11>0) {
     //     addr11--;
@@ -96,7 +98,7 @@ void IDCCChannel::sendAccessory(uint16_t addr11, bool thrown) {
 //     loadPacket(0, b.data(), b.size(), ACCESSORY_PACKET_REPEATS);
 // }
 
-uint IDCCChannel::getBaselineCurrent() const {
+uint BaseChannel::getBaselineCurrent() const {
     uint baseline = 0;
 
     // collect baseline current
@@ -111,7 +113,7 @@ uint IDCCChannel::getBaselineCurrent() const {
 }
 
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
-bool IDCCChannel::checkCurrentResponse(uint baseline) const {
+bool BaseChannel::checkCurrentResponse(uint baseline) const {
     bool ret = false;
     int max = 0;
     delay(ACK_SAMPLE_MILLIS);
@@ -121,7 +123,7 @@ bool IDCCChannel::checkCurrentResponse(uint baseline) const {
     return ret;
 }
 
-int16_t IDCCChannel::readCVProg(int cv) {
+int16_t BaseChannel::readCVProg(int cv) {
 	uint8_t packet[4];
 	int ret;
 
@@ -152,7 +154,7 @@ int16_t IDCCChannel::readCVProg(int cv) {
 
 }
 
-bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
+bool BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
     DCC_LOGI("Verifying cv%d==%d", cv, bValue);
     uint8_t packet[4];
 
@@ -173,7 +175,7 @@ bool IDCCChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
 
 }
 
-bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
+bool BaseChannel::writeCVByteProg(int cv, uint8_t bValue) {
     uint8_t packet[4];
     uint baseline;
 
@@ -201,7 +203,7 @@ bool IDCCChannel::writeCVByteProg(int cv, uint8_t bValue) {
 
 }
 
-bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
+bool BaseChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     uint8_t packet[4];
     uint baseline;
 
@@ -231,7 +233,7 @@ bool IDCCChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
 
 }
 
-void IDCCChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
+void BaseChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
     uint8_t packet[6];   // save space for checksum byte
 
     byte nB=0;
@@ -251,7 +253,7 @@ void IDCCChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
 
 }
 
-void IDCCChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue) {
+void BaseChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue) {
     uint8_t b[6];                      // save space for checksum byte
 
     byte nB=0;
@@ -271,5 +273,7 @@ void IDCCChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t
     b[nB++]=0xF0 | bValue<<3 | bNum;
 
     loadPacket(b,nB,4);
+
+}
 
 }

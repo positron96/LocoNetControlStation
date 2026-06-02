@@ -53,10 +53,10 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 #define DCC_PROG_PIN_SENSE 39
 
 dcc::PacketList<10> dcc_packets_main;
-dcc::DCCESP32Channel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
 dcc::PacketList<2> dcc_packets_prog;
-dcc::DCCESP32Channel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
-DCCESP32SignalGenerator dccTimer(1); //timer1
+dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+dcc::DCCESP32SignalGenerator dccTimer(1); //timer1
 
 LocoNetSlotManager slotMan(&bus);
 
@@ -241,7 +241,7 @@ void loop() {
     /*
     if(Serial.available()) {
         Serial.read();
-        DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
+        ESP32TimerChannel<10>::RegisterList *r = dccMain.getReg();
         Packet *p = r->currentPacket;
         while(r->currentPacket == p) {
             dccMain.timerFunc();

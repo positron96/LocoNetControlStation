@@ -6,11 +6,11 @@
 namespace dcc {
 
 
-class DCCESP32Channel: public IDCCChannel {
+class ESP32TimerChannel: public BaseChannel {
 public:
 
-    DCCESP32Channel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin, BasePacketList &packets):
-        IDCCChannel{packets},
+    ESP32TimerChannel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin, BasePacketList &packets):
+        BaseChannel{packets},
         _outputPin{outputPin}, _enPin{enPin}, _sensePin{sensePin}
     {
     }
@@ -21,7 +21,7 @@ public:
         pinMode(_enPin, OUTPUT);
         digitalWrite(_enPin, LOW);
 
-        //DCC_LOGI("DCCESP32Channel(enPin=%d)::begin", _enPin);
+        //DCC_LOGI("ESP32TimerChannel(enPin=%d)::begin", _enPin);
 
         //analogSetCycles(16);
         //analogSetWidth(11);
@@ -58,17 +58,15 @@ public:
     }
 
     void IRAM_ATTR timerFunc() override {
-        timerPeriodsLeft--;
-        //DCC_DEBUGF_ISR("DCCESP32Channel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);
+        timerPeriodsLeft = timerPeriodsLeft - 1;
+        //DCC_DEBUGF_ISR("ESP32TimerChannel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);
         if(timerPeriodsLeft == timerPeriodsHalf) {
-            digitalWrite(_outputPin, HIGH );
+            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 1);
         }
         if(timerPeriodsLeft == 0) {
-            digitalWrite(_outputPin, LOW );
+            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 0);
             nextBit();
         }
-
-        //current = readCurrentAdc();
     }
 
 private:

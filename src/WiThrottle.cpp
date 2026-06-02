@@ -1,6 +1,6 @@
 #include "WiThrottle.h"
 
-#include "DCC.h"
+#include "LocoAddress.h"
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
 #include "log.h"
 
@@ -442,10 +442,10 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, et
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
 
-    if (wdt.timedOut() && heartbeat==Heartbeat::Alive) {
+    if (wdt.timedOut() && health==ClientHealth::Alive) {
         // stop loco
         LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
-        heartbeat = Heartbeat::SoftTimeout;
+        health = ClientHealth::SoftTimeout;
         for(const auto& throttle: slots)
             for(const auto& slot: throttle.second) {
                 CS.setLocoSpeed(slot.second, SPEED_EMGR);
@@ -453,9 +453,9 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
             }
         sendMessage("Timeout exceeded, locos stopped");
     }
-    if ((wdt.timedOut2() && heartbeat==Heartbeat::SoftTimeout)) {
+    if ((wdt.timedOut2() && health==ClientHealth::SoftTimeout)) {
         LOGI("timeout exceeded twice: closing connection" );
-        heartbeat = Heartbeat::HardTimeout;
+        health = ClientHealth::HardTimeout;
         cli->close();
     }
 
