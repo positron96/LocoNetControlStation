@@ -123,6 +123,8 @@ namespace dcc {
                 }
             }
 
+            if(loco_slots.empty()) return false;
+
             // get packet from loco slots in round-robin way
             cur_slot++;
             if(cur_slot == loco_slots.end()) {
@@ -167,7 +169,10 @@ namespace dcc {
         size_t slot_phase{0};
         ISlotMap::iterator cur_slot;
 
-        BasePacketList(ISlotMap &loco_slots): loco_slots{loco_slots} {}
+        BasePacketList(ISlotMap &loco_slots)
+        : loco_slots{loco_slots}, cur_slot{loco_slots.end()}
+        {
+        }
 
         bool enqueue_slot_packet(SlotLocation loc, int priority) {
             if(queue_packets.full()) return false;
