@@ -98,11 +98,12 @@ private:
             current_bit = 0;
             if (p->nRepeats>0) {
                 p->nRepeats--;
-                DCC_LOGD_ISR("repeat packet = %d", p->nRepeat);
+                DCC_LOGD_ISR("repeat packet = %d", p->nRepeats);
             } else {
                 if(!packets.fetch_next_packet(*p)) {
                     *p = {idle_packet_bits, 1};
                 }
+                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", p->packet.len, p->packet.buf[0], p->packet.buf[1], p->nRepeats);
             }
         }
 
@@ -123,8 +124,6 @@ private:
             timerPeriodsLeft = 4;
         }
     }
-
-    //void IRAM_ATTR timerFunc();
 
 };
 

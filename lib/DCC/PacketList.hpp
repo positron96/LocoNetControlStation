@@ -103,18 +103,19 @@ namespace dcc {
         /**
          * Finds packet with highest priority and puts it into dst.
          * Updates its own storage, e.g. removed packet if it only needs to be sent once.
+         * @return true if packet was put into dst, false if no packets available.
          */
-        bool fetch_next_packet(PacketWithRepeats &dst) {
+        bool fetch_next_packet(PacketWithRepeats &packet_out) {
             if(!queue_packets.empty()) {
                 QueueItem item = queue_packets.top();
                 queue_packets.pop();
                 if(etl::holds_alternative<PacketWithRepeats>(item.data)) {
-                    dst = etl::get<PacketWithRepeats>(item.data);
+                    packet_out = etl::get<PacketWithRepeats>(item.data);
                     return true;
                 } else {
                     auto loc = etl::get<SlotLocation>(item.data);
                     if(loc.it->second[loc.idx].has_value() ) { // should always be true
-                        dst = PacketWithRepeats{loc.it->second[loc.idx].value(), 1};
+                        packet_out = PacketWithRepeats{loc.it->second[loc.idx].value(), 1};
                         // update cur_slot and phase, it will be advanced on next call;
                         cur_slot = loc.it;
                         slot_phase = loc.idx == 0 ? 0 : loc.idx*2+1; // convert index to phase
@@ -123,6 +124,7 @@ namespace dcc {
                 }
             }
 
+            // prevent null pointer dereference in case of empty slots
             if(loco_slots.empty()) return false;
 
             // get packet from loco slots in round-robin way
@@ -134,7 +136,7 @@ namespace dcc {
             // every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
             size_t idx = slot_phase % 2 == 0 ? 0 : slot_phase / 2 + 1;
             if(cur_slot->second[idx].has_value() ) {
-                dst = PacketWithRepeats{cur_slot->second[idx].value(), 1};
+                packet_out = PacketWithRepeats{cur_slot->second[idx].value(), 1};
                 return true;
             }
 

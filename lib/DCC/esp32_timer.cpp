@@ -3,15 +3,6 @@
 namespace dcc {
 
 
-//char _msg[1024];
-//char _buf[100];
-/*
-void ESP32TimerChannel::PacketSlot::initPackets(){
-    activePacket = packet;
-    updatePacket = packet+1;
-} */
-
-
 static ESP32Timer * _inst = nullptr;
 
 
@@ -34,8 +25,10 @@ void ESP32Timer::begin() {
     if (main!=nullptr) main->begin();
     if (prog!=nullptr) prog->begin();
 
+    constexpr size_t TIMER_TICK_US = 58;
+
     (void)_timerNum;
-    _timer = timerBegin(1000000 / 58); // 58us
+    _timer = timerBegin(1000000 / TIMER_TICK_US);
     timerAttachInterrupt(_timer, timerCallback);
     timerAlarm(_timer, 10, true, 0);
     timerStart(_timer);

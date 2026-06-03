@@ -17,24 +17,28 @@
 
 #include <atomic>
 
-#define DCC_DEBUG
+#define DCC_LOG_LVL  ARDUHAL_LOG_LEVEL_DEBUG
 
-#ifdef DCC_DEBUG
-#define DCC_LOGD(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
-#define DCC_LOGD_ISR(...)
-#define DCC_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
-#define DCC_LOGI_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
-#define DCC_LOGW(format, ...) log_printf(ARDUHAL_LOG_FORMAT(W, format), ##__VA_ARGS__)
-//extern char _msg[1024];
-//extern char _buf[100];
-//#define DCC_DEBUG_ISR(...)  do{ snprintf(_buf, 100, __VA_ARGS__); snprintf(_msg, 1024, "%s%s\n", _msg, _buf ); } while(0)
-//#define DCC_DEBUG_ISR_DUMP()  do{ Serial.print(_msg); _msg[0]=0; } while(0);
+#include  "rom/ets_sys.h"  // for ets_printf
+
+#if DCC_LOG_LVL >= ARDUHAL_LOG_LEVEL_WARN
+    #define DCC_LOGW(format, ...) log_printf(ARDUHAL_LOG_FORMAT(W, format), ##__VA_ARGS__)
+    #define DCC_LOGW_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(W, format), ##__VA_ARGS__)
 #else
-#define DCC_LOGD(...)
-#define DCC_LOGD_ISR(...)
-#define DCC_LOGI(...)
-#define DCC_LOGI_ISR( ...)
-#define DCC_LOGW( ...)
+    #define DCC_LOGW(...)
+    #define DCC_LOGW_ISR(...)
+#endif
+#if DCC_LOG_LVL >= ARDUHAL_LOG_LEVEL_INFO
+    #define DCC_LOGI(format, ...) log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__)
+#else
+    #define DCC_LOGI(...)
+#endif
+#if DCC_LOG_LVL >= ARDUHAL_LOG_LEVEL_DEBUG
+    #define DCC_LOGD(format, ...) log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+    #define DCC_LOGD_ISR(format, ...) ets_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__)
+#else
+    #define DCC_LOGD(...)
+    #define DCC_LOGD_ISR(...)
 #endif
 
 
