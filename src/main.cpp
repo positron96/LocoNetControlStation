@@ -220,13 +220,6 @@ void loop() {
     CS.loop();
     //lSerial.loop();
 
-    /*
-    static unsigned long nextDccMeter = 0;
-    if(millis()>nextDccMeter) {
-        uint16_t v = dccMain.readCurrentAdc() ;
-        if(v > 15) dccMain.setPower(false);
-        nextDccMeter = millis()+20;
-    }*/
     uint32_t ms = millis();
     static uint32_t lastMs = 0;
     if(ms!=lastMs && timerController.tick(ms - lastMs)) {
@@ -239,11 +232,6 @@ void loop() {
     if(millis()>nextInRead) {
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
-
-            //bool r = dccMain.verifyCVByteProg(1, v==1 ? 13 : 14);
-            //int r = dccMain.readCVProg(1);
-
-            //Serial.printf("main(): readCVProg: %d\n", r);
             Serial.printf( "reporting sensor %d\n", v==HIGH) ;
             reportSensor(&bus, 1, v==HIGH);
             Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
