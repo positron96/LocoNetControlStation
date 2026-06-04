@@ -1,7 +1,6 @@
 #pragma once
 
-#include "DCC.h"
-#include "PacketList.hpp"
+#include "esp32_channel.hpp"
 
 namespace dcc {
 
@@ -11,55 +10,12 @@ namespace dcc {
  * Use in conjunction with ESP32Timer.
  *
  */
-class ESP32TimerChannel: public BaseChannel {
+class ESP32TimerChannel: public ESP32Channel {
 public:
 
     ESP32TimerChannel(uint8_t outputPin, uint8_t enPin, uint8_t sensePin, BasePacketList &packets):
-        BaseChannel{packets},
-        _outputPin{outputPin}, _enPin{enPin}, _sensePin{sensePin}
+        ESP32Channel{outputPin, enPin, sensePin, packets}
     {
-    }
-
-
-    void begin() override {
-        pinMode(_outputPin, OUTPUT);
-        pinMode(_enPin, OUTPUT);
-        digitalWrite(_enPin, LOW);
-
-        //DCC_LOGI("ESP32TimerChannel(enPin=%d)::begin", _enPin);
-
-        //analogSetCycles(16);
-        //analogSetWidth(11);
-        analogSetPinAttenuation(_sensePin, ADC_0db);
-        /*esp_adc_cal_value_t ar = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_0, ADC_WIDTH_BIT_12, 1100, &adc_chars);
-        if (ar == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-            DCC_LOGI("eFuse Vref");
-        } else {
-            DCC_LOGI("Default vref");
-        }*/
-
-        // during loadPacket there is time when new index is enabled for refresh, but urgentPacket is not yet loaded.
-        //loadPacket(1, idlePacket, 2, 0);
-    }
-
-    void end() override {
-        pinMode(_outputPin, INPUT);
-        pinMode(_enPin, INPUT);
-    }
-
-    void setPower(bool v) override {
-        DCC_LOGI("setPower(%d)", v);
-        digitalWrite(_enPin, v ? HIGH : LOW);
-    }
-
-    bool getPower() override {
-        return digitalRead(_enPin) == HIGH;
-    }
-
-    void updateCurrent() override {
-        uint16_t c = analogRead(_sensePin);
-        current = c;
-        if(c > maxCurrent) maxCurrent = c;
     }
 
     void IRAM_ATTR timerFunc() {
@@ -75,11 +31,6 @@ public:
     }
 
 private:
-
-    uint8_t _outputPin;
-    uint8_t _enPin;
-    uint8_t _sensePin;
-    //esp_adc_cal_characteristics_t adc_chars;
 
     PacketWithRepeats currentPacket;
     size_t current_bit;

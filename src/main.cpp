@@ -1,6 +1,8 @@
 #include <DCC.h>
-#include <esp32_timer_channel.hpp>
-#include <esp32_timer.hpp>
+// #include <esp32_timer_channel.hpp>
+// #include <esp32_timer.hpp>
+#include <esp32_rmt_channel.hpp>
+#include <esp32_current_meter.hpp>
 
 #include "CommandStation.h"
 
@@ -48,9 +50,12 @@ LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
 dcc::PacketList<10> dcc_packets_main;
 dcc::PacketList<2> dcc_packets_prog;
-dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
-dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
-dcc::ESP32Timer dccTimer(1); //timer1
+// dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+// dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+// dcc::ESP32Timer dccTimer(1); //timer1
+dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+dcc::ESP32CurrentMeter currentMeter;
 
 LocoNetSlotManager slotMan(&bus);
 
@@ -75,6 +80,21 @@ using TimerType = etl::callback_timer_atomic<2, std::atomic_uint>;
 TimerType timerController;
 etl::timer::id::type ledTimer;
 etl::timer::id::type checkCurrentTimer;
+
+class PowerStatusObserver: public dcc::PowerObserver {
+    void notification(const dcc::PowerEvent &event) override {
+        if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
+            if(event.channel == &dccMain) {
+                ledStartBlinking(LED_INTL_CONFIG2, 1);
+            Serial.println("Overcurrent on main");
+            } else if(event.channel == &dccProg) {
+
+                Serial.println("Overcurrent on prog");
+            }
+
+        }
+    }
+} powerStatusObserver;
 
 void setup() {
 
@@ -121,8 +141,15 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
-    dccTimer.setMainChannel(&dccMain);
-    dccTimer.setProgChannel(&dccProg);
+    // dccTimer.setMainChannel(&dccMain);
+    // dccTimer.setProgChannel(&dccProg);
+
+    dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
+    dccMain.setOvercurrentThreshold(2000);
+    currentMeter.addChannel(dccMain);
+    dccProg.setVoltageToCurrentCoef(1.0f);
+    dccProg.setOvercurrentThreshold(500);
+    currentMeter.addChannel(dccProg);
 
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
@@ -166,7 +193,13 @@ void setup() {
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName(CS_NAME);
 
-    dccTimer.begin();
+    //dccTimer.begin();
+    dccMain.begin();
+    dccProg.begin();
+    currentMeter.begin();
+    dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
+    dccMain.add_observer(powerStatusObserver);
+    dccProg.add_observer(powerStatusObserver);
 
     dccMain.setPower(true);
     dccProg.setPower(true);
@@ -196,7 +229,7 @@ void loop() {
     }*/
     uint32_t ms = millis();
     static uint32_t lastMs = 0;
-    if(timerController.tick(ms - lastMs)) {
+    if(ms!=lastMs && timerController.tick(ms - lastMs)) {
         lastMs = ms;
     }
 
@@ -235,17 +268,7 @@ void loop() {
 }
 
 void checkCurrent() {
-    bool oc = dccMain.checkOvercurrent();
-    if(!oc) {
-        withrottleServer.notifyPowerStatus();
-        Serial.println("Overcurrent on main");
-    }
-
-    oc = dccProg.checkOvercurrent();
-    if(!oc) {
-        Serial.println("Overcurrent on prog");
-    }
-
+    currentMeter.checkOvercurrent();
 }
 
 

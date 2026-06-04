@@ -10,6 +10,7 @@
 
 #include "CommandStation.h"
 #include "Watchdog.h"
+#include "power_event.hpp" // from DCC
 
 #include <WiFi.h>
 #include <WiFiServer.h>
@@ -31,7 +32,7 @@
 #endif
 
 
-class WiThrottleServer {
+class WiThrottleServer: public dcc::PowerObserver {
 public:
 
     constexpr static uint16_t DEF_PORT = 4444;
@@ -44,6 +45,9 @@ public:
         server.end();
     }
 
+    void notification(const dcc::PowerEvent &event) override {
+        notifyPowerStatus();
+    }
 
     void notifyPowerStatus(AsyncClient *c=nullptr) {
         bool v = CS.getPowerState();

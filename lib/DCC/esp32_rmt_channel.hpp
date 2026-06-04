@@ -1,6 +1,6 @@
 #pragma once
 
-#include "base_channel.hpp"
+#include "esp32_channel.hpp"
 
 #include <driver/rmt_common.h>
 #include <driver/rmt_encoder.h>
@@ -15,26 +15,18 @@ namespace dcc {
 /**
  * A DCC channel that outputs DCC waveform using ESP32 RMT TX peripheral.
  */
-class ESP32RMTChannel : public BaseChannel {
+class ESP32RMTChannel : public ESP32Channel {
 public:
     ESP32RMTChannel(
         uint8_t outputPin,
         uint8_t enPin,
         uint8_t sensePin,
         BasePacketList &packets
-    ) : BaseChannel{packets},
-        _outputPin{outputPin},
-        _enPin{enPin},
-        _sensePin{sensePin}
+    ) : ESP32Channel{outputPin, enPin, sensePin, packets}
     { }
 
     void begin() override {
-        pinMode(_outputPin, OUTPUT);
-        pinMode(_enPin, OUTPUT);
-        digitalWrite(_outputPin, LOW);
-        digitalWrite(_enPin, LOW);
-
-        analogSetPinAttenuation(_sensePin, ADC_0db);
+        ESP32Channel::begin();
 
         rmt_tx_channel_config_t txCfg{};
         txCfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
@@ -71,26 +63,17 @@ public:
             return;
         }
 
-        if (xTaskCreate(packetTaskFunc, "dcc_rmt_tx", 4096, this, 3, &_packetTask) != pdPASS) {
+        _running = true;
+        if (xTaskCreate(packetTaskLoop_c, "dcc_rmt_tx", 4096, this, 3, &_packetTask) != pdPASS) {
             _running = false;
             DCC_LOGW("Failed to start DCC RMT task");
             return;
         }
 
-        esp_timer_create_args_t adcCfg{adcTimerFunc, this, ESP_TIMER_TASK, "dcc_adc"};
-        if (esp_timer_create(&adcCfg, &_adcTimer) == ESP_OK) {
-            esp_timer_start_periodic(_adcTimer, 1000);  // 1ms
-        }
     }
 
     void end() override {
         _running = false;
-
-        if (_adcTimer != nullptr) {
-            esp_timer_stop(_adcTimer);
-            esp_timer_delete(_adcTimer);
-            _adcTimer = nullptr;
-        }
 
         if (_packetTask != nullptr) {
             vTaskDelete(_packetTask);
@@ -108,35 +91,13 @@ public:
             _rmtChannel = nullptr;
         }
 
-        pinMode(_outputPin, INPUT);
-        pinMode(_enPin, INPUT);
-    }
-
-    void setPower(bool v) override {
-        DCC_LOGI("setPower(%d)", v);
-        digitalWrite(_enPin, v ? HIGH : LOW);
-    }
-
-    bool getPower() override {
-        return digitalRead(_enPin) == HIGH;
-    }
-
-    void updateCurrent() override {
-        uint16_t c = analogRead(_sensePin);
-        current = c;
-        if (c > maxCurrent) {
-            maxCurrent = c;
-        }
+        ESP32Channel::end();
     }
 
 private:
     static constexpr uint16_t DCC_ONE_HALF_US = 58;
     static constexpr uint16_t DCC_ZERO_HALF_US = 116;
     static constexpr size_t MAX_RMT_ITEMS = PacketBits::MAX_RAW_PACKET_BYTES * 8;
-
-    uint8_t _outputPin;
-    uint8_t _enPin;
-    uint8_t _sensePin;
 
     etl::array<rmt_symbol_word_t, MAX_RMT_ITEMS> rmt_items;
 
@@ -145,17 +106,11 @@ private:
 
     volatile bool _running{false};
     TaskHandle_t _packetTask{nullptr};
-    esp_timer_handle_t _adcTimer{nullptr};
 
-    static void packetTaskFunc(void *arg) {
+    static void packetTaskLoop_c(void *arg) {
         static_cast<ESP32RMTChannel *>(arg)->packetTaskLoop();
         vTaskDelete(nullptr);
     }
-
-    static void adcTimerFunc(void *arg) {
-        static_cast<ESP32RMTChannel *>(arg)->updateCurrent();
-    }
-
 
     static size_t fillRmt(
         const PacketBits &packet,

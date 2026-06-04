@@ -31,15 +31,12 @@ public:
 private:
     hw_timer_t * _timer = nullptr;
     uint8_t _timerNum;
-    esp_timer_handle_t _adcTimer;
     ESP32TimerChannel *main = nullptr;
     ESP32TimerChannel *prog = nullptr;
 
-    friend void timerCallback();
-    friend void adcTimerCallback(void*);
+    static IRAM_ATTR void timerFunc_c(void* arg);
 
     void IRAM_ATTR timerFunc();
-    void IRAM_ATTR adcTimerFunc();
 };
 
 }

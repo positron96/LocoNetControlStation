@@ -4,6 +4,7 @@
 #include "LocoSpeed.h"
 #include "packet.hpp"
 #include "PacketList.hpp"
+#include "power_event.hpp"
 
 #include <esp32-hal-timer.h>
 //#include <esp_adc_cal.h>
@@ -12,6 +13,7 @@
 
 #include <etl/map.h>
 #include <etl/bitset.h>
+#include <etl/observer.h>
 
 #include <Arduino.h>
 
@@ -44,12 +46,6 @@
 
 namespace dcc {
 
-constexpr float ADC_RESISTANCE = 0.1;
-constexpr float ADC_MAX_MV = 1100;
-constexpr float ADC_TO_MV = ADC_MAX_MV/4096;
-constexpr float ADC_TO_MA = ADC_TO_MV / ADC_RESISTANCE;
-constexpr uint16_t MAX_CURRENT = 2000;
-
 extern uint8_t idlePacket[3];
 extern uint8_t resetPacket[3];
 extern PacketBits idle_packet_bits;
@@ -60,7 +56,7 @@ extern PacketBits idle_packet_bits;
  * It outputs DCC waveforms and reads current consumption
  *   for both CV operations and overpower protection.
  */
-class BaseChannel {
+class BaseChannel: public etl::observable<PowerObserver, 5> {
 
 public:
 
@@ -70,12 +66,11 @@ public:
 
     virtual void end()=0;
 
-    virtual void setPower(bool v)=0;
+    virtual void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal)=0;
 
     virtual bool getPower()=0;
 
     /**
-     *
      */
     void sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
 
@@ -103,12 +98,12 @@ public:
 
     void unloadSlot(const LocoAddress addr) { packets.clear_loco(addr); }
 
+    /** Different channels may have different thresholds. */
+    void setOvercurrentThreshold(uint16_t mA) { overCurrentThreshold = mA; }
     bool checkOvercurrent() {
-        uint16_t v = getCurrent();
-        float mA = v * ADC_TO_MA;
-        //if(v!=0) DCC_LOGI("%d, %d", v, (int)mA);
-        if(mA>MAX_CURRENT) {
-            setPower(false);
+        uint16_t mA = getCurrent();
+        if(mA > overCurrentThreshold) {
+            setPower(false, PowerEvent::Reason::Overcurrent);
             return false;
         }
         else return true;
@@ -125,6 +120,7 @@ public:
     virtual ~BaseChannel() = default;
 
 protected:
+    uint16_t overCurrentThreshold;
     std::atomic<uint16_t> current;
     std::atomic<uint16_t> maxCurrent;
 
@@ -143,8 +139,38 @@ protected:
     uint getBaselineCurrent() const;
     bool checkCurrentResponse(uint baseline) const;
 
-private:
-    friend class ESP32Timer;
+};
+
+
+/**
+ * Thin container of channels to be current-monitored.
+ **/
+class CurrentMeter {
+public:
+    constexpr static size_t MAX_CHANNELS = 2;
+
+    virtual void  begin() = 0;
+
+    virtual void end() = 0;
+
+    void addChannel(BaseChannel &ch) {
+        channels.push_back(&ch);
+    }
+
+    void update() {
+        for(auto ch: channels) {
+            ch->updateCurrent();
+        }
+    }
+
+    void checkOvercurrent() {
+        for(auto ch: channels) {
+            ch->checkOvercurrent();
+        }
+    }
+
+protected:
+    etl::vector<BaseChannel*, MAX_CHANNELS> channels;
 };
 
 }
