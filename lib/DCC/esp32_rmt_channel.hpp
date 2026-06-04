@@ -2,7 +2,9 @@
 
 #include "base_channel.hpp"
 
-#include <driver/rmt.h>
+#include <driver/rmt_common.h>
+#include <driver/rmt_encoder.h>
+#include <driver/rmt_tx.h>
 
 #include <etl/array.h>
 #include <etl/span.h>
@@ -19,13 +21,11 @@ public:
         uint8_t outputPin,
         uint8_t enPin,
         uint8_t sensePin,
-        BasePacketList &packets,
-        rmt_channel_t rmtChannel = RMT_CHANNEL_0
+        BasePacketList &packets
     ) : BaseChannel{packets},
         _outputPin{outputPin},
         _enPin{enPin},
-        _sensePin{sensePin},
-        _rmtChannel{rmtChannel}
+        _sensePin{sensePin}
     { }
 
     void begin() override {
@@ -36,30 +36,45 @@ public:
 
         analogSetPinAttenuation(_sensePin, ADC_0db);
 
-        rmt_config_t cfg{};
-        cfg.rmt_mode = RMT_MODE_TX;
-        cfg.channel = _rmtChannel;
-        cfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
-        cfg.mem_block_num = 1;
-        cfg.clk_div = 80;  // 1 tick = 1us (80MHz / 80)
-        cfg.tx_config.loop_en = false;
-        cfg.tx_config.carrier_en = false;
-        cfg.tx_config.idle_output_en = true;
-        cfg.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+        rmt_tx_channel_config_t txCfg{};
+        txCfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
+        txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
+        txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
+        txCfg.mem_block_symbols = 64;
+        txCfg.trans_queue_depth = 4;
+        txCfg.intr_priority = 0;
 
-        if (rmt_config(&cfg) != ESP_OK) {
-            DCC_LOGW("RMT config failed for GPIO %d", _outputPin);
-            return;
-        }
-        if (rmt_driver_install(_rmtChannel, 0, 0) != ESP_OK) {
-            DCC_LOGW("RMT driver install failed for channel %d", static_cast<int>(_rmtChannel));
+        if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
+            DCC_LOGW("RMT new TX channel failed for GPIO %d", _outputPin);
             return;
         }
 
-        _running = true;
-        if (xTaskCreate(txTaskFunc, "dcc_rmt_tx", 4096, this, 2, &_txTask) != pdPASS) {
+        rmt_copy_encoder_config_t encCfg{};
+        if (rmt_new_copy_encoder(&encCfg, &_copyEncoder) != ESP_OK) {
+            DCC_LOGW("RMT copy encoder creation failed");
+            rmt_del_channel(_rmtChannel);
+            _rmtChannel = nullptr;
+            return;
+        }
+
+        // rmt_tx_event_callbacks_t cb {
+        //     .on_trans_done = txDoneFunc
+        // };
+        // rmt_tx_register_event_callbacks(_rmtChannel, &cb, this);
+
+        if (rmt_enable(_rmtChannel) != ESP_OK) {
+            DCC_LOGW("RMT TX channel enable failed");
+            rmt_del_encoder(_copyEncoder);
+            _copyEncoder = nullptr;
+            rmt_del_channel(_rmtChannel);
+            _rmtChannel = nullptr;
+            return;
+        }
+
+        if (xTaskCreate(packetTaskFunc, "dcc_rmt_tx", 4096, this, 3, &_packetTask) != pdPASS) {
             _running = false;
             DCC_LOGW("Failed to start DCC RMT task");
+            return;
         }
 
         esp_timer_create_args_t adcCfg{adcTimerFunc, this, ESP_TIMER_TASK, "dcc_adc"};
@@ -77,13 +92,21 @@ public:
             _adcTimer = nullptr;
         }
 
-        if (_txTask != nullptr) {
-            rmt_tx_stop(_rmtChannel);
-            vTaskDelete(_txTask);
-            _txTask = nullptr;
+        if (_packetTask != nullptr) {
+            vTaskDelete(_packetTask);
+            _packetTask = nullptr;
         }
-
-        rmt_driver_uninstall(_rmtChannel);
+        if (_rmtChannel != nullptr) {
+            rmt_disable(_rmtChannel);
+        }
+        if (_copyEncoder != nullptr) {
+            rmt_del_encoder(_copyEncoder);
+            _copyEncoder = nullptr;
+        }
+        if (_rmtChannel != nullptr) {
+            rmt_del_channel(_rmtChannel);
+            _rmtChannel = nullptr;
+        }
 
         pinMode(_outputPin, INPUT);
         pinMode(_enPin, INPUT);
@@ -114,15 +137,18 @@ private:
     uint8_t _outputPin;
     uint8_t _enPin;
     uint8_t _sensePin;
-    rmt_channel_t _rmtChannel;
-    etl::array<rmt_item32_t, MAX_RMT_ITEMS> rmt_items;
+
+    etl::array<rmt_symbol_word_t, MAX_RMT_ITEMS> rmt_items;
+
+    rmt_channel_handle_t _rmtChannel{nullptr};
+    rmt_encoder_handle_t _copyEncoder{nullptr};
 
     volatile bool _running{false};
-    TaskHandle_t _txTask{nullptr};
+    TaskHandle_t _packetTask{nullptr};
     esp_timer_handle_t _adcTimer{nullptr};
 
-    static void txTaskFunc(void *arg) {
-        static_cast<ESP32RMTChannel *>(arg)->txTaskLoop();
+    static void packetTaskFunc(void *arg) {
+        static_cast<ESP32RMTChannel *>(arg)->packetTaskLoop();
         vTaskDelete(nullptr);
     }
 
@@ -130,10 +156,10 @@ private:
         static_cast<ESP32RMTChannel *>(arg)->updateCurrent();
     }
 
+
     static size_t fillRmt(
         const PacketBits &packet,
-        size_t repeats,
-        etl::span<rmt_item32_t> items
+        etl::span<rmt_symbol_word_t> items
     ) {
 
         if (packet.len == 0 || items.size() == 0) {
@@ -141,23 +167,18 @@ private:
         }
 
         size_t itemIdx = 0;
-        for (size_t rep = 0; rep < repeats && itemIdx < items.size(); ++rep) {
-            for (size_t bit = 0; bit < packet.len && itemIdx < items.size(); ++bit) {
-                const bool isOne = packet.bit_at(bit);
-                const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
+        for (size_t bit = 0; bit < packet.len && itemIdx < items.size(); ++bit) {
+            const bool isOne = packet.bit_at(bit);
+            const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
 
-                rmt_item32_t item{};
-                item.level0 = 0;
-                item.duration0 = half;
-                item.level1 = 1;
-                item.duration1 = half;
-                items[itemIdx++] = item;
-            }
+            rmt_symbol_word_t &item = items[itemIdx++];
+            item.level0 = 0;  item.duration0 = half;
+            item.level1 = 1;  item.duration1 = half;
         }
         return itemIdx;
     }
 
-    void txTaskLoop() {
+    void packetTaskLoop() {
         PacketWithRepeats packet;
 
         while (_running) {
@@ -170,30 +191,31 @@ private:
                 continue;
             }
 
-            uint8_t repeatsLeft = packet.nRepeats;
-            //const size_t chunkRepeats = 1; // ETL_OR_STD::min(repeatsLeft, maxRepeatsInChunk);
-            const size_t itemCount = fillRmt(packet.packet, 1, rmt_items);
-            // const size_t maxRepeatsInChunk = ETL_OR_STD::max<size_t>(1, MAX_RMT_ITEMS / packetBits);
+            // -1 because nRepeats=1 means loop_count=0 (once)
+            rmt_transmit_config_t tx_opts = {
+                .loop_count = packet.nRepeats - 1
+            };
+            tx_opts.flags.eot_level = 1; // set output low at end of transmission to match last pulse
 
-            while (_running && repeatsLeft > 0) {
-                if (itemCount == 0) {
-                    break;
-                }
+            const size_t itemCount = fillRmt(packet.packet, rmt_items);
+            rmt_items[itemCount-1].duration1 -= 15; // compensate for latency before next transmission starts. TODO: to tune later.
 
-                // blocking implementation for now.
-                const esp_err_t err = rmt_write_items(_rmtChannel, rmt_items.data(), itemCount, true);
-                if (err != ESP_OK) {
-                    DCC_LOGW("rmt_write_items failed (%d)", static_cast<int>(err));
-                    _running = false;
-                    break;
-                }
-
-                repeatsLeft -= 1;
+            for(size_t i=0; i<packet.nRepeats; i++) {
+                ESP_ERROR_CHECK(rmt_transmit(
+                    _rmtChannel,
+                    this->_copyEncoder,
+                    rmt_items.data(),
+                    itemCount * sizeof(rmt_symbol_word_t),
+                    &tx_opts
+                ));
+                ESP_ERROR_CHECK(rmt_tx_wait_all_done(
+                    _rmtChannel, portMAX_DELAY
+                ));
             }
-        }
 
-        gpio_set_level(static_cast<gpio_num_t>(_outputPin), 0);
+        }
     }
+
 };
 
 }
