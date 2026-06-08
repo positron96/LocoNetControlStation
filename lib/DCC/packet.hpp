@@ -16,6 +16,7 @@ namespace dcc {
         F0_4, F5_8, F9_12, F13_20, F21_28
     };
 
+    constexpr size_t MAX_PACKET_LEN = 6;
 
     constexpr size_t ACCESSORY_PACKET_REPEATS = 4; // repeat accessory packets this number of times
 
@@ -25,6 +26,8 @@ namespace dcc {
     // https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
     // DCC++ uses 4.
     constexpr size_t FN_PACKET_REPEATS = 4;
+
+    constexpr size_t DEF_PREAMBLE_LEN = 22;
 
 
     constexpr size_t fn_group_index(const fn_group fg) {
@@ -38,6 +41,9 @@ namespace dcc {
         }
     }
 
+    /**
+     * Takes DCC packet bytes and adds preamble, spacer bits etc.
+     **/
     inline size_t encode_dcc(const etl::span<const uint8_t> src, etl::span<uint8_t> dst, size_t preamble_bits) {
         uint8_t crc = src[0];
         size_t len = src.size();
@@ -56,15 +62,32 @@ namespace dcc {
         return s.size_bits();
     }
 
+    /**
+     * Container for DCC packet bytes
+     **/
+    using Packet = etl::vector<uint8_t, MAX_PACKET_LEN>;
+
+    inline Packet packet_from_bytes(const etl::span<const uint8_t> bytes) {
+        return Packet{bytes.begin(), bytes.end()};
+    }
+
+    /**
+     * Container for raw DCC packet including preamble and spacer bits.
+     **/
     struct PacketBits {
         static constexpr size_t MAX_RAW_PACKET_BYTES = 10;
 
-        etl::array<uint8_t, MAX_RAW_PACKET_BYTES> buf;
-        uint8_t len;
-        static PacketBits from_bytes(const etl::span<const uint8_t> src, size_t preamble_len = 0) {
+        etl::vector<uint8_t, MAX_RAW_PACKET_BYTES> buf;
+        uint8_t size_bits;
+        static PacketBits from_bytes(const etl::span<const uint8_t> src, size_t preamble_len = DEF_PREAMBLE_LEN) {
             PacketBits p;
-            p.len = encode_dcc(src, p.buf, preamble_len);
+            p.size_bits = encode_dcc(src, p.buf, preamble_len);
+            p.buf.resize((p.size_bits+7)/8); // round up
             return p;
+        }
+
+        static PacketBits from_packet(const Packet& src, size_t preamble_len = DEF_PREAMBLE_LEN) {
+            return PacketBits::from_bytes(src, preamble_len);
         }
 
         uint8_t bit_at(size_t idx) const {
@@ -73,8 +96,17 @@ namespace dcc {
     };
 
     struct PacketWithRepeats {
+        Packet packet;
+        uint8_t nRepeats;
+    };
+
+    struct PacketBitsWithRepeats {
         PacketBits packet;
         uint8_t nRepeats;
+
+        static PacketBitsWithRepeats from_packet(const PacketWithRepeats &src, size_t preamble_len) {
+            return {PacketBits::from_packet(src.packet, preamble_len), src.nRepeats};
+        }
     };
 
 

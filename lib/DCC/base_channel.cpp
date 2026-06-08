@@ -7,10 +7,10 @@
 
 namespace dcc {
 
-uint8_t idlePacket[3] = {0xFF, 0x00, 0};
-uint8_t resetPacket[3] = {0x00, 0x00, 0};
+Packet idlePacket{0xFF, 0x00};
+Packet resetPacket{0x00, 0x00};
 
-PacketBits idle_packet_bits = PacketBits::from_bytes(idlePacket);
+PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
 #define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds

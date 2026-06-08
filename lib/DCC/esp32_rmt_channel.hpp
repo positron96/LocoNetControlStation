@@ -113,17 +113,19 @@ private:
     }
 
     static size_t fillRmt(
-        const PacketBits &packet,
+        const Packet &packet,
         etl::span<rmt_symbol_word_t> items
     ) {
 
-        if (packet.len == 0 || items.size() == 0) {
+        PacketBits bits = PacketBits::from_packet(packet);
+
+        if (bits.size_bits == 0 || items.size() == 0) {
             return 0;
         }
 
         size_t itemIdx = 0;
-        for (size_t bit = 0; bit < packet.len && itemIdx < items.size(); ++bit) {
-            const bool isOne = packet.bit_at(bit);
+        for (size_t bit = 0; bit < bits.size_bits && itemIdx < items.size(); ++bit) {
+            const bool isOne = bits.bit_at(bit);
             const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
 
             rmt_symbol_word_t &item = items[itemIdx++];
@@ -138,12 +140,7 @@ private:
 
         while (_running) {
             if (!packets.fetch_next_packet(packet)) {
-                packet = {idle_packet_bits, 1};
-            }
-
-            const size_t packetBits = packet.packet.len;
-            if (packetBits == 0) {
-                continue;
+                packet = {idlePacket, 1};
             }
 
             // -1 because nRepeats=1 means loop_count=0 (once)

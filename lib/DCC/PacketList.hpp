@@ -3,6 +3,7 @@
 #include "packet.hpp"
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
+#include "dcc_log.hpp"
 
 #include <etl/map.h>
 #include <etl/array.h>
@@ -18,13 +19,29 @@ namespace dcc {
     /**
      * Container for DCC packets.
      *
-     * Add different DCC packets to it, and it will pick packets when
-     * DCC signal generator needs one.
-     * Has priority selection mechanism, e.g.emergency stop packet will be prioritized over other packets.
+     * Users should add different DCC packets to it, and it will pick packets
+     *   when DCC signal generator needs one.
+     * Has priority selection mechanism, e.g. emergency stop packet will be prioritized over other packets.
      *
      * Decides if packets need to be refreshed periodically to tracks or not.
-     * E.g. first 12 or so locomotive functions are sent periodically,
-     *   while higher functions don't.
+     * E.g. first 12 locomotive functions are sent periodically,
+     *   while higher functions aren't.
+     *
+     * Internally, maintains a priority queue with packets that need to be sent once
+     *   and a table of packets that need to be refreshed, indexed by Loco address.
+     * Each table row cycles through its packets with speed-dir packet being emitted every even cycle,
+     *   while odd cycles are given to function packets.
+     *
+     * Example of table:
+     * ```
+     * Loco Addr | Speed-dir  | F0..F4  | F5..F8 | F9..F12
+     * ----------+------------+---------+--------+---------
+     * 10        | 100F       | 0b1100  | -      | -
+     * 11        | 0F         | -       | 0b1100 | -
+     * 1234      | 10R        | 0b1111  | 0b1111 | 0b1111
+     * ```
+     *
+     *
      **/
     class BasePacketList {
     public:
@@ -45,7 +62,7 @@ namespace dcc {
                 it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
             }
             auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
-            it->second[0] = PacketBits::from_bytes(bytes);
+            it->second.packets[0] = packet_from_bytes(bytes);
             enqueue_slot_packet(SlotLocation{it, 0}, speed.isEmgr() ? -100 : 0);
             return true;
         }
@@ -64,7 +81,7 @@ namespace dcc {
                 if(loco_slots.full()) return false;
                 it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
             }
-            it->second[idx] = PacketBits::from_bytes(bytes);
+            it->second.packets[idx] = packet_from_bytes(bytes);
             enqueue_slot_packet(SlotLocation{it, idx}, 0);
             return true;
         }
@@ -73,7 +90,7 @@ namespace dcc {
             if(queue_packets.full()) return false;
             QueueItem item{
                 .priority = priority,
-                .data = PacketWithRepeats{PacketBits::from_bytes(bytes), nRepeats}
+                .data = PacketWithRepeats{packet_from_bytes(bytes), nRepeats}
             };
             queue_packets.push(item);
             return true;
@@ -93,7 +110,6 @@ namespace dcc {
                     cur_slot++;
                     if(cur_slot == loco_slots.end()) {
                         cur_slot = loco_slots.begin();
-                        slot_phase = (slot_phase+1) % MAX_PHASE;
                     }
                 }
                 loco_slots.erase(it);
@@ -102,25 +118,31 @@ namespace dcc {
 
         /**
          * Finds packet with highest priority and puts it into dst.
-         * Updates its own storage, e.g. removed packet if it only needs to be sent once.
+         * Updates its own storage, e.g. removes packet if it only needs to be sent once.
          * @return true if packet was put into dst, false if no packets available.
          */
         bool fetch_next_packet(PacketWithRepeats &packet_out) {
+
+            // if priority queue is not empty, use it
             if(!queue_packets.empty()) {
                 QueueItem item = queue_packets.top();
                 queue_packets.pop();
                 if(etl::holds_alternative<PacketWithRepeats>(item.data)) {
+                    DCC_LOGD("Fetching queue item");
                     packet_out = etl::get<PacketWithRepeats>(item.data);
                     return true;
                 } else {
                     auto loc = etl::get<SlotLocation>(item.data);
-                    if(loc.it->second[loc.idx].has_value() ) { // should always be true
-                        packet_out = PacketWithRepeats{loc.it->second[loc.idx].value(), 1};
+                    LocoSlot &slot = loc.it->second;
+                    if(slot.packets[loc.idx].has_value() ) {
+                        DCC_LOGD("Fetching queue location slot %d, idx %d",
+                            std::distance(loco_slots.begin(), loc.it), loc.idx);
+                        packet_out = PacketWithRepeats{slot.packets[loc.idx].value(), 1};
                         // update cur_slot and phase, it will be advanced on next call;
                         cur_slot = loc.it;
-                        slot_phase = loc.idx == 0 ? 0 : loc.idx*2+1; // convert index to phase
+                        slot.phase = Phase::from_index(loc.idx);
                         return true;
-                    }
+                    } // must have been removed from slots, fall through
                 }
             }
 
@@ -131,31 +153,72 @@ namespace dcc {
             cur_slot++;
             if(cur_slot == loco_slots.end()) {
                 cur_slot = loco_slots.begin();
-                slot_phase = (slot_phase+1) % MAX_PHASE;
             }
-            // every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
-            size_t idx = slot_phase % 2 == 0 ? 0 : slot_phase / 2 + 1;
-            if(cur_slot->second[idx].has_value() ) {
-                packet_out = PacketWithRepeats{cur_slot->second[idx].value(), 1};
-                return true;
+            LocoSlot &slot = cur_slot->second;
+
+            // find a non-empty packet
+            for(size_t i=0; i<MAX_PHASE; i++) { // go though all packets at most
+                slot.phase.inc();
+                // every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
+                size_t idx = slot.phase.to_index();
+                if(slot.packets[idx].has_value() ) {
+                    DCC_LOGD("Fetching slot %d idx %d (ph %d)",
+                        std::distance(loco_slots.begin(), cur_slot),
+                        idx, slot.phase);
+                    packet_out = PacketWithRepeats{slot.packets[idx].value(), 1};
+                    return true;
+                }
             }
+            assert(false); // the slot is allocated, but there are no packets in it, error
 
             return false;
         }
     protected:
 
-        constexpr static size_t N_FNS_PER_LOCO = 3;
-        constexpr static size_t N_PACKETS_PER_LOCO = N_FNS_PER_LOCO + 1;
+        constexpr static size_t N_FN_GROUPS_PER_LOCO = 3;
+        constexpr static size_t N_PACKETS_PER_LOCO = N_FN_GROUPS_PER_LOCO + 1;
         constexpr static size_t MAX_PHASE = N_PACKETS_PER_LOCO * 2;
-        using LocoSlot = etl::array< etl::optional<PacketBits>, N_PACKETS_PER_LOCO>;
-        using ISlotMap = etl::imap<LocoAddress, LocoSlot>;
-        ISlotMap &loco_slots;
 
-        struct SlotLocation {
-            ISlotMap::iterator it;
-            size_t idx;
+        struct Phase {
+            size_t phase;
+
+            /// every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
+            size_t to_index() {
+                return phase % 2 == 0 ? 0 : phase / 2 + 1;
+            }
+
+            /// convert index to phase
+            static Phase from_index(size_t idx) {
+                return {idx == 0 ? 0 : (idx*2 + 1)};
+            }
+
+            void inc() {
+                phase ++;
+                if(phase == BasePacketList::MAX_PHASE) phase = 0;
+            }
         };
+
+        /** A row in slots table */
+        struct LocoSlot {
+            etl::array< etl::optional<Packet>, N_PACKETS_PER_LOCO> packets;
+            Phase phase;
+        };
+
+        using ISlotMap = etl::imap<LocoAddress, LocoSlot>;
+
+        /** A 2D table with packets that need to be periodically refreshed. */
+        ISlotMap &loco_slots;
+        ISlotMap::iterator cur_slot;
+
+        /** A location in slot table: a map iterator and an index in packet array. */
+        struct SlotLocation {
+            ISlotMap::iterator it; ///< slot location in the map
+            size_t idx; ///< index in slot, 0=speed/dir, 1.. = fn packets
+        };
+
         constexpr static size_t N_QUEUE_PACKETS = 10;
+
+        /** Item for priority queue, either a packet or a location in the slot table. */
         struct QueueItem {
             int priority;
             etl::variant<
@@ -168,14 +231,12 @@ namespace dcc {
         };
         etl::priority_queue<QueueItem, N_QUEUE_PACKETS> queue_packets;
 
-        size_t slot_phase{0};
-        ISlotMap::iterator cur_slot;
-
         BasePacketList(ISlotMap &loco_slots)
         : loco_slots{loco_slots}, cur_slot{loco_slots.end()}
         {
         }
 
+        /** Put a slot location into priority queue. */
         bool enqueue_slot_packet(SlotLocation loc, int priority) {
             if(queue_packets.full()) return false;
 

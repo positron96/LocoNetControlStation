@@ -32,29 +32,32 @@ public:
 
 private:
 
-    PacketWithRepeats currentPacket;
+    PacketBitsWithRepeats currentPacket;
     size_t current_bit;
 
     /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
-    volatile uint8_t timerPeriodsHalf = 1; // first thing a timerfunc does is decrement this, so make it not underflow
+    volatile uint8_t timerPeriodsHalf = 1; // some sane nonzero value
     /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
-    volatile uint8_t timerPeriodsLeft = 2; // some sane nonzero value.
+    volatile uint8_t timerPeriodsLeft = 2; // first thing a timerfunc does is decrement this, so make it not underflow
 
     void IRAM_ATTR nextBit() {
-        auto *p = &currentPacket;
+        auto *current = &currentPacket;
         //DCC_DEBUGF_ISR("nextBit: currentPacket=%d, activePacket=%d, cbit=%d, bits=%d", R.currentIdx(),  R.currentPacket->activeIdx(), R.currentBit, p->nBits );
 
         // end of packet, either repeat this or get next one
-        if (current_bit == p->packet.len) {
+        if (current_bit == current->packet.size_bits) {
             current_bit = 0;
-            if (p->nRepeats>0) {
-                p->nRepeats--;
-                DCC_LOGD_ISR("repeat packet = %d", p->nRepeats);
+            if (current->nRepeats>0) {
+                current->nRepeats--;
+                DCC_LOGD_ISR("repeat packet = %d", current->nRepeats);
             } else {
-                if(!packets.fetch_next_packet(*p)) {
-                    *p = {idle_packet_bits, 1};
+                PacketWithRepeats bytes;
+                if(packets.fetch_next_packet(bytes)) {
+                    *current = PacketBitsWithRepeats::from_packet(bytes, DEF_PREAMBLE_LEN);
+                } else {
+                    *current = {idle_packet_bits, 1};
                 }
-                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", p->packet.len, p->packet.buf[0], p->packet.buf[1], p->nRepeats);
+                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", current->packet.size_bits, current->packet.buf[0], current->packet.buf[1], current->nRepeats);
             }
         }
 
