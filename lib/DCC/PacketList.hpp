@@ -86,11 +86,11 @@ namespace dcc {
             return true;
         }
 
-        bool put_generic_packet(const etl::span<const uint8_t> bytes, uint8_t nRepeats, int priority = 0) {
+        bool put_generic_packet(const etl::span<const uint8_t> bytes, uint8_t n_repeats, int priority = 0) {
             if(queue_packets.full()) return false;
             QueueItem item{
                 .priority = priority,
-                .data = PacketWithRepeats{packet_from_bytes(bytes), nRepeats}
+                .data = PacketWithRepeats{packet_from_bytes(bytes), n_repeats}
             };
             queue_packets.push(item);
             return true;
@@ -117,8 +117,8 @@ namespace dcc {
         }
 
         /**
-         * Finds packet with highest priority and puts it into dst.
-         * Updates its own storage, e.g. removes packet if it only needs to be sent once.
+         * Finds packet in the queue or table and puts it into dst.
+         *
          * @return true if packet was put into dst, false if no packets available.
          */
         bool fetch_next_packet(PacketWithRepeats &packet_out) {
@@ -156,22 +156,22 @@ namespace dcc {
             }
             LocoSlot &slot = cur_slot->second;
 
-            // find a non-empty packet
-            for(size_t i=0; i<MAX_PHASE; i++) { // go though all packets at most
-                slot.phase.inc();
-                // every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
-                size_t idx = slot.phase.to_index();
-                if(slot.packets[idx].has_value() ) {
-                    DCC_LOGD("Fetching slot %d idx %d (ph %d)",
-                        std::distance(loco_slots.begin(), cur_slot),
-                        idx, slot.phase);
-                    packet_out = PacketWithRepeats{slot.packets[idx].value(), 1};
-                    return true;
+            slot.phase.inc();
+            size_t idx = slot.phase.to_index();
+            if(!slot.packets[idx].has_value() ) {
+                // index we want has no packet, advance index (with rollover)
+                for(size_t i=0; i<N_PACKETS_PER_LOCO; i++) {
+                    idx++; if(idx==N_PACKETS_PER_LOCO) idx=0;
+                    if(slot.packets[idx].has_value()) { slot.phase = Phase::from_index(idx); break; } // found it
                 }
             }
-            assert(false); // the slot is allocated, but there are no packets in it, error
+            assert(slot.packets[idx].has_value()); // slot allocated, but we didn't find packets it in
 
-            return false;
+            DCC_LOGD("Fetching slot %d idx %d (ph %d)",
+                std::distance(loco_slots.begin(), cur_slot),
+                idx, slot.phase);
+            packet_out = PacketWithRepeats{slot.packets[idx].value(), 1};
+            return true;
         }
     protected:
 
@@ -180,7 +180,7 @@ namespace dcc {
         constexpr static size_t MAX_PHASE = N_PACKETS_PER_LOCO * 2;
 
         struct Phase {
-            size_t phase;
+            size_t phase{0};
 
             /// every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
             size_t to_index() {
