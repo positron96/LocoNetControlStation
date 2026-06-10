@@ -33,7 +33,7 @@ public:
         txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
         txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
         txCfg.mem_block_symbols = 64;
-        txCfg.trans_queue_depth = 4;
+        txCfg.trans_queue_depth = 1;
         txCfg.intr_priority = 0;
 
         if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
@@ -129,8 +129,8 @@ private:
             const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
 
             rmt_symbol_word_t &item = items[itemIdx++];
-            item.level0 = 0;  item.duration0 = half;
-            item.level1 = 1;  item.duration1 = half;
+            item.level0 = 1;  item.duration0 = half;
+            item.level1 = 0;  item.duration1 = half;
         }
         return itemIdx;
     }
@@ -147,10 +147,11 @@ private:
             rmt_transmit_config_t tx_opts = {
                 .loop_count = packet.nRepeats - 1
             };
-            tx_opts.flags.eot_level = 1; // set output low at end of transmission to match last pulse
+            tx_opts.flags.eot_level = 0; // set output low at end of transmission to match last pulse
 
             const size_t itemCount = fillRmt(packet.packet, rmt_items);
-            rmt_items[itemCount-1].duration1 -= 15; // compensate for latency before next transmission starts. TODO: to tune later.
+            assert(itemCount>0);
+            rmt_items[itemCount-1].duration1 = 10; // compensate for latency before next transmission starts. TODO: to tune later.
 
             for(size_t i=0; i<packet.nRepeats; i++) {
                 ESP_ERROR_CHECK(rmt_transmit(
@@ -161,7 +162,7 @@ private:
                     &tx_opts
                 ));
                 ESP_ERROR_CHECK(rmt_tx_wait_all_done(
-                    _rmtChannel, portMAX_DELAY
+                    _rmtChannel, 1000
                 ));
             }
 

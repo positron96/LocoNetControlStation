@@ -81,6 +81,7 @@ namespace dcc {
         uint8_t size_bits;
         static PacketBits from_bytes(const etl::span<const uint8_t> src, size_t preamble_len = DEF_PREAMBLE_LEN) {
             PacketBits p;
+            p.buf.uninitialized_resize(p.buf.capacity()); // change size for span to work
             p.size_bits = encode_dcc(src, p.buf, preamble_len);
             p.buf.resize((p.size_bits+7)/8); // round up
             return p;

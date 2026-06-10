@@ -25,6 +25,10 @@
 #include <stdio.h>
 #include <atomic>
 
+#ifndef USE_WIFI
+#define USE_WIFI 1
+#endif
+
 LocoNetBus bus;
 
 #define LOCONET_PIN_RX 16
@@ -162,7 +166,7 @@ void setup() {
         TimerType::callback_type::create<checkCurrent>(),
         1, true);
 
-
+#if USE_WIFI != 0
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
         // start AP
@@ -192,20 +196,20 @@ void setup() {
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName(CS_NAME);
+    lbServer.begin();
+    withrottleServer.begin();
+    dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
+#endif
+
+    dccMain.add_observer(powerStatusObserver);
+    dccProg.add_observer(powerStatusObserver);
     //dccTimer.begin();
     dccMain.begin();
     dccProg.begin();
-    currentMeter.begin();
-    dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
-    dccMain.add_observer(powerStatusObserver);
-    dccProg.add_observer(powerStatusObserver);
-
     dccMain.setPower(true);
     dccProg.setPower(true);
-
-    lbServer.begin();
-    withrottleServer.begin();
+    currentMeter.begin();
 
     timerController.enable(true);
     timerController.start(checkCurrentTimer);
@@ -215,8 +219,10 @@ void setup() {
 
 void loop() {
 
+#if USE_WIFI != 0
     lbServer.loop();
     withrottleServer.loop();
+#endif
     CS.loop();
     //lSerial.loop();
 
