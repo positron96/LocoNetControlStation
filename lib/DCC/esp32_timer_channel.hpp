@@ -38,26 +38,24 @@ private:
     /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
     volatile uint8_t timerPeriodsHalf = 1; // some sane nonzero value
     /* how many 58us periods are left (at start, 2 for "1", 4 for "0"). */
-    volatile uint8_t timerPeriodsLeft = 2; // first thing a timerfunc does is decrement this, so make it not underflow
+    volatile uint8_t timerPeriodsLeft = 1; // first thing a timerfunc does is decrement this, so make it not underflow
 
     void IRAM_ATTR nextBit() {
-        auto *current = &currentPacket;
         //DCC_DEBUGF_ISR("nextBit: currentPacket=%d, activePacket=%d, cbit=%d, bits=%d", R.currentIdx(),  R.currentPacket->activeIdx(), R.currentBit, p->nBits );
-
         // end of packet, either repeat this or get next one
-        if (current_bit == current->packet.size_bits) {
+        if (current_bit == currentPacket.packet.size_bits) {
             current_bit = 0;
-            if (current->nRepeats>0) {
-                current->nRepeats--;
-                DCC_LOGD_ISR("repeat packet = %d", current->nRepeats);
+            if (currentPacket.nRepeats>0) {
+                currentPacket.nRepeats--;
+                DCC_LOGD_ISR("repeat packet = %d", currentPacket.nRepeats);
             } else {
                 PacketWithRepeats bytes;
                 if(packets.fetch_next_packet(bytes)) {
-                    *current = PacketBitsWithRepeats::from_packet(bytes, DEF_PREAMBLE_LEN);
+                    currentPacket = PacketBitsWithRepeats::from_packet(bytes, DEF_PREAMBLE_LEN);
                 } else {
-                    *current = {idle_packet_bits, 1};
+                    currentPacket = {idle_packet_bits, 1};
                 }
-                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", current->packet.size_bits, current->packet.buf[0], current->packet.buf[1], current->nRepeats);
+                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", currentPacket.packet.size_bits, current->packet.buf[0], current->packet.buf[1], current->nRepeats);
             }
         }
 

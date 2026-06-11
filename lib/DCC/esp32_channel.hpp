@@ -25,7 +25,8 @@ public:
         digitalWrite(_outputPin, LOW);
         digitalWrite(_enPin, LOW);
 
-        analogSetPinAttenuation(_sensePin, ADC_0db);
+        //analogRead(_sensePin); // without it, analogSetPinAttenuation throws error
+        //analogSetPinAttenuation(_sensePin, ADC_0db);
     }
 
     void end() override {

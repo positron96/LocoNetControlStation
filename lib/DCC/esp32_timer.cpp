@@ -16,7 +16,7 @@ void ESP32Timer::begin() {
     (void)_timerNum;
     _timer = timerBegin(1000000 / TIMER_TICK_US);
     timerAttachInterruptArg(_timer, timerFunc_c, this);
-    timerAlarm(_timer, 10, true, 0);
+    timerAlarm(_timer, 1, true, 0);
     timerStart(_timer);
 
 }
@@ -35,11 +35,9 @@ void IRAM_ATTR ESP32Timer::timerFunc_c(void* arg) {
     static_cast<ESP32Timer*>(arg)->timerFunc();
 }
 
-void ESP32Timer::timerFunc() {
-
+void IRAM_ATTR ESP32Timer::timerFunc() {
     if (main!=nullptr) main->timerFunc();
     if (prog!=nullptr) prog->timerFunc();
-
 }
 
 }

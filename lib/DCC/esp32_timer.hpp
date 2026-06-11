@@ -21,22 +21,20 @@ public:
 
     /**
      * Starts half-bit timer.
-     * To get 58us tick we need divisor of 58us/0.0125us(80mhz) = 4640,
-     * separate this into 464 prescaler and 10 timer alarm.
      */
     void begin();
 
     void end();
 
 private:
-    hw_timer_t * _timer = nullptr;
+    hw_timer_t * _timer{nullptr};
     uint8_t _timerNum;
-    ESP32TimerChannel *main = nullptr;
-    ESP32TimerChannel *prog = nullptr;
+    ESP32TimerChannel *main{nullptr};
+    ESP32TimerChannel *prog{nullptr};
 
-    static IRAM_ATTR void timerFunc_c(void* arg);
+    static void timerFunc_c(void* arg);
 
-    void IRAM_ATTR timerFunc();
+    void timerFunc();
 };
 
 }

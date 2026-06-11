@@ -12,8 +12,8 @@
 
 namespace dcc {
 
-    constexpr int _debug_pin = 10;
-    constexpr int _debug_pin2 = 11;
+    // constexpr int _debug_pin = 14;
+    // constexpr int _debug_pin2 = 12;
 
 /**
  * A DCC channel that outputs DCC waveform using ESP32 RMT TX peripheral.
@@ -29,8 +29,8 @@ public:
     { }
 
     void begin() override {
-        pinMode(_debug_pin, OUTPUT);
-        pinMode(_debug_pin2, OUTPUT);
+        // pinMode(_debug_pin, OUTPUT);
+        // pinMode(_debug_pin2, OUTPUT);
         ESP32Channel::begin();
 
         rmt_tx_channel_config_t txCfg{};
@@ -38,7 +38,7 @@ public:
         txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
         txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
         txCfg.mem_block_symbols = 64;
-        txCfg.trans_queue_depth = 1; // !!! can be 2 (in zimo example)
+        txCfg.trans_queue_depth = 2; // !!! can be 2 (in zimo example)
         txCfg.intr_priority = 0;
 
         if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
@@ -144,9 +144,9 @@ private:
         PacketWithRepeats packet;
 
         while (_running) {
-            gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 1);
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 1);
             if (!packets.fetch_next_packet(packet)) {
-                DCC_LOGD("No packets pending, sending idle");
+                //DCC_LOGD_ISR("No packets pending, sending idle");
                 packet = {idlePacket, 1};
             }
 
@@ -155,14 +155,13 @@ private:
                 .loop_count = packet.nRepeats - 1
             };
             tx_opts.flags.eot_level = 0; // set output low at end of transmission to match last pulse
-            gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 0);
-
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 0);
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 1);
             const size_t itemCount = fillRmt(packet.packet, rmt_items);
             assert(itemCount>0);
-            rmt_items[itemCount-1].duration1 = 10; // compensate for latency before next transmission starts. TODO: to tune later.
-
+            rmt_items[itemCount-1].duration1 -= 15; // compensate for latency before next transmission starts. TODO: to tune later.
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 0);
             for(size_t i=0; i<packet.nRepeats; i++) {
-                gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 1);
                 ESP_ERROR_CHECK(rmt_transmit(
                     _rmtChannel,
                     this->_copyEncoder,
@@ -170,7 +169,6 @@ private:
                     itemCount * sizeof(rmt_symbol_word_t),
                     &tx_opts
                 ));
-                gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 0);
             }
 
         }
