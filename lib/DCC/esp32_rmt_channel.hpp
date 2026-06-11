@@ -33,7 +33,7 @@ public:
         txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
         txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
         txCfg.mem_block_symbols = 64;
-        txCfg.trans_queue_depth = 1;
+        txCfg.trans_queue_depth = 1; // !!! can be 2 (in zimo example)
         txCfg.intr_priority = 0;
 
         if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
@@ -140,10 +140,11 @@ private:
 
         while (_running) {
             if (!packets.fetch_next_packet(packet)) {
+                DCC_LOGD("No packets pending, sending idle");
                 packet = {idlePacket, 1};
             }
 
-            // -1 because nRepeats=1 means loop_count=0 (once)
+            // -1 because nRepeats=1 (once) means loop_count=0
             rmt_transmit_config_t tx_opts = {
                 .loop_count = packet.nRepeats - 1
             };
@@ -160,9 +161,6 @@ private:
                     rmt_items.data(),
                     itemCount * sizeof(rmt_symbol_word_t),
                     &tx_opts
-                ));
-                ESP_ERROR_CHECK(rmt_tx_wait_all_done(
-                    _rmtChannel, 1000
                 ));
             }
 
