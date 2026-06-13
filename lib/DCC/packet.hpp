@@ -13,7 +13,7 @@
 namespace dcc {
 
     enum class fn_group {
-        F0_4, F5_8, F9_12, F13_20, F21_28
+        F0_4, F5_8, F9_12, F13_20, F21_28, F29_36
     };
 
     constexpr size_t MAX_PACKET_LEN = 6;
@@ -118,6 +118,7 @@ namespace dcc {
     };
 
 
+    /** @return iterator at first empty pos after adding address. */
     template <typename It>
     constexpr inline It encode_address(const LocoAddress addr, It out) {
         uint16_t iAddr = addr.addr();
@@ -129,8 +130,8 @@ namespace dcc {
         return out;
     }
 
-    inline etl::array<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
-        etl::array<uint8_t, 4> data;
+    inline etl::vector<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, uint8_t tSpeed, SpeedMode sm, uint8_t tDirection) {
+        etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
 
         if(sm==SpeedMode::S128) {
@@ -142,27 +143,29 @@ namespace dcc {
             *it = 0b0100'0000 | (tSpeed & 0b0001'1111);
             if(tDirection==1) *it |= 0b0010'0000;
             // 14 speed steps unsupported
+            it++;
         }
-
+        data.uninitialized_resize(std::distance(data.begin(), it));
         // DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr, tSpeed, (int)sm, (tDirection==1)?'F':'B');
-
         return data;
     }
 
-    inline etl::array<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, LocoSpeed speed, SpeedMode mode, bool fwd) {
+    inline etl::vector<uint8_t, 4> make_speed_dir_packet(LocoAddress addr, LocoSpeed speed, SpeedMode mode, bool fwd) {
         return make_speed_dir_packet(addr, speed.getDCCByte(mode), mode, fwd ? 1 : 0);
     }
 
+    [[deprecated("use make_fn_packet instead")]]
     inline auto make_fn_packet(LocoAddress addr, uint8_t fByte, uint8_t eByte) {
-        etl::array<uint8_t, 4> data;
+        etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
 
         if ( (fByte & 0b1100'0000) == 0b1000'0000) {// this is a request for functions FL,F1-F12
             *it = (fByte | 0x80) & 0xBF; // for safety this guarantees that first nibble of function byte will always be of binary form 10XX which should always be the case for FL,F1-F12
         } else {                             // this is a request for functions F13-F28
             *it++ = (fByte | 0xDE) & 0xDF; // for safety this guarantees that first byte will either be 0xDE (for F13-F20) or 0xDF (for F21-F28)
-            *it = eByte;
+            *it++ = eByte;
         }
+        data.uninitialized_resize(std::distance(data.begin(), it));
 
         // DCC_LOGI("iReg %d, addr %d, fByte=%02x eByte=%02x", iReg, addr, fByte, eByte);
         return data;
@@ -172,7 +175,8 @@ namespace dcc {
     inline auto make_f0_f4_packet(LocoAddress addr, uint32_t fns) {
         etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
-        *it = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Fu) >> 1u;
+        *it++ = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Fu) >> 1u;
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -180,7 +184,8 @@ namespace dcc {
         etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
         state >>= 5;
-        *it = 0b1011'0000u | (state & 0b1111);
+        *it++ = 0b1011'0000u | (state & 0b1111);
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -188,7 +193,8 @@ namespace dcc {
         etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
         fns >>= 9;
-        *it = 0b1010'0000u | (fns & 0b1111);
+        *it++ = 0b1010'0000u | (fns & 0b1111);
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -198,6 +204,7 @@ namespace dcc {
         fns >>= 13;
         *it++ = 0b1101'1110u;
         *it++ = fns & 0xFF;
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -206,7 +213,8 @@ namespace dcc {
         auto it = encode_address(addr, data.begin());
         fns >>= 21;
         *it++ = 0b1101'1111u;
-        *it++ = fns;
+        *it++ = fns & 0xFF;
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -215,7 +223,8 @@ namespace dcc {
         auto it = encode_address(addr, data.begin());
         fns >>= 29;
         *it++ = 0b1101'1000u;
-        *it++ = fns & 0b1111;  //!!! we have only 4 bits left in uint32_t
+        *it++ = fns & 0b1111;  //!!! we have only 4 bits left in uint32_t fns, so we can only set F29-F32, F33-F36 are not supported
+        data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }
 
@@ -226,6 +235,7 @@ namespace dcc {
             case fn_group::F9_12:  return make_f9_f12_packet(addr, fns);
             case fn_group::F13_20: return make_f13_f20_packet(addr, fns);
             case fn_group::F21_28: return make_f21_f28_packet(addr, fns);
+            case fn_group::F29_36: return make_f29_f36_packet(addr, fns);
             default:                return make_f0_f4_packet(addr, 0); // should not happen, return something valid
         }
     }
