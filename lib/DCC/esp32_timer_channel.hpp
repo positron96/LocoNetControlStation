@@ -1,6 +1,15 @@
 #pragma once
 
+/**
+ * !!! DEPRECATED !!!
+ * After update to ESP-IDF 5, timer accuracy is unacceptably bad.
+ * Reasons are unknown, could be function's IRAM placement.
+ * Use RMT.
+ */
+
 #include "esp32_channel.hpp"
+
+#include <driver/gpio.h>
 
 namespace dcc {
 
@@ -55,7 +64,10 @@ private:
                 } else {
                     currentPacket = {idle_packet_bits, 1};
                 }
-                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d", currentPacket.packet.size_bits, current->packet.buf[0], current->packet.buf[1], current->nRepeats);
+                DCC_LOGD_ISR("next packet: [%d]=[%02X %02X...]*%d",
+                    currentPacket.packet.size_bits,
+                    currentPacket.packet.buf[0], currentPacket.packet.buf[1],
+                    currentPacket.nRepeats);
             }
         }
 

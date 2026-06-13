@@ -14,7 +14,7 @@ namespace dcc {
 class ESP32Timer {
 
 public:
-    explicit ESP32Timer(uint8_t timerNum = 1);
+    explicit ESP32Timer();
 
     void setProgChannel(ESP32TimerChannel * ch) { prog = ch;}
     void setMainChannel(ESP32TimerChannel * ch) { main = ch;}
@@ -28,7 +28,7 @@ public:
 
 private:
     hw_timer_t * _timer{nullptr};
-    uint8_t _timerNum;
+
     ESP32TimerChannel *main{nullptr};
     ESP32TimerChannel *prog{nullptr};
 

@@ -1,9 +1,11 @@
 #include "esp32_timer.hpp"
 
+#include <esp32-hal-timer.h>
+#include <esp_timer.h>
+
 namespace dcc {
 
-ESP32Timer::ESP32Timer(uint8_t timerNum)
-    : _timerNum(timerNum)
+ESP32Timer::ESP32Timer()
 {
 }
 
@@ -13,7 +15,6 @@ void ESP32Timer::begin() {
 
     constexpr size_t TIMER_TICK_US = 58;
 
-    (void)_timerNum;
     _timer = timerBegin(1000000 / TIMER_TICK_US);
     timerAttachInterruptArg(_timer, timerFunc_c, this);
     timerAlarm(_timer, 1, true, 0);
