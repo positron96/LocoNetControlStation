@@ -7,11 +7,6 @@
 #include "power_event.hpp"
 #include "dcc_log.hpp"
 
-#include <esp32-hal-timer.h>
-//#include <esp_adc_cal.h>
-#include <esp_timer.h>
-#include <driver/gpio.h>
-
 #include <etl/map.h>
 #include <etl/bitset.h>
 #include <etl/observer.h>

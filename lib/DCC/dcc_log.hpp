@@ -1,6 +1,6 @@
 #pragma once
 
-#define DCC_LOG_LVL  ARDUHAL_LOG_LEVEL_DEBUG
+#define DCC_LOG_LVL  ARDUHAL_LOG_LEVEL_INFO
 
 #include  "rom/ets_sys.h"  // for ets_printf
 

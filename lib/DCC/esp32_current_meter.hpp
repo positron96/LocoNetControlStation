@@ -2,6 +2,10 @@
 
 #include "base_channel.hpp"
 
+#include <esp_timer.h>
+
+//#include <esp_adc_cal.h>
+
 namespace dcc {
 
     class ESP32CurrentMeter: public CurrentMeter {

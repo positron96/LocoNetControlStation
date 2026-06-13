@@ -88,6 +88,12 @@ namespace dcc {
 
         bool put_generic_packet(const etl::span<const uint8_t> bytes, uint8_t n_repeats, int priority = 0) {
             if(queue_packets.full()) return false;
+            switch(bytes.size()) {
+                case 1: DCC_LOGI("[len=1:%02X]x%d", bytes[0], n_repeats); break;
+                case 2: DCC_LOGI("[len=2:%02X %02X]x%d", bytes[0], bytes[1], n_repeats); break;
+                default: DCC_LOGI("[len=%d:%02X...]x%d", bytes.size(), bytes[0], n_repeats); break;
+            }
+
             QueueItem item{
                 .priority = priority,
                 .data = PacketWithRepeats{packet_from_bytes(bytes), n_repeats}

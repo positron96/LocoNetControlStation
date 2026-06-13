@@ -122,22 +122,30 @@ private:
         etl::span<rmt_symbol_word_t> items
     ) {
 
-        PacketBits bits = PacketBits::from_packet(packet);
+        PacketBits bits = PacketBits::from_packet(packet, DEF_PREAMBLE_LEN-1);
 
-        if (bits.size_bits == 0 || items.size() == 0) {
+        if (items.size() == 0) {
             return 0;
         }
 
-        size_t itemIdx = 0;
-        for (size_t bit = 0; bit < bits.size_bits && itemIdx < items.size(); ++bit) {
-            const bool isOne = bits.bit_at(bit);
+        // add one bit more so that last bit with currupted duration is not an end bit.
+        // uint8_t *dd = bits.buf.data();
+        // DCC_LOGI("bytes %d: %02X %02X %02X", packet.size(), packet[0],packet[1],packet[2]);
+        bits.append_bit(1);
+        // DCC_LOGI("bits  %d: %02X %02X %02X %02X  %02X %02X %02X", bits.size_bits, dd[0],dd[1],dd[2], dd[3],dd[4],dd[5], dd[6]);
+
+        // TODO: if packet does not fit, this just fills what it can. Maybe fail?
+        size_t nBit = 0;
+        for (nBit = 0; nBit < bits.size_bits && nBit < items.size(); ++nBit) {
+            const bool isOne = bits.bit_at(nBit);
             const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
 
-            rmt_symbol_word_t &item = items[itemIdx++];
+            rmt_symbol_word_t &item = items[nBit];
             item.level0 = 1;  item.duration0 = half;
             item.level1 = 0;  item.duration1 = half;
         }
-        return itemIdx;
+
+        return nBit;
     }
 
     void packetTaskLoop() {
@@ -148,12 +156,11 @@ private:
             if (!packets.fetch_next_packet(packet)) {
                 //DCC_LOGD_ISR("No packets pending, sending idle");
                 packet = {idlePacket, 1};
+            } else {
+                DCC_LOGD("[len=%d:%02X...]x%d", packet.packet.size(), packet.packet[0], packet.nRepeats);
             }
 
-            // -1 because nRepeats=1 (once) means loop_count=0
-            rmt_transmit_config_t tx_opts = {
-                .loop_count = packet.nRepeats - 1
-            };
+            rmt_transmit_config_t tx_opts = {};
             tx_opts.flags.eot_level = 0; // set output low at end of transmission to match last pulse
             // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 0);
             // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 1);
@@ -161,7 +168,7 @@ private:
             assert(itemCount>0);
             rmt_items[itemCount-1].duration1 -= 15; // compensate for latency before next transmission starts. TODO: to tune later.
             // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 0);
-            for(size_t i=0; i<packet.nRepeats; i++) {
+            for(size_t i=0; i<packet.nRepeats; i++) { // ESP32 doesn't support loop_count, so loop manually
                 ESP_ERROR_CHECK(rmt_transmit(
                     _rmtChannel,
                     this->_copyEncoder,

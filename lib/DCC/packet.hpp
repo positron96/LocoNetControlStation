@@ -51,7 +51,7 @@ namespace dcc {
             crc ^= src[i];
 
         // don't care about endianness, we don't write multi-bytes
-        etl::bit_stream_writer s(dst.data(), dst.size(), etl::endian::native);
+        etl::bit_stream_writer s(dst.data(), dst.size(), etl::endian::big);
         if(preamble_bits != 0) s.write(0xFFFFFFFF, preamble_bits);  // preamble (max 32 bits)
         for(size_t i=0; i<len; i++) {
             s.write(0, 1); // data start bit
@@ -59,6 +59,7 @@ namespace dcc {
         }
         s.write(0, 1); // data start bit
         s.write(crc, 8);
+        s.write(1, 1); // data end bit
         return s.size_bits();
     }
 
@@ -92,7 +93,13 @@ namespace dcc {
         }
 
         uint8_t bit_at(size_t idx) const {
-            return (buf[idx / 8] >> (7 - (idx % 8))) & 0x1;
+            return (buf[idx / 8] >> (7-(idx % 8))) & 0x1;
+        }
+        void append_bit(uint8_t v) {
+            size_t nbyte = size_bits / 8, nbit = size_bits % 8;
+            if(nbit == 0) buf.push_back(0); // doesn't check for size
+            bitWrite(buf.data()[nbyte], 7-nbit, v);
+            size_bits++;
         }
     };
 
@@ -226,24 +233,22 @@ namespace dcc {
     inline auto make_accessory_packet(uint16_t addr9, uint8_t ch, bool thrown) {
         // DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
 
-        etl::array<uint8_t, 2> b;
+        etl::array<uint8_t, 2> data;
 
-        /*
-        first byte is of the form 10AAAAAA, where AAAAAA represent
-        6 least significant bits of accessory address (9-bit. Here we have 14-bit address, so take bits 2-7) */
-        b[0] = ( addr9 & 0x3F) | 0x80;
+        // 10AA'AAAA, where AAAAAA = 6 least significant bits of accessory 9-bit address
+        data[0] = ( addr9 & 0x3F) | 0x80;
         /*
         "The most significant bits of the 9-bit address are bits 4-6 of the second data byte.
         By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
         https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
         */
-        // second byte is of the form 1AAACDDD, where C should be 1, and the least significant D represents throw/close
-        b[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
+        // 1AAA'CDDR, where C=1(=on), R=throw(0)/close(1)
+        data[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
             | (ch & 0x3) << 1
-            | (thrown?0x1:0)
-            | 0b1000'0000   ;
+            | (thrown?0:1)
+            | 0b1000'1000;
 
-        return b;
+        return data;
     }
 
     inline auto make_accessory_packet(uint16_t addr11, bool thrown) {
