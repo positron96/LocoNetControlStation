@@ -1,6 +1,6 @@
 #include "WiThrottle.h"
 
-#include "DCC.h"
+#include "LocoAddress.h"
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
 #include "log.h"
 
@@ -285,7 +285,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     }
     // wifiPrintln(cli, "PW8888"); // Web port
     wifiPrintln(cli, "");
-    
+
 
     cc.rxpos = 0;
     cc.cli = cli;
@@ -309,7 +309,7 @@ void WiThrottleServer::clientStop(ClientData &client) {
     client.heartbeatEnabled = false;
     AsyncClient *cli = client.cli;
     // this method should be called only from onDisconnected, so this should be false
-    if(cli->connected() ) cli->stop();
+    if(cli->connected() ) cli->close();
     clients.erase(cli);
 }
 
@@ -442,10 +442,10 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, et
 void WiThrottleServer::ClientData::checkHeartbeat() {
     if(! heartbeatEnabled) return;
 
-    if (wdt.timedOut() && heartbeat==Heartbeat::Alive) {
+    if (wdt.timedOut() && health==ClientHealth::Alive) {
         // stop loco
         LOGI("timeout exceeded: current %ds, last updated at %ds",  millis()/1000, wdt.getLastUpdate()/1000 );
-        heartbeat = Heartbeat::SoftTimeout;
+        health = ClientHealth::SoftTimeout;
         for(const auto& throttle: slots)
             for(const auto& slot: throttle.second) {
                 CS.setLocoSpeed(slot.second, SPEED_EMGR);
@@ -453,9 +453,9 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
             }
         sendMessage("Timeout exceeded, locos stopped");
     }
-    if ((wdt.timedOut2() && heartbeat==Heartbeat::SoftTimeout)) {
+    if ((wdt.timedOut2() && health==ClientHealth::SoftTimeout)) {
         LOGI("timeout exceeded twice: closing connection" );
-        heartbeat = Heartbeat::HardTimeout;
+        health = ClientHealth::HardTimeout;
         cli->close();
     }
 
@@ -478,8 +478,8 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
 
     TurnoutAction a;
     switch(action) {
-        case 'T':  a = TurnoutAction::THROWN;  break;
-        case 'C':  a = TurnoutAction::CLOSED;  break;
+        case 'T':  a = TurnoutAction::THROW;  break;
+        case 'C':  a = TurnoutAction::CLOSE;  break;
         case '2':  a = TurnoutAction::TOGGLE;  break;
         default:
             cc.sendMessage("Unknown turnout command!", true);

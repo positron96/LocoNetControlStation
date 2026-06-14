@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
-#include <LocoNet.h>
+#include <LocoNet2.h>
 #include <etl/map.h>
 #include "CommandStation.h"
 
@@ -14,7 +14,7 @@ public:
 
     LN_STATUS onMessage(const lnMsg& msg) override {
         processMessage(&msg);
-        return LN_DONE;
+        return LN_IDLE;
     }
 
     void processMessage(const lnMsg* msg);
@@ -27,14 +27,14 @@ private:
     uint8_t dispatchedSlot;
 
     struct LnSlotData {
-        uint8_t ss2; 
-        uint8_t id1; 
+        uint8_t ss2;
+        uint8_t id1;
         uint8_t id2;
         LnSlotData(): ss2(0),id1(0),id2(0) {}
     };
 
     etl::map<uint8_t, LnSlotData, CommandStation::MAX_SLOTS> extra;
-    
+
     bool slotValid(uint8_t slot) {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
     }

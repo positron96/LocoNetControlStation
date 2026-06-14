@@ -8,7 +8,7 @@
 #include <AsyncTCP.h>
 
 #include <ln_opc.h>
-#include <LocoNet.h>
+#include <LocoNet2.h>
 #include <etl/queue.h>
 #include <etl/set.h>
 
@@ -20,11 +20,12 @@
 #define LB_LOGD(format, ...)  //do{ log_printf(ARDUHAL_LOG_FORMAT(D, format), ##__VA_ARGS__); }while(0)
 #else
 #define LB_LOGI(...)
-#define LB_LOGD(...) 
+#define LB_LOGD(...)
 #endif
 
-
 #define FROM_HEX(c) (   ((c)>'9') ? ((c) & ~0x20)-'A'+0xA : ((c)-'0')   )
+
+constexpr uint16_t LBSERVER_DEFAULT_TCP_PORT = 1234;
 
 class LbServer: public LocoNetConsumer {
 
@@ -36,7 +37,7 @@ public:
 
         server.onClient( [this](void*, AsyncClient* cli ) {
             if(clients.full()) {
-                LB_LOGI("onConnect: Not accepting client: %s", cli->remoteIP().toString().c_str() );
+                LB_LOGI("onConnect: Not accepting client: %s (full)", cli->remoteIP().toString().c_str() );
                 cli->close();
                 return;
             }
@@ -55,12 +56,12 @@ public:
                     processRx( ((char*)data)[i], cli);
             });
 
-            cli->onError([this](void*, AsyncClient* cli, int8_t err) { 
-                LB_LOGI("onError(%X): %d", (intptr_t)cli, err);  
+            cli->onError([this](void*, AsyncClient* cli, int8_t err) {
+                LB_LOGI("onError(%X): %d", (intptr_t)cli, err);
             });
-            cli->onTimeout([this](void*, AsyncClient* cli, uint32_t time) { 
-                LB_LOGI("onTimeout(%X): %d", (intptr_t)cli, time); 
-                cli->close(); 
+            cli->onTimeout([this](void*, AsyncClient* cli, uint32_t time) {
+                LB_LOGI("onTimeout(%X): %d", (intptr_t)cli, time);
+                cli->close();
             });
 
         }, nullptr);
@@ -87,22 +88,25 @@ public:
 
     LN_STATUS onMessage(const lnMsg& msg) override {
         if( !txQueue.full() && !clients.empty() ) txQueue.push(msg);
-        return LN_DONE;
+        return LN_IDLE;
     }
 
 private:
+    constexpr static size_t MAX_CLIENTS = 5;
 
     LocoNetBus *bus;
 
     uint16_t port;
 
     AsyncServer server;
-    etl::set<AsyncClient*, 5> clients;
+    etl::set<AsyncClient*, MAX_CLIENTS> clients;
 
-    etl::queue<LnMsg, 5> txQueue;
+    etl::queue<LnMsg, MAX_CLIENTS> txQueue;
 
     LocoNetMessageBuffer lbBuf;
     const static int LB_BUF_SIZE = 100;
+    // FIXME: there is only one buffer, several clients writing at the same time will produce a mess!
+    //  Realistically, only one PC connects to it.
     char lbStr[LB_BUF_SIZE];
     int lbPos = 0;
 
@@ -119,13 +123,13 @@ private:
                         LB_LOGD("LbServer::loop adding byte %02x from chars '%c' '%c' (pos %d)", val, lbStr[i-2], lbStr[i-1], i);
                         LnMsg *msg = lbBuf.addByte(val);
                         if(msg!=nullptr) {
-                            
+
                             sendMessage(*msg); // echo
                             LN_STATUS ret = bus->broadcast(*msg, this);
 
-                            if(ret==LN_DONE) cli->write("SENT OK\n"); else
+                            if(ret==LN_IDLE) cli->write("SENT OK\n"); else
                             if(ret==LN_RETRY_ERROR) cli->write("SENT ERROR LN_RETRY_ERROR\n"); else
-                            cli->write("SENT ERROR generic\n"); 
+                            cli->write("SENT ERROR generic\n");
                             break;
                         }
                     }
@@ -140,19 +144,19 @@ private:
     }
 
     void sendMessage(const LnMsg &msg) {
-        
-        char ttt[LB_BUF_SIZE] = "RECEIVE";
-        uint t = strlen(ttt);
-        uint8_t ln = msg.length();
-        for(int j=0; j<ln; j++) {
-            t += sprintf(ttt+t, " %02X", msg.data[j]);
+
+        char buf[LB_BUF_SIZE] = "RECEIVE";
+        uint len = strlen(buf);
+        uint8_t nBytes = msg.length();
+        for(int j=0; j<nBytes; j++) {
+            len += snprintf(buf+len, LB_BUF_SIZE-len, " %02X", msg.data[j]);
         }
-        LB_LOGD("Transmitting '%s'", ttt );
-        t += sprintf(ttt+t, "\n");
+        LB_LOGD("Transmitting '%s'", buf );
+        len += snprintf(buf+len, LB_BUF_SIZE-len, "\n");
         for (auto cli: clients) {
-            size_t len = cli->write(ttt);
-            if(len != t) {
-                LB_LOGI("cli(%x) tx length mismatch: expected %d, actual %d", (intptr_t)cli, t, len);
+            size_t written_len = cli->write(buf);
+            if(len != written_len) {
+                LB_LOGI("cli(%x) tx length mismatch: expected %d, actual %d", (intptr_t)cli, len, len);
             }
         }
     }

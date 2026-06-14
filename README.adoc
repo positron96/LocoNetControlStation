@@ -2,11 +2,17 @@
 
 image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
+**Status:** Version from 2021 (v1.0) is stable.
+Version from 2026 has updated ESP-IDF SDK and Arduino core,
+  but DCC signal generation suffers from occasional timing glitches,
+  so it not as reliable as the old one.
+
+
 Video demo:
 
 image:https://img.youtube.com/vi/KVks68XLQuE/mqdefault.jpg[link=https://youtu.be/KVks68XLQuE]
 
-The command station is based on ESP32 chip. 
+The command station is based on ESP32 chip.
 Development is done with Arduino core for ESP32 on PlatformIO.
 
 Planned features are:
@@ -22,13 +28,13 @@ Planned features are:
 * [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)+++
 
 The intended primary interface of the command station is LocoNet.
-LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB. 
+LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB.
 However, if needed, LocoNet can be cut from project and DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
 WiThrottle protocol is used to connect WiFi throttle to Command station and does not depend on LocoNet routing.
 
 ## Hardware
 
-The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module 
+The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module
 (that's one of the cheapest ESP32 board).
 The board has L298N chip for DCC generation for both main and program tracks.
 
@@ -37,9 +43,9 @@ This circuitry is common in DIY LocoNet projects{empty}footnote:[http://www.spco
 
 The PCB is open-source and is available here: https://oshwlab.com/positron96/loconet-command-station.
 
-The project will also work on a breadboard with a L298N board (a red one with current sensing pins) 
+The project will also work on a breadboard with a L298N board (a red one with current sensing pins)
 and DIP versions of components.
-Other available LocoNet breakout boards will also work. 
+Other available LocoNet breakout boards will also work.
 They must operate at 3.3V.
 5V levels on ESP32 GPIOs are out of spec (though it'll probably work).
 
@@ -70,20 +76,20 @@ Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
 ## Code architecture:
 
-* lib/DCC/DCC.h/.cpp: DCC packet generation link:lib/DCC[library]. 
+* lib/DCC/DCC.h/.cpp: DCC packet generation link:lib/DCC[library].
 ** `IDCCChannel` - an interface for working with one track (main/programming).
-** `DCCESP32Channel`- implementation of IDCCChannel. 
-Contains structures to store packets, switch between allocated slots. 
+** `DCCESP32Channel`- implementation of IDCCChannel.
+Contains structures to store packets, switch between allocated slots.
 A lot of architecture is derived from DCC++.
-** `DCCESP32SignalGenerator` - a class that runs timer for DCC waveform generation. 
+** `DCCESP32SignalGenerator` - a class that runs timer for DCC waveform generation.
 Contains references for 2 instances of IDCCChannel, so for both tracks only one timer is used.
 
 * CommandStation.h/.cpp: an API for a command station.
 The class finds, allocates, releases locomotive slots, sends programming data on programming tracks, stores turnout list.
 Calls functions from DCC.h to generate DCC packets.
 
-* LocoNetSlotManager.h/.cpp: a class that parses and generates LocoNet messages concerning command station functions. 
-Does slot managing and programming. 
+* LocoNetSlotManager.h/.cpp: a class that parses and generates LocoNet messages concerning command station functions.
+Does slot managing and programming.
 Calls functions from CommandStation.h for actual access to locomotives and tracks.
 
 * WiThrottle.h/.cpp: class for WiFi-based throttles (EngineDriver, WiThrottle and such).
@@ -94,7 +100,7 @@ Parses data from TCP, injects LocoNet packets into LocoNet bus, sends back resul
 Packets from the bus are sent to TCP.
 
 * LocoNetSerial: an implementation of LocoNet over UART (for connecting to PC with USB cable).
-Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited. 
+Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited.
 Not used at the moment, as serial port is used for debugging output.
 
 ### LocoNet routing
@@ -102,20 +108,20 @@ Not used at the moment, as serial port is used for debugging output.
 Since this project is an Ultimate Command Station, it must accepts Loconet messages from different sources: physical LocoNet bus, USB-Serial, LbServer (LocoNet over TCP). All messages must be transparently routed to between all connected buses. It means that:
 
  * There must be a routing mechanism for broadcasting messages from one source to others.
- * Existing frontend classes (e.g. Throttle) must be separated from hardware backend and conncted to other sources. 
+ * Existing frontend classes (e.g. Throttle) must be separated from hardware backend and conncted to other sources.
  When command station itself generates a message (e.g. a reply to throttle), it must be broadcasted to all handlers.
  * Result of sending a message to the bus is only taken into account for real LocoNet bus; it is assumed that USB and WiFi always send packets successfully.
 
 With this in mind, the LocoNet2 library was heavily redesigned and refactored.
-The LocoNet class is now separated into hardware backend (LocoNetPhy), a message parser (LocoNetDispatcher), and a routing bus (LocoNetBus) between them. 
+The LocoNet class is now separated into hardware backend (LocoNetPhy), a message parser (LocoNetDispatcher), and a routing bus (LocoNetBus) between them.
 Other sources of messages extend LocoNetConsumer class and are connected to the bus. and messages.
 Frontend classes (Throttle, FastClock, SystemVariable etc) are connected to the message parser instead of hardware class and so can handle messages from all sources.
 
 The implementation is based on these libraries:
 
- *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks. 
+ *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks.
 
- * link:lib/DCC[DCC] library is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project] (heavily modified). Used for DCC packet generation. 
+ * link:lib/DCC[DCC] library is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project] (heavily modified). Used for DCC packet generation.
 
  * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
 
@@ -128,13 +134,32 @@ The implementation is based on these libraries:
 
 **Beware that CV reading/writing may not work for your decoder.**
 
-It appears that ADC on my esp32 changed its parameters over the year. 
+It appears that ADC on my esp32 changed its parameters over the year.
 It now does not detect decoder responses when reading/writing CVs.
-I tested with one particular decoder, the voltage over the shunt resistor is around 30mV, the resistor is 0.1 Ohm, so the current is 0.3A, which is within NMRA specs for basic acknowledge. 
-However, the ESP32 shows non-zero readings only starting from around 80 mV, and ADC readings are around 2-8. 
+I tested with one particular decoder, the voltage over the shunt resistor is around 30mV, the resistor is 0.1 Ohm, so the current is 0.3A, which is within NMRA specs for basic acknowledge.
+However, the ESP32 shows non-zero readings only starting from around 80 mV, and ADC readings are around 2-8.
 This is actually within specs of ESP32 that https://docs.espressif.com/projects/esp-idf/en/v4.4/esp32/api-reference/peripherals/adc.html#adc-attenuation[state] that measurable readings start from 100 mV.
 Somehow it did work much better before, as I have the ADC threshold in the code at 500 before.
 I had to lower it to 2, so now the CV reading somewhat works, but not reliably.
 
 In the future version, a proper amplifier needs to be adde to the schematic.
 I am looking at this TI https://www.ti.com/product/INA180[INA180].
+
+### 2026-06
+
+I've returned to work on this project after a long break.
+The main goal is to remake the PCB for a DIN rail enclosure,
+  but I started with adding support for periodic refreshing locomotive functions
+  (they were one shot before) and upgrading thecodebase to
+  use modern  versions of SDK and libraries and C++ standard.
+Last version before redesign is marked 1.0.
+
+Upgrading code for ESP-IDF v5 caused the timer to break,
+  as the jitter is too large with the new API for some reason.
+I was able to somewhat combat this by switching to RMT peripheral,
+  but it's also suffering from problems due to delays between RMT transmissions.
+In new SDK RMT peripheral has completely new API which link:https://github.com/espressif/esp-idf/issues/13003[doesn't allow continous streaming].
+So, while the new version mostly works (and has some important fixes to existing functionality),
+  it needs a reimplementation of DCC.
+The options I'm considering is back-porting of older RMT driver
+  or trying an built-in ULP co-processor.

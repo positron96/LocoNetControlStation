@@ -1,15 +1,19 @@
 #include <DCC.h>
+// #include <esp32_timer_channel.hpp>
+// #include <esp32_timer.hpp>
+#include <esp32_rmt_channel.hpp>
+#include <esp32_current_meter.hpp>
 
 #include "CommandStation.h"
 
 #include "LocoNetSlotManager.h"
 
 #include "LocoNetSerial.h"
-#include "LbServer.h"
+#include "LocoNetTCPServer.h"
 
 #include "WiThrottle.h"
 
-#include <LocoNetESP32.h>
+#include <LocoNetStream.h>
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -21,25 +25,23 @@
 #include <stdio.h>
 #include <atomic>
 
+#ifndef USE_WIFI
+#define USE_WIFI 1
+#endif
+
 LocoNetBus bus;
 
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17
-//#include <LocoNetESP32UART.h>
-//LocoNetESP32Uart locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, false );
-//#include <LocoNetESP32Hybrid.h>
-//LocoNetESP32Hybrid locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 1, false, true, 0 );
-//#include <LocoNetESP32.h>
-LocoNetESP32 locoNetPhy(&bus, LOCONET_PIN_RX, LOCONET_PIN_TX, 0);
+#include <LocoNetStreamESP32.h>
+LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
 
+#define CS_NAME "ESP32CommandStation"
 
-#define LBSERVER_TCP_PORT  1234
-LbServer lbServer(LBSERVER_TCP_PORT, &bus);
+LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
-
-#define CS_NAME "ESP32CommandStation"
 
 #define PIN_LED  22
 
@@ -50,9 +52,14 @@ LbServer lbServer(LBSERVER_TCP_PORT, &bus);
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
 
-DCCESP32Channel<10> dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE);
-DCCESP32Channel<2> dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE);
-DCCESP32SignalGenerator dccTimer(1); //timer1
+dcc::PacketList<10> dcc_packets_main;
+dcc::PacketList<2> dcc_packets_prog;
+// dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+// dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+// dcc::ESP32Timer dccTimer(1); //timer1
+dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+dcc::ESP32CurrentMeter currentMeter;
 
 LocoNetSlotManager slotMan(&bus);
 
@@ -78,6 +85,21 @@ TimerType timerController;
 etl::timer::id::type ledTimer;
 etl::timer::id::type checkCurrentTimer;
 
+class PowerStatusObserver: public dcc::PowerObserver {
+    void notification(const dcc::PowerEvent &event) override {
+        if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
+            if(event.channel == &dccMain) {
+                ledStartBlinking(LED_INTL_CONFIG2, 1);
+            Serial.println("Overcurrent on main");
+            } else if(event.channel == &dccProg) {
+
+                Serial.println("Overcurrent on prog");
+            }
+
+        }
+    }
+} powerStatusObserver;
+
 void setup() {
 
     Serial.begin(115200);
@@ -89,7 +111,7 @@ void setup() {
 
     digitalWrite(PIN_LED, LOW);
 
-    locoNetPhy.begin();
+    locoNetPhy.start();
     //lSerial.begin();
 
 
@@ -123,8 +145,15 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
-    dccTimer.setMainChannel(&dccMain);
-    dccTimer.setProgChannel(&dccProg);
+    // dccTimer.setMainChannel(&dccMain);
+    // dccTimer.setProgChannel(&dccProg);
+
+    dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
+    dccMain.setOvercurrentThreshold(2000);
+    currentMeter.addChannel(dccMain);
+    dccProg.setVoltageToCurrentCoef(1.0f);
+    dccProg.setOvercurrentThreshold(500);
+    currentMeter.addChannel(dccProg);
 
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
@@ -137,7 +166,7 @@ void setup() {
         TimerType::callback_type::create<checkCurrent>(),
         1, true);
 
-
+#if USE_WIFI != 0
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
         // start AP
@@ -167,14 +196,20 @@ void setup() {
     MDNS.begin("ESP32Server");
 	//MDNS.addService("http","tcp", DCCppServer_Port);
 	MDNS.setInstanceName(CS_NAME);
-
-    dccTimer.begin();
-
-    dccMain.setPower(true);
-    dccProg.setPower(true);
-
     lbServer.begin();
     withrottleServer.begin();
+    dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
+
+#endif
+
+    dccMain.add_observer(powerStatusObserver);
+    dccProg.add_observer(powerStatusObserver);
+    //dccTimer.begin();
+    dccMain.begin();
+    dccProg.begin();
+    dccMain.setPower(true);
+    dccProg.setPower(true);
+    currentMeter.begin();
 
     timerController.enable(true);
     timerController.start(checkCurrentTimer);
@@ -184,21 +219,16 @@ void setup() {
 
 void loop() {
 
+#if USE_WIFI != 0
     lbServer.loop();
     withrottleServer.loop();
+#endif
     CS.loop();
     //lSerial.loop();
 
-    /*
-    static unsigned long nextDccMeter = 0;
-    if(millis()>nextDccMeter) {
-        uint16_t v = dccMain.readCurrentAdc() ;
-        if(v > 15) dccMain.setPower(false);
-        nextDccMeter = millis()+20;
-    }*/
     uint32_t ms = millis();
     static uint32_t lastMs = 0;
-    if(timerController.tick(ms - lastMs)) {
+    if(ms!=lastMs && timerController.tick(ms - lastMs)) {
         lastMs = ms;
     }
 
@@ -208,11 +238,6 @@ void loop() {
     if(millis()>nextInRead) {
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
-
-            //bool r = dccMain.verifyCVByteProg(1, v==1 ? 13 : 14);
-            //int r = dccMain.readCVProg(1);
-
-            //Serial.printf("main(): readCVProg: %d\n", r);
             Serial.printf( "reporting sensor %d\n", v==HIGH) ;
             reportSensor(&bus, 1, v==HIGH);
             Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
@@ -234,37 +259,10 @@ void loop() {
         nextInRead = millis() + 10;
     }
 
-    /*
-    if(Serial.available()) {
-        Serial.read();
-        DCCESP32Channel<10>::RegisterList *r = dccMain.getReg();
-        Packet *p = r->currentPacket;
-        while(r->currentPacket == p) {
-            dccMain.timerFunc();
-            delay(1);
-            if(r->currentBit==1) break;
-        }
-    }
-    */
-
 }
 
 void checkCurrent() {
-    bool oc = dccMain.checkOvercurrent();
-    if(!oc) {
-        withrottleServer.notifyPowerStatus();
-        Serial.println("Overcurrent on main");
-    }
-
-    oc = dccProg.checkOvercurrent();
-    if(!oc) {
-        Serial.println("Overcurrent on prog");
-    }
-
-    //uint32_t v = dccMain.readCurrentAdc();
-    //cur = cur*0.9 + v*0.1;
-    //if(v!=0)Serial.printf("%d, %d\n", v, (int)cur );
-    //dccMain.timerFunc();
+    currentMeter.checkOvercurrent();
 }
 
 

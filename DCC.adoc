@@ -31,15 +31,15 @@ PPP 0 11AA-AAAA 0 AAAA-AAAA 0 CCCD DDDD () 0 EEEE-EEEE 1   - Extended Locomotive
                               1101 1111 0 DDDD-DDDD 0 E..E - F28..F21
 
 
-PPP 0 10AA-AAAA 0 1AAA-CDDD 0 EEEE-EEEE 1 - Basic Accessory Decoder Packet Format (9/11-bit address) S-9.2.1#420
-                   AAA                    - high bits of address, in 1's complement
+PPP 0 10AA-AAAA 0 1aaa-CDDD 0 EEEE-EEEE 1 - Basic Accessory Decoder Packet Format (9/11-bit address) S-9.2.1#420
+                   aaa                    - high bits of address, in 1's complement
                        C                  - activate or deactivate
                         DD                - output pair or 2 lowest bits of 11-bit address
-                          D               - thrown/closed
+                          D               - 0=thrown/red;1=closed/green
 
-PPP 0 10AA-AAAA 0 0AAA-0AA1 0 000X-XXXX 0 EEEE-EEEE 1 - Extended Accessory Decoder Control Packet  S-9.2.1#436
-        AA-AAAA    AAA  AA                            - 11-bit address
-                   AAA                                - 1's complement, highest 3 bits of address
+PPP 0 10AA-AAAA 0 0aaa-0AA1 0 000X-XXXX 0 EEEE-EEEE 1 - Extended Accessory Decoder Control Packet  S-9.2.1#436
+        AA-AAAA    aaa  AA                            - 11-bit address
+                   aaa                                - 1's complement, highest 3 bits of address
                         AA                            - lowest 2 bits of address
                                  X-XXXX               - aspect to be shown. 0=stop aspect
 

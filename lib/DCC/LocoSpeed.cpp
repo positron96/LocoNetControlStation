@@ -4,7 +4,7 @@
 
 
     LocoSpeed LocoSpeed::fromFloat(float speed) {
-        if(speed<0) return SPEED_EMGR; 
+        if(speed<0) return SPEED_EMGR;
         else {
             int s = ceil(speed*MAX_SPEED_VAL);
             if(s==0) return SPEED_IDLE;
@@ -42,7 +42,7 @@
         switch(speedMode) {
             case SpeedMode::S128: return s;
             case SpeedMode::S14: if(s>=15) return 127; return (s-1)*9 + 1;
-            case SpeedMode::S28:  
+            case SpeedMode::S28:
                 if(s<=3) return s-2; // 2 and 3 are IDLE and EMGR
                 if(s>=31) return 127;
                 return (s-3)*9/2 + 1;
