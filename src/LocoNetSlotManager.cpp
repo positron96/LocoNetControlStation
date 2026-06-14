@@ -251,12 +251,12 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
         uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 0 : 1;
         CS.setLocoDir(slot, dir);
         // fn order in received byte is 04321, needs swapping
-        CS.setLocoFns(slot, 0b0001'1111, moveBit5to1(v) );
+        CS.setLocoFns(slot, dcc::fn_group::F0_4, moveBit5to1(v) );
     }
 
     void LocoNetSlotManager::processSnd(uint8_t slot, uint8_t snd) {
         LOGI("OPC_LOCO_SND slot %d snd %02x", slot, snd);
-        CS.setLocoFns(slot, 0x1E0, snd << 5 );
+        CS.setLocoFns(slot, dcc::fn_group::F5_8, (uint32_t)snd << 5);
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {

@@ -194,7 +194,7 @@ public:
         dd.refreshing = refresh;
 
         if(refresh) {
-            // no need to load, it will load itself on setLocoSpeed
+            // no need to load, it will load itself on setLocoSpeed/setLocoFn
             dd.kickWatchdog();
         } else {
             dccMain->unloadSlot(dd.addr);
@@ -229,40 +229,56 @@ public:
         return getSlot(slot).speedMode;
     }
 
+    /** Changes one function. */
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
         if(dd.fn[fn] == val) return;
+        // CS_DEBUGF("slot %d FN%d=%d", slot, fn, val);
 
         dd.fn[fn] = val;
         using dcc::fn_group;
-        fn_group fg;
-
+        fn_group fg = dcc::fn_to_group(fn);
         uint32_t ifn = dd.fn.value<uint32_t>();
-        if     (fn<5)  fg = fn_group::F0_4;
-        else if(fn<9)  fg = fn_group::F5_8;
-        else if(fn<13) fg = fn_group::F9_12;
-        else if(fn<21) fg = fn_group::F13_20;
-        else           fg = fn_group::F21_28;
+
         dccMain->sendFunctionGroup(dd.addr, fg, ifn);
     }
 
-    void setLocoFns(uint8_t slot, uint32_t m, uint32_t f ) {
+    /** Changes bits of DCC function group. */
+    void setLocoFns(uint8_t slot, dcc::fn_group fg, uint32_t vals) {
         LocoData &dd = getSlot(slot);
         dd.kickWatchdog();
-        uint32_t v = dd.fn.value<uint32_t>();
-        // if required bits (m) intersect function group bits (GM) and these bits (f^v != 0) differ from current value,
-        // update bits (v=) and send function group
-        #define CHECK_SEND(GM, FG)  if(  ( (m&GM)!=0) && ( ( (v^f)&m&GM)!=0 ) )  \
-            { v = (v&(0xFFFF'FFFF&~GM)) | (f&m&GM);   dccMain->sendFunctionGroup(dd.addr, FG, v ); }
-        using dcc::fn_group;
-        CHECK_SEND(      0x1F, fn_group::F0_4);
-        CHECK_SEND(     0x1E0, fn_group::F5_8);
-        CHECK_SEND(    0x1E00, fn_group::F9_12);
-        CHECK_SEND( 0x1F'E000, fn_group::F13_20);
-        CHECK_SEND(0x1FE'0000, fn_group::F21_28);
-        #undef CHECK_SEND
-        dd.fn = LocoData::Fns( v );
+        uint32_t current = dd.fn.value<uint32_t>();
+        uint32_t mask = dcc::fn_group_mask(fg);
+        vals = (current & ~mask) | (vals & mask);
+        if(vals == current) return;
+        // CS_DEBUGF("slot %d FN G%d = %d", slot, (int)fg, vals);
+
+        dccMain->sendFunctionGroup(dd.addr, fg, vals);
+        dd.fn = LocoData::Fns( vals );
+    }
+
+    /** Changes bits across multiple function groups. */
+    void setLocoFns(uint8_t slot, uint32_t mask, uint32_t vals ) {
+        LocoData &dd = getSlot(slot);
+        dd.kickWatchdog();
+        vals = vals & mask; // only take bits in mask, ignore others
+        uint32_t current = dd.fn.value<uint32_t>();
+        vals = (current & ~mask) | vals; // updated value for all bits
+        uint32_t changed = current ^ vals;
+
+        for(size_t g=0; g<dcc::FN_NUMBER; g++) {
+            dcc::fn_group fg = static_cast<dcc::fn_group>(g);
+            uint32_t gm = dcc::fn_group_mask(fg);
+            // if required mask intersects function group mask
+            //  and these bits differ from current value,
+            // update bits (v=) and send function group
+            if((mask & gm) != 0 && (changed & gm) != 0) {
+                dccMain->sendFunctionGroup(dd.addr, fg, vals);
+            }
+        }
+
+        dd.fn = LocoData::Fns( vals );
     }
 
     bool getLocoFn(uint8_t slot, uint8_t fn) {
