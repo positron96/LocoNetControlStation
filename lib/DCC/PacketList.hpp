@@ -64,17 +64,21 @@ namespace dcc {
             auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
             it->second.packets[0] = packet_from_bytes(bytes);
             enqueue_slot_packet(SlotLocation{it, 0}, speed.isEmgr() ? -100 : 0);
+            DCC_LOGI("Addr:%d, spd:%d(%s) %c, %s",
+                addr.addr(), speed.get128(), SpeedModeToStr(mode), fwd?'F':'R',
+                fmt_span(bytes));
             return true;
         }
 
         bool put_loco_fn_packet(const LocoAddress addr, fn_group fg, uint32_t data) {
             auto bytes = make_fn_packet(addr, fg, data);
 
-            size_t idx = fn_group_index(fg) + 1;
-            if(idx > N_PACKETS_PER_LOCO) {
+            size_t idx = fn_group_index(fg);
+            if(idx >= N_FN_GROUPS_PER_LOCO) {
                 // use non-slot packet for extra functions
                 return put_generic_packet(bytes, FN_PACKET_REPEATS, 0);
             }
+            idx += 1; // 0th index is speed+dir
             // find slot for loco
             auto it = loco_slots.find(addr);
             if(it == loco_slots.end() ) {
@@ -83,16 +87,13 @@ namespace dcc {
             }
             it->second.packets[idx] = packet_from_bytes(bytes);
             enqueue_slot_packet(SlotLocation{it, idx}, 0);
+            DCC_LOGI("Addr:%d, fg:%d, %s", addr.addr(), (int)fg, fmt_span(bytes));
             return true;
         }
 
         bool put_generic_packet(const etl::span<const uint8_t> bytes, uint8_t n_repeats, int priority = 0) {
             if(queue_packets.full()) return false;
-            switch(bytes.size()) {
-                case 1: DCC_LOGI("[len=1:%02X]x%d", bytes[0], n_repeats); break;
-                case 2: DCC_LOGI("[len=2:%02X %02X]x%d", bytes[0], bytes[1], n_repeats); break;
-                default: DCC_LOGI("[len=%d:%02X...]x%d", bytes.size(), bytes[0], n_repeats); break;
-            }
+            DCC_LOGI("%sx%d", fmt_span(bytes), n_repeats);
 
             QueueItem item{
                 .priority = priority,
@@ -118,6 +119,13 @@ namespace dcc {
                         cur_slot = loco_slots.begin();
                     }
                 }
+                if(loco_slots.size()==1) {
+                    // if we are clearing the only slot, reset cur_slot to end to prevent dereferencing it
+                    cur_slot = loco_slots.end();
+                }
+                DCC_LOGI("Clearing slot %d (loco %d), cur is %d",
+                    std::distance(loco_slots.begin(), it), addr.addr(),
+                    std::distance(loco_slots.begin(), cur_slot));
                 loco_slots.erase(it);
             }
         }
@@ -134,16 +142,20 @@ namespace dcc {
                 QueueItem item = queue_packets.top();
                 queue_packets.pop();
                 if(etl::holds_alternative<PacketWithRepeats>(item.data)) {
-                    DCC_LOGD("Fetching queue item");
+                    // queue has a packet, return it
                     packet_out = etl::get<PacketWithRepeats>(item.data);
+                    DCC_LOGD("ret queue packet: %s", fmt_span(packet_out.packet));
                     return true;
                 } else {
+                    // queue has a slot ref
                     auto loc = etl::get<SlotLocation>(item.data);
                     LocoSlot &slot = loc.it->second;
                     if(slot.packets[loc.idx].has_value() ) {
-                        DCC_LOGD("Fetching queue location slot %d, idx %d",
-                            std::distance(loco_slots.begin(), loc.it), loc.idx);
                         packet_out = PacketWithRepeats{slot.packets[loc.idx].value(), 1};
+                        DCC_LOGD("ret queue location slot %d/%d, idx %d, len %d",
+                            std::distance(loco_slots.begin(), loc.it),
+                            loco_slots.size(), loc.idx, packet_out.packet.size());
+
                         // update cur_slot and phase, it will be advanced on next call;
                         cur_slot = loc.it;
                         slot.phase = Phase::from_index(loc.idx);
@@ -166,41 +178,62 @@ namespace dcc {
             size_t idx = slot.phase.to_index();
             if(!slot.packets[idx].has_value() ) {
                 // index we want has no packet, advance index (with rollover)
-                for(size_t i=0; i<N_PACKETS_PER_LOCO; i++) {
-                    idx++; if(idx==N_PACKETS_PER_LOCO) idx=0;
-                    if(slot.packets[idx].has_value()) { slot.phase = Phase::from_index(idx); break; } // found it
+                for(size_t attempt=0; attempt<N_PACKETS_PER_LOCO; attempt++) {
+                    idx++; if(idx>=N_PACKETS_PER_LOCO) idx=0;
+                    if(slot.packets[idx].has_value()) {
+                        // found it
+                        slot.phase = Phase::from_index(idx);
+                        break;
+                    }
                 }
             }
-            assert(slot.packets[idx].has_value()); // slot allocated, but we didn't find packets it in
+            if(!slot.packets[idx].has_value()) {
+                // slot allocated, but we didn't find packets it in
+                DCC_LOGW("Slot %d of %d (loco %d) has no packet at idx %d",
+                    std::distance(loco_slots.begin(), cur_slot),
+                    loco_slots.size(),
+                    cur_slot->first.addr(),
+                    idx);
+                assert(false);
+            }
 
-            DCC_LOGD("Fetching slot %d idx %d (ph %d)",
-                std::distance(loco_slots.begin(), cur_slot),
-                idx, slot.phase);
             packet_out = PacketWithRepeats{slot.packets[idx].value(), 1};
+            DCC_LOGD("ret slot %d/%d idx %d (ph %d): %s",
+                std::distance(loco_slots.begin(), cur_slot),
+                loco_slots.size(),
+                idx, slot.phase, fmt_span(packet_out.packet));
             return true;
         }
     protected:
 
         constexpr static size_t N_FN_GROUPS_PER_LOCO = 3;
         constexpr static size_t N_PACKETS_PER_LOCO = N_FN_GROUPS_PER_LOCO + 1;
-        constexpr static size_t MAX_PHASE = N_PACKETS_PER_LOCO * 2;
+        constexpr static size_t NUM_PHASES = N_FN_GROUPS_PER_LOCO * 2;
 
+        /** Class to advance phase within one row of packet table.
+         * Every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
+         * phase: 0  1  2  3  4  5
+         * index: 0  1  0  2  0  3
+         * I.e. for 3 fn packets, 6 phases are needed.
+         */
         struct Phase {
             size_t phase{0};
 
-            /// every even phase -> 0th (speed/dir) packet, every odd one -> fn packet
+            /// @brief  convert phase to index
+            /// @return
             size_t to_index() {
-                return phase % 2 == 0 ? 0 : phase / 2 + 1;
+                return phase % 2 == 0 ? 0 : (phase / 2 + 1);
             }
 
             /// convert index to phase
             static Phase from_index(size_t idx) {
-                return {idx == 0 ? 0 : (idx*2 + 1)};
+                // 0->0, 1->1, 2->3, 3->5
+                return {idx == 0 ? 0 : (idx*2 - 1)};
             }
 
             void inc() {
                 phase ++;
-                if(phase == BasePacketList::MAX_PHASE) phase = 0;
+                if(phase == BasePacketList::NUM_PHASES) phase = 0;
             }
         };
 
@@ -250,7 +283,7 @@ namespace dcc {
                 .priority = priority,
                 .data = loc
             };
-            queue_packets.push(item);
+            //queue_packets.push(item);
             return true;
         }
 

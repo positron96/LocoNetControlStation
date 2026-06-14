@@ -16,6 +16,33 @@ namespace dcc {
         F0_4, F5_8, F9_12, F13_20, F21_28, F29_36
     };
 
+    constexpr size_t FN_NUMBER = 6;
+
+    constexpr size_t fn_group_index(const fn_group fg) {
+        return etl::to_underlying(fg);
+    }
+
+    constexpr uint32_t fn_group_mask(const fn_group fg) {
+        switch(fg) {
+            case fn_group::F0_4:   return                                  0b1'1111;
+            case fn_group::F5_8:   return                             0b1'1110'0000;
+            case fn_group::F9_12:  return                        0b1'1110'0000'0000;
+            case fn_group::F13_20: return              0b1'1111'1110'0000'0000'0000;
+            case fn_group::F21_28: return    0b1'1111'1110'0000'0000'0000'0000'0000;
+            case fn_group::F29_36: return 0b1110'0000'0000'0000'0000'0000'0000'0000;
+        }
+        return 0; // should never reach
+    }
+
+    constexpr fn_group fn_to_group(const size_t fn) {
+        if(fn < 5) return fn_group::F0_4;
+        else if(fn < 9) return fn_group::F5_8;
+        else if(fn < 13) return fn_group::F9_12;
+        else if(fn < 21) return fn_group::F13_20;
+        else if(fn < 29) return fn_group::F21_28;
+        else return fn_group::F29_36;
+    }
+
     constexpr size_t MAX_PACKET_LEN = 6;
 
     constexpr size_t ACCESSORY_PACKET_REPEATS = 4; // repeat accessory packets this number of times
@@ -28,18 +55,6 @@ namespace dcc {
     constexpr size_t FN_PACKET_REPEATS = 4;
 
     constexpr size_t DEF_PREAMBLE_LEN = 22;
-
-
-    constexpr size_t fn_group_index(const fn_group fg) {
-        switch(fg) {
-            case fn_group::F0_4: return 0;
-            case fn_group::F5_8: return 1;
-            case fn_group::F9_12: return 2;
-            case fn_group::F13_20: return 3;
-            case fn_group::F21_28: return 4;
-            default: return 0;
-        }
-    }
 
     /**
      * Takes DCC packet bytes and adds preamble, spacer bits etc.
@@ -154,7 +169,7 @@ namespace dcc {
         return make_speed_dir_packet(addr, speed.getDCCByte(mode), mode, fwd ? 1 : 0);
     }
 
-    [[deprecated("use make_fn_packet instead")]]
+    [[deprecated("use make_fn_packet(fn_group) instead")]]
     inline auto make_fn_packet(LocoAddress addr, uint8_t fByte, uint8_t eByte) {
         etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());

@@ -4,19 +4,28 @@
 /** DCC speed mode. */
 enum class SpeedMode { S14, S28, S128 };
 
+inline constexpr const char* SpeedModeToStr(SpeedMode sm) {
+    switch(sm) {
+        case SpeedMode::S14: return "S14";
+        case SpeedMode::S28: return "S28";
+        case SpeedMode::S128: return "SS128";
+    }
+    return "?";
+}
+
 constexpr uint8_t DCC_SPEED_IDLE = 0; ///< DCC speed value for idle (stop)
 constexpr uint8_t DCC_SPEED_EMGR = 1; ///< DCC speed value for emergency stop
 
-/** 
+/**
  * Stores locomotive speed.
- * 
+ *
  * Has utility functions to convert to/from different DCC speed modes (14, 28, 128) and float (0..1) values.
  * Internally, stores speed as DCC 128 speed steps.
  * It's a lightweight object, so can be passed by value cheapliy.
  */
 class LocoSpeed {
 public:
-    constexpr LocoSpeed(): LocoSpeed{0} {} 
+    constexpr LocoSpeed(): LocoSpeed{0} {}
 
     LocoSpeed(uint8_t speed, SpeedMode mode): LocoSpeed{dccTo128(speed, mode)} {}
 
@@ -46,4 +55,3 @@ constexpr uint8_t getMaxSpeedVal(SpeedMode s);
 
 constexpr LocoSpeed SPEED_IDLE = LocoSpeed::from128(DCC_SPEED_IDLE);
 constexpr LocoSpeed SPEED_EMGR = LocoSpeed::from128(DCC_SPEED_EMGR);
-

@@ -9,6 +9,7 @@
 #include <etl/array.h>
 #include <etl/span.h>
 
+// #include <driver/gpio.h>
 
 namespace dcc {
 
@@ -38,7 +39,7 @@ public:
         txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
         txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
         txCfg.mem_block_symbols = 64;
-        txCfg.trans_queue_depth = 2; // !!! can be 2 (in zimo example)
+        txCfg.trans_queue_depth = 1; // !!! can be 2 (in zimo example)
         txCfg.intr_priority = 0;
 
         if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
@@ -69,7 +70,7 @@ public:
         }
 
         _running = true;
-        if (xTaskCreate(packetTaskLoop_c, "dcc_rmt_tx", 4096, this, 3, &_packetTask) != pdPASS) {
+        if (xTaskCreate(packetTaskLoop_c, "dcc_rmt_tx", 4096, this, 1, &_packetTask) != pdPASS) {
             _running = false;
             DCC_LOGW("Failed to start DCC RMT task");
             return;
@@ -122,15 +123,16 @@ private:
         etl::span<rmt_symbol_word_t> items
     ) {
 
-        PacketBits bits = PacketBits::from_packet(packet, DEF_PREAMBLE_LEN-1);
-
-        if (items.size() == 0) {
+        if (items.size() == 0 || packet.size() == 0) {
             return 0;
         }
+
+        PacketBits bits = PacketBits::from_packet(packet, DEF_PREAMBLE_LEN-1);
 
         // add one bit more so that last bit with currupted duration is not an end bit.
         // uint8_t *dd = bits.buf.data();
         // DCC_LOGI("bytes %d: %02X %02X %02X", packet.size(), packet[0],packet[1],packet[2]);
+        // Serial.printf("bytes %s\r\n", fmt_span(packet));
         bits.append_bit(1);
         // DCC_LOGI("bits  %d: %02X %02X %02X %02X  %02X %02X %02X", bits.size_bits, dd[0],dd[1],dd[2], dd[3],dd[4],dd[5], dd[6]);
 
@@ -157,18 +159,19 @@ private:
                 //DCC_LOGD_ISR("No packets pending, sending idle");
                 packet = {idlePacket, 1};
             } else {
-                DCC_LOGD("[len=%d:%02X...]x%d", packet.packet.size(), packet.packet[0], packet.nRepeats);
+                DCC_LOGD("fetched: %sx%d", fmt_span(packet.packet), packet.nRepeats);
             }
 
             rmt_transmit_config_t tx_opts = {};
             tx_opts.flags.eot_level = 0; // set output low at end of transmission to match last pulse
             // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 0);
-            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 1);
+
             const size_t itemCount = fillRmt(packet.packet, rmt_items);
             assert(itemCount>0);
-            rmt_items[itemCount-1].duration1 -= 15; // compensate for latency before next transmission starts. TODO: to tune later.
-            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin2), 0);
-            for(size_t i=0; i<packet.nRepeats; i++) { // ESP32 doesn't support loop_count, so loop manually
+            rmt_items[itemCount-1].duration1 -= 30; // compensate for latency before next transmission starts. TODO: to tune later.
+
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 1);
+            for(size_t i=0; i<packet.nRepeats; i++) { // OG ESP32 doesn't support loop_count, so loop manually
                 ESP_ERROR_CHECK(rmt_transmit(
                     _rmtChannel,
                     this->_copyEncoder,
@@ -177,6 +180,7 @@ private:
                     &tx_opts
                 ));
             }
+            // gpio_set_level(static_cast<gpio_num_t>(_debug_pin), 0);
 
         }
     }
