@@ -8,9 +8,9 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 
-#include "base_channel.hpp"
-#include "packet.hpp"
-#include "LocoAddress.h"
+#include "dcc/base_channel.hpp"
+#include "dcc/packet.hpp"
+#include "dcc/LocoAddress.h"
 #include <LocoNet2.h>
 
 #include "Watchdog.h"

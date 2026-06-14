@@ -5,7 +5,7 @@
 #include "packet.hpp"
 #include "PacketList.hpp"
 #include "power_event.hpp"
-#include "dcc_log.hpp"
+#include "log.hpp"
 
 #include <etl/map.h>
 #include <etl/bitset.h>
