@@ -19,9 +19,10 @@ constexpr uint8_t DCC_SPEED_EMGR = 1; ///< DCC speed value for emergency stop
 /**
  * Stores locomotive speed.
  *
- * Has utility functions to convert to/from different DCC speed modes (14, 28, 128) and float (0..1) values.
+ * Does not store speed mode (28, 128 etc).
  * Internally, stores speed as DCC 128 speed steps.
- * It's a lightweight object, so can be passed by value cheapliy.
+ * Has utility functions to convert to/from different DCC speed modes (14, 28, 128) and float (0..1) values.
+ * It's a lightweight object, so can be passed by value cheaply.
  */
 class LocoSpeed {
 public:

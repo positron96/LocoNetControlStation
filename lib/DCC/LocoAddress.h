@@ -6,6 +6,7 @@
 
 /**
  * Represents a DCC address.
+ *
  * Can be either short (or basic or primary) or long (or extended).
  * By DCC standard, short addresses are in range 1--127, long addresses are in range 1--10239.
  * Other systems can limit address range
@@ -20,9 +21,9 @@ class LocoAddress {
 public:
     LocoAddress() : num(0) {}
     /** Creates short address. */
-    static LocoAddress shortAddr(uint8_t addr) {  return LocoAddress(addr); }
+    static LocoAddress shortAddr(uint8_t addr) {  return LocoAddress{addr}; }
     /** Creates long address. */
-    static LocoAddress longAddr(uint16_t addr) {  return LocoAddress(-addr); }
+    static LocoAddress longAddr(uint16_t addr) {  return LocoAddress{-addr}; }
     bool isShort() const { return num>=0; }
     bool isLong() const { return num<=0; }
     /** Returns numeric value of this address. */
@@ -36,6 +37,6 @@ public:
     }
     operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
 private:
-    LocoAddress(int16_t num): num{num} { }
     int16_t num;
+    LocoAddress(int16_t num): num{num} { }
 };
