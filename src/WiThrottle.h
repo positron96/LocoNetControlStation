@@ -10,7 +10,7 @@
 
 #include "CommandStation.h"
 #include "Watchdog.h"
-#include "power_event.hpp" // from DCC
+#include "dcc/power_event.hpp"
 
 #include <WiFi.h>
 #include <WiFiServer.h>

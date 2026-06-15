@@ -1,4 +1,4 @@
-#include "LocoSpeed.h"
+#include "dcc/LocoSpeed.h"
 
 #include <cmath>
 

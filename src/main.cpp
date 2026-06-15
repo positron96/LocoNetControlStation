@@ -1,8 +1,8 @@
 #include <DCC.h>
 // #include <esp32_timer_channel.hpp>
 // #include <esp32_timer.hpp>
-#include <esp32_rmt_channel.hpp>
-#include <esp32_current_meter.hpp>
+#include <dcc/esp32_rmt_channel.hpp>
+#include <dcc/esp32_current_meter.hpp>
 
 #include "CommandStation.h"
 

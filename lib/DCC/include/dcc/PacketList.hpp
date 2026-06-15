@@ -3,7 +3,7 @@
 #include "packet.hpp"
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
-#include "dcc_log.hpp"
+#include "log.hpp"
 
 #include <etl/map.h>
 #include <etl/array.h>

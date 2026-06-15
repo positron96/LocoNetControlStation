@@ -3,7 +3,7 @@
  * @see On extended packets: https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
  */
 
-#include "base_channel.hpp"
+#include "dcc/base_channel.hpp"
 
 namespace dcc {
 

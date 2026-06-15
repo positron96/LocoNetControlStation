@@ -1,6 +1,6 @@
 #include "WiThrottle.h"
 
-#include "LocoAddress.h"
+#include "dcc/LocoAddress.h"
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
 #include "log.h"
 
