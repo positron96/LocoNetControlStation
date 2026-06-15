@@ -145,19 +145,30 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
-    // dccTimer.setMainChannel(&dccMain);
-    // dccTimer.setProgChannel(&dccProg);
-
     dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
     dccMain.setOvercurrentThreshold(2000);
     currentMeter.addChannel(dccMain);
+
     dccProg.setVoltageToCurrentCoef(1.0f);
     dccProg.setOvercurrentThreshold(500);
     currentMeter.addChannel(dccProg);
 
+    dccMain.add_observer(powerStatusObserver);
+    dccProg.add_observer(powerStatusObserver);
+
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
     CS.setLocoNetBus(&bus);
+
+    // dccTimer.setMainChannel(&dccMain);
+    // dccTimer.setProgChannel(&dccProg);
+    // dccTimer.begin();
+
+    dccMain.begin();
+    dccProg.begin();
+    dccMain.setPower(true);
+    dccProg.setPower(true);
+    currentMeter.begin();
 
     ledTimer = timerController.register_timer(
         TimerType::callback_type::create<ledUpdate>(),
@@ -165,6 +176,9 @@ void setup() {
     checkCurrentTimer = timerController.register_timer(
         TimerType::callback_type::create<checkCurrent>(),
         1, true);
+
+    timerController.enable(true);
+    timerController.start(checkCurrentTimer);
 
 #if USE_WIFI != 0
     bool bt = digitalRead(PIN_BT)==0;
@@ -201,18 +215,6 @@ void setup() {
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
 #endif
-
-    dccMain.add_observer(powerStatusObserver);
-    dccProg.add_observer(powerStatusObserver);
-    //dccTimer.begin();
-    dccMain.begin();
-    dccProg.begin();
-    dccMain.setPower(true);
-    dccProg.setPower(true);
-    currentMeter.begin();
-
-    timerController.enable(true);
-    timerController.start(checkCurrentTimer);
 
 }
 

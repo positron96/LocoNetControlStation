@@ -156,8 +156,6 @@ void WiThrottleServer::begin() {
 
     MDNS.addService("withrottle","tcp", port);
 
-    notifyPowerStatus();
-
 }
 
 void WiThrottleServer::loop() {
