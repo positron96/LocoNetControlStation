@@ -92,9 +92,9 @@ public:
     virtual ~BaseChannel() = default;
 
 protected:
-    uint16_t overCurrentThreshold;
-    std::atomic<uint16_t> current;
-    std::atomic<uint16_t> maxCurrent;
+    uint16_t overCurrentThreshold{std::numeric_limits<uint16_t>::max()}; ///< disabled until explicitly set
+    std::atomic<uint16_t> current{0};
+    std::atomic<uint16_t> maxCurrent{0};
 
     BasePacketList &packets;
 

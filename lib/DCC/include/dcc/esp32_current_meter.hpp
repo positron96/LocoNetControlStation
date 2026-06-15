@@ -10,7 +10,7 @@ namespace dcc {
 
     class ESP32CurrentMeter: public CurrentMeter {
     public:
-        void begin() {
+        void begin() override {
             esp_timer_create_args_t cfg{adcTimerFunc_c, this, ESP_TIMER_TASK, "adc"};
             esp_timer_create(&cfg, &_adcTimer);
             esp_timer_start_periodic(_adcTimer, 1000);  // 1ms
@@ -20,7 +20,7 @@ namespace dcc {
             }
         }
 
-        void end() {
+        void end() override {
             esp_timer_stop(_adcTimer);
             esp_timer_delete(_adcTimer);
             _adcTimer = nullptr;
@@ -30,7 +30,7 @@ namespace dcc {
         esp_timer_handle_t _adcTimer;
 
         static void adcTimerFunc_c(void* arg) {
-            ((ESP32CurrentMeter*)arg)->adcTimerFunc();
+            static_cast<ESP32CurrentMeter*>(arg)->adcTimerFunc();
         }
         void adcTimerFunc() {
             for(auto ch: channels) {

@@ -55,11 +55,9 @@ namespace dcc {
         // TODO: for S14 mode, F0 bit is also needed
         bool put_loco_speed_dir_packet(const LocoAddress addr, const LocoSpeed speed, const SpeedMode mode, const bool fwd) {
 
-            // find slot for loco
-            auto it = loco_slots.find(addr);
+            auto it = find_or_add_slot(addr);
             if(it == loco_slots.end() ) {
-                if(loco_slots.full()) return false;
-                it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
+                return false;
             }
             auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
             it->second.packets[0] = packet_from_bytes(bytes);
@@ -79,11 +77,9 @@ namespace dcc {
                 return put_generic_packet(bytes, FN_PACKET_REPEATS, 0);
             }
             idx += 1; // 0th index is speed+dir
-            // find slot for loco
-            auto it = loco_slots.find(addr);
+            auto it = find_or_add_slot(addr);
             if(it == loco_slots.end() ) {
-                if(loco_slots.full()) return false;
-                it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
+                return false;
             }
             it->second.packets[idx] = packet_from_bytes(bytes);
             enqueue_slot_packet(SlotLocation{it, idx}, 0);
@@ -114,7 +110,7 @@ namespace dcc {
             if(it != loco_slots.end() ) {
                 if(cur_slot == it) {
                     // if currently selected slot is being cleared, move to next one to avoid sending invalid packet
-                    cur_slot++;
+                    ++cur_slot;
                     if(cur_slot == loco_slots.end()) {
                         cur_slot = loco_slots.begin();
                     }
@@ -168,7 +164,7 @@ namespace dcc {
             if(loco_slots.empty()) return false;
 
             // get packet from loco slots in round-robin way
-            cur_slot++;
+            ++cur_slot;
             if(cur_slot == loco_slots.end()) {
                 cur_slot = loco_slots.begin();
             }
@@ -179,7 +175,7 @@ namespace dcc {
             if(!slot.packets[idx].has_value() ) {
                 // index we want has no packet, advance index (with rollover)
                 for(size_t attempt=0; attempt<N_PACKETS_PER_LOCO; attempt++) {
-                    idx++; if(idx>=N_PACKETS_PER_LOCO) idx=0;
+                    ++idx; if(idx>=N_PACKETS_PER_LOCO) idx=0;
                     if(slot.packets[idx].has_value()) {
                         // found it
                         slot.phase = Phase::from_index(idx);
@@ -232,7 +228,7 @@ namespace dcc {
             }
 
             void inc() {
-                phase ++;
+                ++phase;
                 if(phase == BasePacketList::NUM_PHASES) phase = 0;
             }
         };
@@ -270,9 +266,19 @@ namespace dcc {
         };
         etl::priority_queue<QueueItem, N_QUEUE_PACKETS> queue_packets;
 
-        BasePacketList(ISlotMap &loco_slots)
+        explicit BasePacketList(ISlotMap &loco_slots)
         : loco_slots{loco_slots}, cur_slot{loco_slots.end()}
         {
+        }
+
+        ISlotMap::iterator find_or_add_slot(LocoAddress addr) {
+            auto it = loco_slots.find(addr);
+            if(it == loco_slots.end() ) {
+                if(!loco_slots.full()) {
+                    it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
+                }
+            }
+            return it;
         }
 
         /** Put a slot location into priority queue. */

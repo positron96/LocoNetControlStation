@@ -41,8 +41,8 @@ public:
 
 private:
 
-    PacketBitsWithRepeats currentPacket;
-    size_t current_bit;
+    PacketBitsWithRepeats currentPacket{};
+    size_t current_bit{0};
 
     /* how many 58us periods needed for half-cycle (1 for "1", 2 for "0") */
     volatile uint8_t timerPeriodsHalf = 1; // some sane nonzero value

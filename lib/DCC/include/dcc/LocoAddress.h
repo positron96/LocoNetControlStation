@@ -23,7 +23,7 @@ public:
     /** Creates short address. */
     static LocoAddress shortAddr(uint8_t addr) {  return LocoAddress{addr}; }
     /** Creates long address. */
-    static LocoAddress longAddr(uint16_t addr) {  return LocoAddress{-addr}; }
+    static LocoAddress longAddr(uint16_t addr) {  return LocoAddress{static_cast<int16_t>(-addr)}; }
     bool isShort() const { return num>=0; }
     bool isLong() const { return num<=0; }
     /** Returns numeric value of this address. */
