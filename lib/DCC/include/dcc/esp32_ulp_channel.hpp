@@ -24,8 +24,11 @@ namespace dcc::esp32 {
         void begin() override {
             // pinMode(_debug_pin, OUTPUT);
             // pinMode(_debug_pin2, OUTPUT);
-            ESP32Channel::begin();
+            //ESP32Channel::begin();
 
+            pinMode(_enPin, OUTPUT);
+            digitalWrite(_enPin, LOW);
+            // _outputPin is managed by ULP.
         }
 
         void end() override {
@@ -38,7 +41,7 @@ namespace dcc::esp32 {
 
     class ESP32UlpManager {
     public:
-        explicit ESP32UlpManager();
+        explicit ESP32UlpManager() {};
 
         void setMainChannel(ESP32UlpChannel * ch) { channels[0] = ch;}
         void setProgChannel(ESP32UlpChannel * ch) { channels[1] = ch;}
@@ -57,7 +60,7 @@ namespace dcc::esp32 {
 
             if (xTaskCreate(packetTaskLoop_c, "dcc_tx", 4096, this, 1, &_packetTask) != pdPASS) {
                 _running = false;
-                DCC_LOGW("Failed to start DCC RMT task");
+                DCC_LOGW("Failed to start DCC ULP task");
                 return;
             }
 
@@ -139,6 +142,7 @@ namespace dcc::esp32 {
 
         void packetTaskLoop() {
             SymbolQueue symbols[N];
+            DCC_LOGI("Starting task");
 
             ulp_bitstream::start();
             while (_running) {
@@ -163,11 +167,11 @@ namespace dcc::esp32 {
                         break; // at most 1 packet per loop.
                     }
                 }
-                DCC_LOGI("pushed %d periods", count);
+                if(count!=0) DCC_LOGI("pushed %d periods; left untouched: %d", count, avail);
                 delay(1);
-
             }
             ulp_bitstream::stop();
+            DCC_LOGI("Stopping task");
 
         }
 

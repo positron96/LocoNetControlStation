@@ -1,7 +1,8 @@
 #include <DCC.h>
 // #include <esp32_timer_channel.hpp>
 // #include <esp32_timer.hpp>
-#include <dcc/esp32_rmt_channel.hpp>
+// #include <dcc/esp32_rmt_channel.hpp>
+#include <dcc/esp32_ulp_channel.hpp>
 #include <dcc/esp32_current_meter.hpp>
 
 #include "CommandStation.h"
@@ -57,8 +58,11 @@ dcc::PacketList<2> dcc_packets_prog;
 // dcc::ESP32TimerChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
 // dcc::ESP32TimerChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
 // dcc::ESP32Timer dccTimer(1); //timer1
-dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
-dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+// dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+// dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+dcc::esp32::ESP32UlpChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, dcc_packets_main);
+dcc::esp32::ESP32UlpChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
+dcc::esp32::ESP32UlpManager dccTimer{};
 dcc::ESP32CurrentMeter currentMeter;
 
 LocoNetSlotManager slotMan(&bus);
@@ -145,19 +149,30 @@ void setup() {
         Serial.println(state ? "Active" : "Inactive");
     });
 
-    // dccTimer.setMainChannel(&dccMain);
-    // dccTimer.setProgChannel(&dccProg);
-
     dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
     dccMain.setOvercurrentThreshold(2000);
     currentMeter.addChannel(dccMain);
+
     dccProg.setVoltageToCurrentCoef(1.0f);
     dccProg.setOvercurrentThreshold(500);
     currentMeter.addChannel(dccProg);
 
+    dccMain.add_observer(powerStatusObserver);
+    dccProg.add_observer(powerStatusObserver);
+
     CS.setDccMain(&dccMain);
     CS.setDccProg(&dccProg);
     CS.setLocoNetBus(&bus);
+
+    dccTimer.setMainChannel(&dccMain);
+    dccTimer.setProgChannel(&dccProg);
+    dccTimer.begin();
+
+    dccMain.begin();
+    dccProg.begin();
+    dccMain.setPower(true);
+    dccProg.setPower(true);
+    currentMeter.begin();
 
     ledTimer = timerController.register_timer(
         TimerType::callback_type::create<ledUpdate>(),
@@ -165,6 +180,9 @@ void setup() {
     checkCurrentTimer = timerController.register_timer(
         TimerType::callback_type::create<checkCurrent>(),
         1, true);
+
+    timerController.enable(true);
+    timerController.start(checkCurrentTimer);
 
 #if USE_WIFI != 0
     bool bt = digitalRead(PIN_BT)==0;
@@ -201,18 +219,6 @@ void setup() {
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
 #endif
-
-    dccMain.add_observer(powerStatusObserver);
-    dccProg.add_observer(powerStatusObserver);
-    //dccTimer.begin();
-    dccMain.begin();
-    dccProg.begin();
-    dccMain.setPower(true);
-    dccProg.setPower(true);
-    currentMeter.begin();
-
-    timerController.enable(true);
-    timerController.start(checkCurrentTimer);
 
 }
 
