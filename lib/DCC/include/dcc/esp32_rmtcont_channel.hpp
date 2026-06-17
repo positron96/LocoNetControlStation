@@ -1,21 +1,18 @@
 #pragma once
 
+#include "base_channel.hpp"
 #include "esp32_channel.hpp"
 
-#include <hal/rmt_types.h>
+#include <driver/rmt.h>
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
-#include <freertos/queue.h>
+#include <etl/array.h>
+#include <etl/span.h>
+
 
 namespace dcc {
 
 /**
- * A DCC channel that outputs DCC waveform using continuous ESP32 RMT LL API.
- *
- * The ISR callback posts a fill-request (pointer + count) to a high-priority
- * FreeRTOS task via a queue.  Packet encoding happens in the task context, not
- * in the ISR, so the ISR returns in O(1) and all normal FreeRTOS APIs are safe.
+ * A DCC channel that outputs DCC waveform using ESP32 RMT TX peripheral.
  */
 class ESP32RMTChannel : public ESP32Channel {
 public:
@@ -30,122 +27,123 @@ public:
     void begin() override {
         ESP32Channel::begin();
 
-        if (_channel >= 8) {
-            DCC_LOGW("No free RMT channel for GPIO %d", _outputPin);
+        rmt_config_t cfg{};
+        cfg.rmt_mode = RMT_MODE_TX;
+        cfg.channel = _rmtChannel;
+        cfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
+        cfg.mem_block_num = 1;
+        cfg.clk_div = 80;  // 1 tick = 1us (80MHz / 80)
+        cfg.tx_config.loop_en = false;
+        cfg.tx_config.carrier_en = false;
+        cfg.tx_config.idle_output_en = true;
+        cfg.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+
+        if (rmt_config(&cfg) != ESP_OK) {
+            DCC_LOGW("RMT config failed for GPIO %d", _outputPin);
+            return;
+        }
+        if (rmt_driver_install(_rmtChannel, 0, 0) != ESP_OK) {
+            DCC_LOGW("RMT driver install failed for channel %d", static_cast<int>(_rmtChannel));
             return;
         }
 
-        // Create queue before starting TX so the pre-fill call from rmt_cont_tx_start can post
-        _fillQueue = xQueueCreate(1, sizeof(FillRequest));
-        if (!_fillQueue) {
-            DCC_LOGW("Failed to create fill queue for ch %d", _channel);
-            return;
-        }
-
-
-
-        // High priority so it preempts lower-priority work and finishes before
-        // RMT consumes the half-buffer.
-        if (xTaskCreate(fillTask_c, "dcc_rmt_fill", 2048, this,
-                        configMAX_PRIORITIES - 1, &_fillTask) != pdPASS) {
-            DCC_LOGW("Failed to create fill task for ch %d", _channel);
+        _running = true;
+        if (xTaskCreate(txTaskFunc, "dcc_rmt_tx", 4096, this, 2, &_txTask) != pdPASS) {
             _running = false;
-
-            vQueueDelete(_fillQueue);
-            _fillQueue = nullptr;
+            DCC_LOGW("Failed to start DCC RMT task");
         }
+
     }
 
     void end() override {
         _running = false;
-        if (_fillTask) {
-            if (_fillQueue) {
-                FillRequest dummy{nullptr, 0};
-                xQueueSend(_fillQueue, &dummy, pdMS_TO_TICKS(10));
-            }
-            vTaskDelay(pdMS_TO_TICKS(50));
-            _fillTask = nullptr;
+
+        if (_txTask != nullptr) {
+            rmt_tx_stop(_rmtChannel);
+            vTaskDelete(_txTask);
+            _txTask = nullptr;
         }
-        if (_fillQueue) {
-            vQueueDelete(_fillQueue);
-            _fillQueue = nullptr;
-        }
+
+        rmt_driver_uninstall(_rmtChannel);
 
         ESP32Channel::end();
     }
 
 private:
-    struct FillRequest {
-        volatile rmt_symbol_word_t *items;
-        uint16_t count;
-    };
+    static constexpr uint16_t DCC_ONE_HALF_US = 58;
+    static constexpr uint16_t DCC_ZERO_HALF_US = 100;
+    static constexpr size_t MAX_RMT_ITEMS = PacketBits::MAX_RAW_PACKET_BYTES * 8;
 
-    QueueHandle_t _fillQueue{nullptr}; // ISR → task
-    TaskHandle_t  _fillTask{nullptr};
+    rmt_channel_t _rmtChannel;
+    etl::array<rmt_item32_t, MAX_RMT_ITEMS> rmt_items;
 
-    uint8_t _channel{s_nextChannel++};
-
-    static constexpr uint16_t DCC_ONE_HALF_US  = 58;
-    static constexpr uint16_t DCC_ZERO_HALF_US = 116;
-    inline static uint8_t s_nextChannel{0};
     volatile bool _running{false};
+    TaskHandle_t _txTask{nullptr};
 
-    PacketBitsWithRepeats _activePacket{};
-    size_t _bitPos{0};
-
-    // Runs in task context — may call any FreeRTOS/packet API freely.
-    void fillSymbols(volatile rmt_symbol_word_t *items, uint16_t count) {
-        for (uint16_t i = 0; i < count; ++i) {
-            if (_bitPos >= _activePacket.packet.size_bits) {
-                _bitPos = 0;
-                if (_activePacket.nRepeats > 0) {
-                    --_activePacket.nRepeats;
-                } else {
-                    PacketWithRepeats bytes;
-                    if (packets.fetch_next_packet(bytes)) {
-                        _activePacket = PacketBitsWithRepeats::from_packet(bytes, DEF_PREAMBLE_LEN);
-                    } else {
-                        _activePacket = {idle_packet_bits, 1};
-                    }
-                }
-            }
-
-            const bool isOne = _activePacket.packet.bit_at(_bitPos++);
-            const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
-
-            items[i].level0    = 1;
-            items[i].duration0 = half;
-            items[i].level1    = 0;
-            items[i].duration1 = half;
-        }
-    }
-
-    void fillTask() {
-        while (_running) {
-            FillRequest req;
-            if (xQueueReceive(_fillQueue, &req, portMAX_DELAY) == pdTRUE) {
-                if (!_running || req.items == nullptr) break;
-                fillSymbols(req.items, req.count);
-            }
-        }
-    }
-
-    static void fillTask_c(void *arg) {
-        static_cast<ESP32RMTChannel *>(arg)->fillTask();
+    static void txTaskFunc(void *arg) {
+        static_cast<ESP32RMTChannel *>(arg)->txTaskLoop();
         vTaskDelete(nullptr);
     }
 
-    // Called from ISR context — must not block, must be IRAM-resident.
-    static void IRAM_ATTR fillCallback(volatile rmt_symbol_word_t *items,
-                                       uint16_t count, void *ctx) {
-        auto *self = static_cast<ESP32RMTChannel *>(ctx);
-        if (!self->_running || !self->_fillQueue) return;
+    static size_t fillRmt(
+        const PacketBits &packet,
+        size_t repeats,
+        etl::span<rmt_item32_t> items
+    ) {
 
-        const FillRequest req{items, count};
-        BaseType_t woken = pdFALSE;
-        // Overwrite any stale request — queue depth is 1.
-        xQueueOverwriteFromISR(self->_fillQueue, &req, &woken);
-        portYIELD_FROM_ISR(woken);
+        if (packet.size_bits == 0 || items.size() == 0) {
+            return 0;
+        }
+
+        size_t itemIdx = 0;
+        for (size_t rep = 0; rep < repeats && itemIdx < items.size(); ++rep) {
+            for (size_t bit = 0; bit < packet.size_bits && itemIdx < items.size(); ++bit) {
+                const bool isOne = packet.bit_at(bit);
+                const uint16_t half = isOne ? DCC_ONE_HALF_US : DCC_ZERO_HALF_US;
+
+                rmt_item32_t item{};
+                item.level0 = 0;
+                item.duration0 = half;
+                item.level1 = 1;
+                item.duration1 = half;
+                items[itemIdx++] = item;
+            }
+        }
+        return itemIdx;
+    }
+
+    void txTaskLoop() {
+        PacketWithRepeats packet;
+
+        while (_running) {
+            if (!packets.fetch_next_packet(packet)) {
+                packet = {idlePacket, 1};
+            }
+
+            uint8_t repeatsLeft = packet.nRepeats;
+            //const size_t chunkRepeats = 1; // ETL_OR_STD::min(repeatsLeft, maxRepeatsInChunk);
+            const size_t itemCount = fillRmt(PacketBits::from_packet(packet.packet), 1, rmt_items);
+            // const size_t maxRepeatsInChunk = ETL_OR_STD::max<size_t>(1, MAX_RMT_ITEMS / packetBits);
+
+            while (_running && repeatsLeft > 0) {
+                if (itemCount == 0) {
+                    break;
+                }
+
+                // blocking implementation for now.
+                const esp_err_t err = rmt_write_items(_rmtChannel, rmt_items.data(), itemCount, true);
+                if (err != ESP_OK) {
+                    DCC_LOGW("rmt_write_items failed (%d)", static_cast<int>(err));
+                    _running = false;
+                    break;
+                }
+
+                repeatsLeft -= 1;
+            }
+        }
+
+        gpio_set_level(static_cast<gpio_num_t>(_outputPin), 0);
     }
 };
+
 }
