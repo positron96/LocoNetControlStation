@@ -2,8 +2,8 @@
 
 #include "esp32_channel.hpp"
 
-#include <esp_attr.h>
-#include <rmt_cont_tx.h>
+#include <hal/rmt_types.h>
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include <freertos/queue.h>
@@ -42,24 +42,7 @@ public:
             return;
         }
 
-        rmt_cont_tx_config_t cfg{};
-        cfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
-        cfg.channel = _channel;
-        cfg.mem_blocks    = 1;
-        cfg.resolution_hz = 1'000'000; // 1 tick = 1 µs
-        cfg.idle_level    = 0;
-        cfg.fill_cb       = &fillCallback;
-        cfg.ctx           = this;
 
-        _running = true;
-
-        if (rmt_cont_tx_start(&cfg) != ESP_OK) {
-            DCC_LOGW("RMT continuous TX start failed on GPIO %d (ch %d)", _outputPin, _channel);
-            _running = false;
-            vQueueDelete(_fillQueue);
-            _fillQueue = nullptr;
-            return;
-        }
 
         // High priority so it preempts lower-priority work and finishes before
         // RMT consumes the half-buffer.
@@ -67,7 +50,7 @@ public:
                         configMAX_PRIORITIES - 1, &_fillTask) != pdPASS) {
             DCC_LOGW("Failed to create fill task for ch %d", _channel);
             _running = false;
-            rmt_cont_tx_stop(_channel);
+
             vQueueDelete(_fillQueue);
             _fillQueue = nullptr;
         }
@@ -87,9 +70,7 @@ public:
             vQueueDelete(_fillQueue);
             _fillQueue = nullptr;
         }
-        if (_channel < 8) {
-            rmt_cont_tx_stop(_channel);
-        }
+
         ESP32Channel::end();
     }
 
