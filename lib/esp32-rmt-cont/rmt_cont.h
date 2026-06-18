@@ -12,11 +12,7 @@
 #include "esp_err.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/ringbuf.h"
-#include "driver/rmt_types_legacy.h"
-
-#if !CONFIG_RMT_SUPPRESS_DEPRECATE_WARN
-#warning "The legacy RMT driver is deprecated, please use driver/rmt_tx.h and/or driver/rmt_rx.h"
-#endif
+#include "rmt_cont_types.h"
 
 #ifdef __cplusplus
 extern "C" {

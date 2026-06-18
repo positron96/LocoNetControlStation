@@ -13,7 +13,7 @@
 #include "esp_check.h"
 #include "driver/gpio.h"
 #include "esp_private/periph_ctrl.h"
-#include "driver/rmt_types_legacy.h"
+#include "rmt_cont_types.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -127,7 +127,6 @@ static void rmt_module_enable(void)
     if (rmt_contex.rmt_module_enabled == false) {
         periph_module_reset(rmt_periph_signals.groups[0].module);
         periph_module_enable(rmt_periph_signals.groups[0].module);
-        rmt_ll_mem_power_by_pmu(rmt_contex.hal.regs);
         rmt_contex.rmt_module_enabled = true;
     }
     RMT_EXIT_CRITICAL();
@@ -138,7 +137,6 @@ static void rmt_module_disable(void)
 {
     RMT_ENTER_CRITICAL();
     if (rmt_contex.rmt_module_enabled == true) {
-        rmt_ll_mem_force_power_off(rmt_contex.hal.regs);
         periph_module_disable(rmt_periph_signals.groups[0].module);
         rmt_contex.rmt_module_enabled = false;
     }
@@ -236,11 +234,7 @@ esp_err_t rmt_set_mem_pd(rmt_channel_t channel, bool pd_en)
 {
     ESP_RETURN_ON_FALSE(channel < RMT_CHANNEL_MAX, ESP_ERR_INVALID_ARG, TAG, RMT_CHANNEL_ERROR_STR);
     RMT_ENTER_CRITICAL();
-    if (pd_en) {
-        rmt_ll_mem_force_power_off(rmt_contex.hal.regs);
-    } else {
-        rmt_ll_mem_power_by_pmu(rmt_contex.hal.regs);
-    }
+    rmt_ll_power_down_mem(rmt_contex.hal.regs, pd_en);
     RMT_EXIT_CRITICAL();
     return ESP_OK;
 }
@@ -249,7 +243,7 @@ esp_err_t rmt_get_mem_pd(rmt_channel_t channel, bool *pd_en)
 {
     ESP_RETURN_ON_FALSE(channel < RMT_CHANNEL_MAX, ESP_ERR_INVALID_ARG, TAG, RMT_CHANNEL_ERROR_STR);
     RMT_ENTER_CRITICAL();
-    *pd_en = rmt_ll_is_mem_force_powered_down(rmt_contex.hal.regs);
+    *pd_en = rmt_ll_is_mem_powered_down(rmt_contex.hal.regs);
     RMT_EXIT_CRITICAL();
     return ESP_OK;
 }
@@ -282,7 +276,7 @@ esp_err_t rmt_tx_stop(rmt_channel_t channel)
 {
     ESP_RETURN_ON_FALSE(RMT_IS_TX_CHANNEL(channel), ESP_ERR_INVALID_ARG, TAG, RMT_CHANNEL_ERROR_STR);
     RMT_ENTER_CRITICAL();
-#if SOC_RMT_SUPPORT_ASYNC_STOP
+#if SOC_RMT_SUPPORT_TX_ASYNC_STOP
     rmt_ll_tx_stop(rmt_contex.hal.regs, channel);
 #else
     // write ending marker to stop the TX channel
