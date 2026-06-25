@@ -1,0 +1,9 @@
+{
+    "name": "esp32-rmt-cont",
+    "version": "0.2.0",
+    "description": "Continuous gapless RMT TX using LL API ping-pong buffer on ESP32",
+    "frameworks": "arduino",
+    "platforms": [
+        "espressif32"
+    ]
+}

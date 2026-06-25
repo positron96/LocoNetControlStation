@@ -60,7 +60,7 @@ namespace dcc {
                 return false;
             }
             auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
-            it->second.packets[0] = packet_from_bytes(bytes);
+            it->second.packets[0] = packet_from_bytes(bytes); // here is actual putting into table
             enqueue_slot_packet(SlotLocation{it, 0}, speed.isEmgr() ? -100 : 0);
             DCC_LOGI("Addr:%d, spd:%d(%s) %c, %s",
                 addr.addr(), speed.get128(), SpeedModeToStr(mode), fwd?'F':'R',
@@ -289,7 +289,7 @@ namespace dcc {
                 .priority = priority,
                 .data = loc
             };
-            //queue_packets.push(item);
+            queue_packets.push(item);
             return true;
         }
 

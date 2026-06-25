@@ -20,12 +20,12 @@ PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
-    DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr, sp.get128(), (int)sm, fwd?'F':'B');
+    DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr.addr(), sp.get128(), (int)sm, fwd?'F':'B');
     packets.put_loco_speed_dir_packet(addr, sp, sm, fwd);
 }
 
 void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {
-    DCC_LOGI("addr %d, group=%d fn=%08x", addr, (uint8_t)group, fn);
+    DCC_LOGI("addr %d, group=%d fn=%08x", addr.addr(), (uint8_t)group, fn);
 
     packets.put_loco_fn_packet(addr, group, fn);
 
