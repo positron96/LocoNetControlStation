@@ -22,6 +22,7 @@
 #include <etl/map.h>
 #include <etl/utility.h>
 #include <etl/string_view.h>
+#include <etl/enum_type.h>
 
 #define WT_DEBUG
 
@@ -61,6 +62,8 @@ public:
 
     void loop();
 
+    String getInfo() const;
+
 private:
 
     const uint16_t port;
@@ -74,11 +77,20 @@ private:
 
     AsyncServer server;
 
-    enum class ClientHealth {
-        Alive,
-        SoftTimeout, ///< stop all locos after soft timeout
-        HardTimeout,  ///< disconnect client after hard timeout
-        Dead  ///< no need to check anything, it should be cleaned up soon
+    struct ClientHealth {
+        enum enum_type {
+            Alive,
+            SoftTimeout, ///< stop all locos after soft timeout
+            HardTimeout,  ///< disconnect client after hard timeout
+            Dead  ///< no need to check anything, it should be cleaned up soon
+        };
+
+        ETL_DECLARE_ENUM_TYPE(ClientHealth, unsigned)
+        ETL_ENUM_TYPE(Alive, "OK")
+        ETL_ENUM_TYPE(SoftTimeout, "Yellow")
+        ETL_ENUM_TYPE(HardTimeout, "Red")
+        ETL_ENUM_TYPE(Dead, "Dead")
+        ETL_END_ENUM_TYPE
     };
 
     struct ClientData {
@@ -157,4 +169,5 @@ private:
     void clientStop(ClientData &c);
 
     void accessoryToggle(unsigned aAddr, char aStatus, bool namedTurnout, ClientData &cc);
+
 };

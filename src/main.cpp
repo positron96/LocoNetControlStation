@@ -15,6 +15,18 @@
 
 #include <LocoNetStream.h>
 
+#include "display/display.hpp"
+#include "display/status_screen.hpp"
+
+#include <U8g2lib.h>
+
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
+
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiManager.h>
@@ -27,6 +39,10 @@
 
 #ifndef USE_WIFI
 #define USE_WIFI 1
+#endif
+
+#ifndef USE_DISPLAY
+#define USE_DISPLAY 1
 #endif
 
 LocoNetBus bus;
@@ -64,6 +80,12 @@ dcc::ESP32CurrentMeter currentMeter;
 LocoNetSlotManager slotMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_NAME);
+
+#if USE_DISPLAY==1
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 16, /* data=*/ 17);
+U8G2 &display::Display::u8g2 = u8g2_;
+display::StatusScreen statusScreen;
+#endif
 
 #define PIN_BT 13
 #define PIN_BT2 15
@@ -113,7 +135,6 @@ void setup() {
 
     locoNetPhy.start();
     //lSerial.begin();
-
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
         char tmp[100];
@@ -214,6 +235,10 @@ void setup() {
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
+    #if USE_DISPLAY==1
+    statusScreen.wtServer = &withrottleServer;
+    statusScreen.lbServer = &lbServer;
+    #endif
 #endif
 
 }
@@ -260,6 +285,14 @@ void loop() {
 
         nextInRead = millis() + 10;
     }
+
+    #if USE_DISPLAY==1
+    static size_t lastStatusDraw = ms;
+    if(ms - lastStatusDraw > 1000) {
+        statusScreen.draw();
+        lastStatusDraw = ms;
+    }
+    #endif
 
 }
 

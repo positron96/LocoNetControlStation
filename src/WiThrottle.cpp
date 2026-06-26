@@ -493,3 +493,20 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
     }
 
 }
+
+
+String WiThrottleServer::getInfo() const {
+    String v;
+    for(const auto &p: clients) {
+        const ClientData &cc = p.second;
+        v += String(" ")+p.first->remoteIP().toString() + " ID: "+cc.hwId + " health:" + cc.health.c_str() + "\n";
+        for(const auto &thr: cc.slots) {
+            v += String("  Throttle ")+thr.first+": ";
+            for(const auto &slot: thr.second) {
+                v += String(slot.first) + " ";
+            }
+            v += "\n";
+        }
+    }
+    return v;
+}

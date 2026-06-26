@@ -185,6 +185,11 @@ public:
         slots[i].deallocate();
     }
 
+    /** Return view on slot numbers */
+    auto getAllocatedSlots() {
+        return etl::views::values(etl::views::as_const(locoSlot));
+    }
+
     void setLocoSlotRefresh(uint8_t slot, bool refresh) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
         LocoData &dd = getSlot(slot);
