@@ -209,6 +209,7 @@ void setup() {
     timerController.start(checkCurrentTimer);
 
 #if USE_WIFI != 0
+    WiFi.setSleep(WIFI_PS_NONE);
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
         // start AP
@@ -228,6 +229,7 @@ void setup() {
             Serial.print("Failed connection");
             ESP.restart();
         }
+        WiFi.setAutoReconnect(true);
         Serial.println("");
         Serial.println("WiFi connected.");
         Serial.println("IP address: ");
