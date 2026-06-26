@@ -22,9 +22,9 @@ namespace display {
             #ifdef USE_WIFI
             bool connected = WiFi.isConnected();
             if(connected) {
-                v = "WF:" + WiFi.getRSSI() + "IP:"+ WiFi.localIP().toString();
+                v = String("WF:") + WiFi.RSSI() + " IP:"+ WiFi.localIP().toString();
             } else {
-                v = "WF:---"
+                v = "WF:---";
             }
             u8g2.drawStr(0, 0, v.c_str());
 
