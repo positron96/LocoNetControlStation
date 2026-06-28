@@ -64,4 +64,8 @@ private:
 
     void fillSlotMsg(uint8_t slot, rwSlotDataMsg &msg);
 
+    void processFastClockMsg(const fastClockMsg &msg);
+
+    void sendFastClock();
+
 };

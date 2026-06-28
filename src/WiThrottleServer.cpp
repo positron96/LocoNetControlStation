@@ -1,4 +1,4 @@
-#include "WiThrottle.h"
+#include "WiThrottleServer.h"
 
 #include "dcc/LocoAddress.h"
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
@@ -273,6 +273,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     if(name!=nullptr) wifiPrintln(cli, String("Ht")+name );
     wifiPrintln(cli, "RL0"); // roster list is size 0
     notifyPowerStatus(cli);
+    notifyFastClock(cli);
     wifiPrintln(cli, "PTT]\\[Turnouts}|{Turnout]\\[Closed}|{"+String(TURNOUT_CLOSED)+"]\\[Thrown}|{"+String(TURNOUT_THROWN) );
     wifiPrint(cli, "PTL");
     for(const auto &t: CS.getTurnouts() ) {

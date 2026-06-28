@@ -1,4 +1,7 @@
 /**
+ *
+ * Serverside implementation of WiThrottle protocol.
+ *
  * Based on https://github.com/positron96/withrottle
  *
  * Also, see JMRI sources, start at https://github.com/JMRI/JMRI/blob/master/java/src/jmri/jmrit/withrottle/DeviceServer.java
@@ -11,6 +14,7 @@
 #include "CommandStation.h"
 #include "Watchdog.h"
 #include "dcc/power_event.hpp"
+#include "FastClock.hpp"
 
 #include <WiFi.h>
 #include <WiFiServer.h>
@@ -23,6 +27,7 @@
 #include <etl/utility.h>
 #include <etl/string_view.h>
 #include <etl/enum_type.h>
+#include <etl/chrono.h>
 
 #define WT_DEBUG
 
@@ -52,12 +57,24 @@ public:
 
     void notifyPowerStatus(AsyncClient *c=nullptr) {
         bool v = CS.getPowerState();
-        powerStatus = v ? '1' : '0';
+        powerOn = v;
+        String s = String("PPA") + (powerOn ? '1' : '0');
         if(c==nullptr) {
             for (auto p: clients) {
-                wifiPrintln(p.first, String("PPA")+powerStatus);
+                wifiPrintln(p.first, s);
             }
-        } else wifiPrintln(c, String("PPA")+powerStatus);
+        } else wifiPrintln(c, s);
+    }
+
+    void notifyFastClock(AsyncClient *c=nullptr) {
+        uint32_t seconds = fast_clock::clock::now().time_since_epoch().count();
+        unsigned rate = fast_clock::clock::getRate();
+        String s = String("PFT")+ seconds + "<;>"+rate;
+        if(c==nullptr) {
+            for (auto p: clients) {
+                wifiPrintln(p.first, s);
+            }
+        } else wifiPrintln(c, s);
     }
 
     void loop();
@@ -144,7 +161,7 @@ private:
 
     void notifyHearbeatStatus(ClientData &c);
 
-    char powerStatus = '0';
+    bool powerOn = false;
 
     void turnPower(char v) {
         CS.setPowerState(v=='1');

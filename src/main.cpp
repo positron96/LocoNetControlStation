@@ -20,7 +20,7 @@
 #include "LocoNetSerial.h"
 #include "LocoNetTCPServer.h"
 
-#include "WiThrottle.h"
+#include "WiThrottleServer.h"
 
 #include <LocoNetStream.h>
 
