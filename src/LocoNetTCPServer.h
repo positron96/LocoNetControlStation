@@ -91,6 +91,14 @@ public:
         return LN_IDLE;
     }
 
+    String getInfo() const {
+        String v;
+        for(const auto &cli: clients) {
+            v += cli->remoteIP().toString() + " ";
+        }
+        return v;
+    }
+
 private:
     constexpr static size_t MAX_CLIENTS = 5;
 

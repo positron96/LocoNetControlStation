@@ -1,3 +1,12 @@
+#ifndef USE_WIFI
+#define USE_WIFI 1
+#endif
+
+#ifndef USE_DISPLAY
+#define USE_DISPLAY 1
+#endif
+
+
 #include <DCC.h>
 // #include <esp32_timer_channel.hpp>
 // #include <esp32_timer.hpp>
@@ -15,19 +24,21 @@
 
 #include <LocoNetStream.h>
 
+#include "display/display.hpp"
+#include "display/status_screen.hpp"
+
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <WiFiManager.h>
 
 #include <Arduino.h>
 
+#include <Wire.h>
+#include <U8g2lib.h>
+
 #include <etl/callback_timer_atomic.h>
 #include <stdio.h>
 #include <atomic>
-
-#ifndef USE_WIFI
-#define USE_WIFI 1
-#endif
 
 LocoNetBus bus;
 
@@ -42,8 +53,6 @@ LocoNetDispatcher parser(&bus);
 LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
-
-#define PIN_LED  22
 
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
@@ -65,6 +74,15 @@ LocoNetSlotManager slotMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_NAME);
 
+#if USE_DISPLAY==1
+constexpr int PIN_DISP_SDA = 18;
+constexpr int PIN_DISP_SCL = 19;
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
+U8G2 &display::Display::u8g2 = u8g2_;
+display::StatusScreen statusScreen;
+#endif
+
+#define PIN_LED  22
 #define PIN_BT 13
 #define PIN_BT2 15
 
@@ -111,9 +129,19 @@ void setup() {
 
     digitalWrite(PIN_LED, LOW);
 
+    #if USE_DISPLAY==1
+    u8g2_.begin();
+    u8g2_.setFontPosTop();
+    u8g2_.setFont(u8g2_font_nokiafc22_tr);
+    u8g2_.setDrawColor(1);
+
+    u8g2_.clearBuffer();
+    u8g2_.drawStr(16,16, "INIT...");
+    u8g2_.sendBuffer();
+    #endif
+
     locoNetPhy.start();
     //lSerial.begin();
-
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
         char tmp[100];
@@ -181,6 +209,7 @@ void setup() {
     timerController.start(checkCurrentTimer);
 
 #if USE_WIFI != 0
+    WiFi.setSleep(WIFI_PS_NONE);
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
         // start AP
@@ -200,6 +229,7 @@ void setup() {
             Serial.print("Failed connection");
             ESP.restart();
         }
+        WiFi.setAutoReconnect(true);
         Serial.println("");
         Serial.println("WiFi connected.");
         Serial.println("IP address: ");
@@ -214,6 +244,10 @@ void setup() {
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
+    #if USE_DISPLAY==1
+    statusScreen.wtServer = &withrottleServer;
+    statusScreen.lbServer = &lbServer;
+    #endif
 #endif
 
 }
@@ -260,6 +294,16 @@ void loop() {
 
         nextInRead = millis() + 10;
     }
+
+    #if USE_DISPLAY==1
+    static size_t lastStatusDraw = ms;
+    if(ms - lastStatusDraw > 1000) {
+        u8g2_.clearBuffer();
+        statusScreen.draw();
+        u8g2_.sendBuffer();
+        lastStatusDraw = ms;
+    }
+    #endif
 
 }
 
