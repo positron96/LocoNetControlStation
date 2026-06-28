@@ -45,7 +45,7 @@ LocoNetBus bus;
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17
 #include <LocoNetStreamESP32.h>
-LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
+//LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
 
 #define CS_NAME "ESP32CommandStation"
@@ -86,6 +86,9 @@ display::StatusScreen statusScreen;
 #define PIN_BT 13
 #define PIN_BT2 15
 
+// constexpr int _debug_pin = 14;
+// constexpr int _debug_pin2 = 12;
+
 constexpr int LED_INTL_NORMAL = 1000;
 constexpr int LED_INTL_CONFIG1 = 500;
 constexpr int LED_INTL_CONFIG2 = 250;
@@ -98,10 +101,13 @@ void ledUpdate();
 
 void checkCurrent();
 
-using TimerType = etl::callback_timer_atomic<2, std::atomic_uint>;
+void tick1s();
+
+using TimerType = etl::callback_timer_atomic<3, std::atomic_uint>;
 TimerType timerController;
 etl::timer::id::type ledTimer;
 etl::timer::id::type checkCurrentTimer;
+etl::timer::id::type secondTimer;
 
 class PowerStatusObserver: public dcc::PowerObserver {
     void notification(const dcc::PowerEvent &event) override {
@@ -127,6 +133,9 @@ void setup() {
     pinMode(PIN_BT2, INPUT_PULLUP);
     pinMode(PIN_LED, OUTPUT);
 
+    // pinMode(_debug_pin, OUTPUT);
+    // pinMode(_debug_pin2, OUTPUT);
+
     digitalWrite(PIN_LED, LOW);
 
     #if USE_DISPLAY==1
@@ -140,7 +149,7 @@ void setup() {
     u8g2_.sendBuffer();
     #endif
 
-    locoNetPhy.start();
+    //locoNetPhy.start();
     //lSerial.begin();
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
@@ -204,9 +213,13 @@ void setup() {
     checkCurrentTimer = timerController.register_timer(
         TimerType::callback_type::create<checkCurrent>(),
         1, true);
+    secondTimer = timerController.register_timer(
+        TimerType::callback_type::create<tick1s>(),
+        1000, true);
 
     timerController.enable(true);
     timerController.start(checkCurrentTimer);
+    timerController.start(secondTimer);
 
 #if USE_WIFI != 0
     WiFi.setSleep(WIFI_PS_NONE);
@@ -224,10 +237,12 @@ void setup() {
     } else {
         WiFiManager wifiManager;
         wifiManager.setConfigPortalTimeout(300); // 5 min
-        if ( !wifiManager.autoConnect(CS_NAME " AP") ) {
-            delay(1000);
-            Serial.print("Failed connection");
-            ESP.restart();
+        if ( !wifiManager.autoConnect(CS_NAME " AP") ) { // sometimes wifi connects during captive portal
+            if(WiFi.status() != WL_CONNECTED) {
+                Serial.print("Failed connection");
+                delay(1000);
+                ESP.restart();
+            }
         }
         WiFi.setAutoReconnect(true);
         Serial.println("");
@@ -263,7 +278,7 @@ void loop() {
     //lSerial.loop();
 
     uint32_t ms = millis();
-    static uint32_t lastMs = 0;
+    static uint32_t lastMs = millis(); // don't start from 0 as connecting to wifi can take a lot
     if(ms!=lastMs && timerController.tick(ms - lastMs)) {
         lastMs = ms;
     }
@@ -272,23 +287,47 @@ void loop() {
     static int inState = 0;
     static int inState2 = 0;
     if(millis()>nextInRead) {
+        // Serial.println("CHECK");
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
-            Serial.printf( "reporting sensor %d\n", v==HIGH) ;
-            reportSensor(&bus, 1, v==HIGH);
-            Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
+            //CS.turnoutAction(6, false, v ? TurnoutAction::THROW : TurnoutAction::CLOSE);
+            auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(16));
+            if(v) {
+                CS.setLocoSlotRefresh(slot, true);
+                CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                //CS.setLocoFns(slot, 0xFFFFFFFF, 0xFFFFFFFF); // all on
+            } else {
+                //CS.setLocoFns(slot, 0xFFFFFFFF, 0);
+                CS.releaseLocoSlot(slot);
+            }
+
+            // Serial.printf( "reporting sensor %d\n", v==HIGH) ;
+            // reportSensor(&bus, 1, v==HIGH);
+            // Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
         inState = v;
 
         v = 1-digitalRead(PIN_BT2);
         if(v!=inState2) {
-            if(dccMain.getPower()) {
-                dccMain.setPower(false);
-                dccProg.setPower(false);
+            auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(32));
+            if(v) {
+                CS.setLocoSlotRefresh(slot, true);
+                CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                //CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                CS.setLocoFn(slot, 0, 1);
+                CS.setLocoFn(slot, 5, 1);
+                CS.setLocoFn(slot, 8, 1);
+
             } else {
-                dccMain.setPower(true);
-                dccProg.setPower(true);
+                CS.releaseLocoSlot(slot);
             }
+            // if(dccMain.getPower()) {
+            //     dccMain.setPower(false);
+            //     dccProg.setPower(false);
+            // } else {
+            //     dccMain.setPower(true);
+            //     dccProg.setPower(true);
+            // }
         }
         inState2 = v;
 
@@ -309,6 +348,15 @@ void loop() {
 
 void checkCurrent() {
     currentMeter.checkOvercurrent();
+}
+
+void tick1s() {
+    if(WiFi.isConnected()) {
+        int rssi = WiFi.RSSI();
+        Serial.printf("RSSI: %d\n", rssi);
+    } else {
+        Serial.printf("No WiFi\n");
+    }
 }
 
 

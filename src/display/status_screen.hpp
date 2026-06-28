@@ -2,7 +2,7 @@
 
 #include "display.hpp"
 #include "../CommandStation.h"
-#include "../WiThrottle.h"
+#include "../WiThrottleServer.h"
 #include "../LocoNetTCPServer.h"
 
 #include <Arduino.h>

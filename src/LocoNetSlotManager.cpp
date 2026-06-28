@@ -383,7 +383,7 @@ void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
     fast_clock::clock.setRate(rate);
     fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60 + ticks * 60 / (0x7F*0x7F));
 
-    LOGI("Received fast clock: days=%d, %02x:%02x .%02x, rate=%d", days, hrs, mins, ticks, rate);
+    LOGI("Received fast clock: days=%d, %02d:%02d .%02d, rate=%d:1", days, hrs, mins, ticks, rate);
 }
 
 void LocoNetSlotManager::sendFastClock() {
