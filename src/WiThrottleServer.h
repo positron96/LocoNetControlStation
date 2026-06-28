@@ -38,7 +38,7 @@
 #endif
 
 
-class WiThrottleServer: public dcc::PowerObserver {
+class WiThrottleServer: public dcc::PowerObserver, public fast_clock::clock_observer {
 public:
 
     constexpr static uint16_t DEF_PORT = 4444;
@@ -47,8 +47,10 @@ public:
 
     void begin();
 
-    void end() {
-        server.end();
+    void end();
+
+    void notification(const fast_clock::ClockChangedEvent &evt) override {
+        notifyFastClock(nullptr);
     }
 
     void notification(const dcc::PowerEvent &event) override {
@@ -67,8 +69,8 @@ public:
     }
 
     void notifyFastClock(AsyncClient *c=nullptr) {
-        uint32_t seconds = fast_clock::clock::now().time_since_epoch().count();
-        unsigned rate = fast_clock::clock::getRate();
+        uint32_t seconds = fast_clock::clock.getSeconds();
+        unsigned rate = fast_clock::clock.getRate();
         String s = String("PFT")+ seconds + "<;>"+rate;
         if(c==nullptr) {
             for (auto p: clients) {

@@ -2,49 +2,78 @@
 
 #include <Arduino.h>
 
-#include <etl/chrono.h>
+#include <etl/observer.h>
+
+#include <freertos/timers.h>
 
 
 namespace fast_clock {
 
-    // a custom ETL clock with second precision for usage in DCC fast clocks.
+    using rep = uint32_t;
 
-    class clock {
+    struct ClockChangedEvent {
+        rep seconds;
+        uint8_t rate;
+        bool big_change;
+    };
+
+    using clock_observer = etl::observer<const ClockChangedEvent&>;
+
+    class Clock: public etl::observable<clock_observer, 10> {
     public:
-        using rep = uint32_t;
-        using period = etl::ratio<1>;
-        using duration = etl::chrono::duration<rep, period>;
-        using time_point = etl::chrono::time_point<clock>;
 
-        static constexpr bool is_steady = true;
+        bool isRunning() { return rate != 0; }
 
-        static time_point now() noexcept {
-            return time_point{duration{seconds}};
+        rep getSeconds() noexcept {
+            return seconds;
         }
 
-        static void update() {
-            uint32_t now = millis();
-            uint32_t elapsed = now - millis_at_last_update;
-            millis_at_last_update = now;
-            seconds += elapsed * rate / 1000;
-        }
-
-        static unsigned getRate() { return rate; }
-        static void setRate(unsigned newRate) { rate = newRate; }
-
-        static void setSeconds(uint32_t newSeconds) {
+        void setSeconds(rep newSeconds) {
             seconds = newSeconds;
             millis_at_last_update = millis();
+            notify_observers(ClockChangedEvent{seconds, rate, true});
+        }
+
+        /** 0=stopped, 1=realtime, 2=twice as fast as realtime,... */
+        uint8_t getRate() { return rate; }
+        void setRate(uint8_t newRate) {
+            if(rate == newRate) return;
+            rate = newRate;
+            notify_observers(ClockChangedEvent{seconds, rate, true});
+
+            if(rate==0) {
+                if(timer!=nullptr) xTimerStop(timer, 0);
+            } else {
+                if(timer==nullptr) {
+                    timer = xTimerCreate("FastClock", pdMS_TO_TICKS(1000),
+                        pdTRUE, (void*)this, &Clock::timer_func );
+                }
+                xTimerStart(timer, 0);
+            }
         }
 
     private:
-        static rep seconds;
-        static unsigned rate; // for now, integer multiplier to world clock.
-        static uint32_t millis_at_last_update;
+        rep seconds;
+        uint8_t rate; /// for now, integer multiplier to world clock.
+        uint32_t millis_at_last_update;
+        TimerHandle_t timer = nullptr;
 
+        static void timer_func(TimerHandle_t tim) {
+            Clock* inst = static_cast<Clock*>(pvTimerGetTimerID(tim));
+            inst->tick1s();
+        }
+
+        void tick1s() {
+            bool close_to_overflow = seconds % 60 > 30;
+            seconds += rate;
+            bool overflown = seconds % 60 < 30;
+            if(close_to_overflow && overflown) {
+                // send event every minute
+                notify_observers(ClockChangedEvent{seconds, rate, false});
+            }
+        }
     };
 
-    inline clock::rep clock::seconds;
-    inline unsigned clock::rate;
-    inline uint32_t clock::millis_at_last_update;
+    inline Clock clock{};
+
 }

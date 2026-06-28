@@ -156,6 +156,14 @@ void WiThrottleServer::begin() {
 
     MDNS.addService("withrottle","tcp", port);
 
+    fast_clock::clock.add_observer(*this);
+
+    notifyPowerStatus();
+}
+
+void WiThrottleServer::end() {
+    server.end();
+    fast_clock::clock.remove_observer(*this);
 }
 
 void WiThrottleServer::loop() {

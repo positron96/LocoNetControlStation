@@ -380,16 +380,14 @@ void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
     unsigned ticks = (msg.frac_minsh<<7) | msg.frac_minsl;
     unsigned rate = msg.clk_rate;
 
-    fast_clock::clock::setRate(rate);
-    fast_clock::clock::setSeconds(days*86400 + hrs*3600 + mins*60 + ticks * 60 / (0x7F*0x7F));
+    fast_clock::clock.setRate(rate);
+    fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60 + ticks * 60 / (0x7F*0x7F));
 
     LOGI("Received fast clock: days=%d, %02x:%02x .%02x, rate=%d", days, hrs, mins, ticks, rate);
 }
 
 void LocoNetSlotManager::sendFastClock() {
-
-    auto now = fast_clock::clock::now();
-    uint32_t seconds = now.time_since_epoch().count();
+    uint32_t seconds = fast_clock::clock.getSeconds();
     unsigned mins = (seconds / 60) % 60;
     unsigned hrs = (seconds / 3600) % 24;
     unsigned days = seconds / 86400;
@@ -399,7 +397,7 @@ void LocoNetSlotManager::sendFastClock() {
     ret.fc.command = OPC_SL_RD_DATA;
     ret.fc.mesg_size = 14;
     ret.fc.slot = FC_SLOT;
-    ret.fc.clk_rate = fast_clock::clock::getRate();
+    ret.fc.clk_rate = fast_clock::clock.getRate();
     // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
     ret.fc.frac_minsl = tmp & 0x7F;
     ret.fc.frac_minsh = (tmp >> 7) & 0x7F;
