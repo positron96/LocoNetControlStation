@@ -10,7 +10,7 @@
 
 #include "CommandStation.h"
 #include "Watchdog.h"
-#include "dcc/power_event.hpp"
+#include "event_bus.hpp"
 
 #include <WiFi.h>
 #include <WiFiServer.h>
@@ -32,7 +32,7 @@
 #endif
 
 
-class WiThrottleServer: public dcc::PowerObserver {
+class WiThrottleServer: public etl::message_router<WiThrottleServer,  PowerEventMsg> {
 public:
 
     constexpr static uint16_t DEF_PORT = 4444;
@@ -45,9 +45,12 @@ public:
         server.end();
     }
 
-    void notification(const dcc::PowerEvent &event) override {
-        notifyPowerStatus();
+    void on_receive(const PowerEventMsg &msg) {
+        //if(msg.event.channel == CS.getMainTrack())
+            notifyPowerStatus();
     }
+
+    void on_receive_unknown(const etl::imessage& msg) {}
 
     void notifyPowerStatus(AsyncClient *c=nullptr) {
         bool v = CS.getPowerState();
