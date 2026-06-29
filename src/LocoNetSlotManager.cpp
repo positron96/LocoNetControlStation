@@ -1,5 +1,7 @@
 #include "LocoNetSlotManager.h"
 
+#include "FastClock.hpp"
+
 #define LOG_LEVEL  LEVEL_INFO
 #include "log.h"
 
@@ -43,6 +45,12 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
     return SM::S128;
 }
 
+inline uint8_t trkByte() {
+    uint8_t ret = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default;
+    if(CS.getPowerState()) ret |= GTRK_POWER;
+    return ret;
+}
+
     LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
         ln->addConsumer(this);
     }
@@ -83,8 +91,7 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             sd.id2 = e.id2;
         }
 
-        sd.trk = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default;
-        if(CS.getPowerState()) sd.trk |= GTRK_POWER;
+        sd.trk = trkByte();
     }
 
     #define LOGI_SLOT(TAG, I, S) LOGI( TAG \
@@ -178,6 +185,10 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
                     processProgMsg(msg->pt);
                     break;
                 }
+                if(m.slot == FC_SLOT) {
+                    processFastClockMsg(msg->fc);
+                    break;
+                }
                 if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
                 rwSlotDataMsg _slot;
                 fillSlotMsg(slot, _slot);
@@ -202,6 +213,10 @@ inline static SpeedMode int2SpeedMode(uint8_t sm) {
             }
             case OPC_RQ_SL_DATA: {
                 uint8_t slot = msg->sr.slot;
+                if(slot == FC_SLOT) {
+                    sendFastClock();
+                    break;
+                }
                 if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;}
                 LOGI("OPC_RQ_SL_DATA slot %d", slot);
                 sendSlotData(slot);
@@ -351,8 +366,79 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
 
         }
     }
+}
 
-    //sendLack(PROG_LACK, 1); // ack ok
-    //sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
+constexpr uint32_t TICK_MAX = 0x3FFF;
 
+void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
+    if( (msg.clk_cntrl & 0x40) == 0 ) {
+        LOGI("Received fast clock message with invalid clock info, ignoring");
+        return;
+    }
+    // magic numbers are simplified from LocoNetFastClock.cpp in LocoNet2 library.
+    unsigned mins = (msg.mins_60 - (127-60));
+    unsigned hrs = (msg.hours_24 - (128-24));
+    unsigned days = msg.days;
+
+    /*
+    Interpretation of frac_minsh/frac_minsl is device-specific.
+    Standard mandates that upon reception of the packet subminute counter must be reset.
+    */
+    unsigned ticks = TICK_MAX - ((msg.frac_minsh<<7) | msg.frac_minsl);
+    unsigned rate = msg.clk_rate;
+
+    clockSetterId = (msg.id2 << 7) | msg.id1;
+
+    fast_clock::clock.setRate(rate);
+    fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60);
+
+    LOGI("Received fast clock: days=%d, %02d:%02d .%02d, rate=%d:1", days, hrs, mins, ticks, rate);
+}
+
+void LocoNetSlotManager::sendFastClock() {
+    uint8_t hrs, mins, secs;
+    unsigned days;
+    fast_clock::clock.getDHMS(days, hrs, mins, secs);
+
+    // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
+    // JMRI sends a completely different value.
+    unsigned ticks = TICK_MAX - secs * 0x7F*0x7F / 60;
+
+    LnMsg ret;
+    ret.fc.command = OPC_SL_RD_DATA;
+    ret.fc.mesg_size = 14;
+    ret.fc.slot = FC_SLOT;
+    ret.fc.clk_rate = fast_clock::clock.getRate();
+    ret.fc.frac_minsl = ticks & 0x7F;
+    ret.fc.frac_minsh = (ticks >> 7) & 0x7F;
+    ret.fc.mins_60 = (mins + (127-60)) & 0x7F;
+    ret.fc.track_stat = trkByte();
+    ret.fc.hours_24 = (hrs + (128-24)) & 0x7F;
+    ret.fc.days = days;
+    ret.fc.clk_cntrl = 0x40; // bit 6: 1=data is valid clock info; 0=ignore this reply
+    ret.fc.id1 = clockSetterId & 0x7F;
+    ret.fc.id2 = clockSetterId >> 7;
+
+    //LOGI("Sending fast clock");
+
+    writeChecksum(ret);
+    _ln->broadcast(ret, this);
+
+}
+
+void LocoNetSlotManager::notification(const fast_clock::ClockChangedEvent &event) {
+    if(isClockMaster && millis() - clockSentTime > CLOCK_SEND_INTL) {
+        clockSentTime = millis();
+        sendFastClock();
+    }
+}
+
+void LocoNetSlotManager::setFastClockMaster(bool v) {
+    if(isClockMaster == v) return;
+    isClockMaster = v;
+    if(isClockMaster) {
+        fast_clock::clock.add_observer(*this);
+    } else {
+        fast_clock::clock.remove_observer(*this);
+    }
 }

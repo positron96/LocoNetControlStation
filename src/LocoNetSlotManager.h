@@ -4,8 +4,9 @@
 #include <LocoNet2.h>
 #include <etl/map.h>
 #include "CommandStation.h"
+#include "FastClock.hpp"
 
-class LocoNetSlotManager : public LocoNetConsumer {
+class LocoNetSlotManager : public LocoNetConsumer, public fast_clock::clock_observer  {
 
 public:
     LocoNetSlotManager(LocoNetBus * const ln);
@@ -18,6 +19,12 @@ public:
     }
 
     void processMessage(const lnMsg* msg);
+
+    void notification(const fast_clock::ClockChangedEvent &event) override;
+
+    bool isFastClockMaster() const { return isClockMaster; }
+
+    void setFastClockMaster(bool v);
 
 
 private:
@@ -34,6 +41,11 @@ private:
     };
 
     etl::map<uint8_t, LnSlotData, CommandStation::MAX_SLOTS> extra;
+
+    static constexpr uint32_t CLOCK_SEND_INTL = 60'000; // send every minute
+    bool isClockMaster{false}; ///< clock master sends periodic clock updates to the bus
+    uint16_t clockSetterId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
+    uint32_t clockSentTime{0};
 
     bool slotValid(uint8_t slot) {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
@@ -63,5 +75,9 @@ private:
     void processProgMsg(const progTaskMsg &msg);
 
     void fillSlotMsg(uint8_t slot, rwSlotDataMsg &msg);
+
+    void processFastClockMsg(const fastClockMsg &msg);
+
+    void sendFastClock();
 
 };

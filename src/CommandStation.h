@@ -5,8 +5,6 @@
  * settings.
  */
 
-#include <etl/map.h>
-#include <etl/bitset.h>
 
 #include "dcc/base_channel.hpp"
 #include "dcc/packet.hpp"
@@ -14,6 +12,9 @@
 #include <LocoNet2.h>
 
 #include "Watchdog.h"
+
+#include <etl/map.h>
+#include <etl/bitset.h>
 
 
 #define CS_DEBUG

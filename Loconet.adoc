@@ -14,8 +14,8 @@ endif::[]
 
 [preface]
 ## Preface
-The goal of this document is to create a comprehensive interpretation of LocoNet Personal specification. 
-Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points. 
+The goal of this document is to create a comprehensive interpretation of LocoNet Personal specification.
+Its first version is roughy the same as original specification, but subsequent versions would add meaning to badly formulated paragraphs and clarify unclear points.
 The style should also be improved.
 
 ### Sources and references
@@ -25,69 +25,69 @@ The style should also be improved.
 
 ## Introduction
 
-This is the definition of the protocol used by Digitrax products that communicate on the Long distance version the LocoNet(R) network. 
-This LocoNet Personal Use Edition 1.0 information is provided solely for non-commercial private use by Digitrax customers. 
-No rights are conveyed for the commercial use of this information, and Digitrax Inc. is not able to provide technical support for private use. 
+This is the definition of the protocol used by Digitrax products that communicate on the Long distance version the LocoNet(R) network.
+This LocoNet Personal Use Edition 1.0 information is provided solely for non-commercial private use by Digitrax customers.
+No rights are conveyed for the commercial use of this information, and Digitrax Inc. is not able to provide technical support for private use.
 Digitrax conveys no warranty for this information and incurs no obligations for its use or incorrect usage.
-Possession of this information signifies acceptance of these conditions of usage. 
+Possession of this information signifies acceptance of these conditions of usage.
 LocoNet is a registered trademark of Digitrax Inc.
 
 
 ### Summary and design philosophy
 
-LocoNet(R) is a "PEER to PEER" distributed network system on which all devices can monitor the network data flow. 
-The network is event driven by different devices in time, and is not polled by a centralized controller in normal operation. 
-LocoNet is a powerful power decentralized and "scalable" distributed system. 
-This is similar to the way the worldwide telephone system works -- i.e. there is no worldwide "master control program" and all telephone central offices follow a strict set of "rules" for worldwide access. 
+LocoNet(R) is a "PEER to PEER" distributed network system on which all devices can monitor the network data flow.
+The network is event driven by different devices in time, and is not polled by a centralized controller in normal operation.
+LocoNet is a powerful power decentralized and "scalable" distributed system.
+This is similar to the way the worldwide telephone system works -- i.e. there is no worldwide "master control program" and all telephone central offices follow a strict set of "rules" for worldwide access.
 The Internet operates in a similar "distributed” manner.
 
-The access technology is Carrier Sense Multiple access with Carrier Detect, CSMA/CD. 
-This type of network technology is the overwhelming choice for connecting computer LAN's around the world. 
-The first implemented 10M bps version of Ethernet has been upgraded to 100M bps and now has even 1,000M bps extensions. 
+The access technology is Carrier Sense Multiple access with Carrier Detect, CSMA/CD.
+This type of network technology is the overwhelming choice for connecting computer LAN's around the world.
+The first implemented 10M bps version of Ethernet has been upgraded to 100M bps and now has even 1,000M bps extensions.
 The CSMA/CD is the basic physical or media access layer that allows multiple devices to interoperate and exchange data efficiently.
 
-LocoNet(R) uses CSMA/CD techniques to arbitrate and control network access. 
-On top of this physical layer, LocoNet(R) specifies a higher level of message protocol that gives efficient management of data structures for operations in the model railroad environment. 
-A sensible bit rate was chosen as a good compromise between ease of wiring, with no need for terminations or complex distribution rules, and fast latency or rapid response time. 
+LocoNet(R) uses CSMA/CD techniques to arbitrate and control network access.
+On top of this physical layer, LocoNet(R) specifies a higher level of message protocol that gives efficient management of data structures for operations in the model railroad environment.
+A sensible bit rate was chosen as a good compromise between ease of wiring, with no need for terminations or complex distribution rules, and fast latency or rapid response time.
 We avoided a simple "specsmanship" of specifying faster bit rates to distinguish us from other system manufacturers' capabilities, and instead chose a fundamentally new system architecture we call LocoNet(R).
 
-Since LocoNet(R) is a distributed system where each device can determine the urgency of its access, it is not easy to compare in a one-to-one manner with older technology such as polled bus systems. 
-We can compare the explosive growth of commercial computer LAN's, and even the Internet itself, to understand that all new "state-of-the-art" data processing systems are based on network type topology. 
+Since LocoNet(R) is a distributed system where each device can determine the urgency of its access, it is not easy to compare in a one-to-one manner with older technology such as polled bus systems.
+We can compare the explosive growth of commercial computer LAN's, and even the Internet itself, to understand that all new "state-of-the-art" data processing systems are based on network type topology.
 The old idea of a central "mainframe" and "Main Control Program" was state of the art for the 60's and 70's and has yielded to new technologies and ideas.
 
-Comparing "raw" bit rates is not meaningful in this context since the strength of a true network system is in allowing multiple queued access without requiring polling or data flow controlling overheads. 
-The real strengths of a LAN become apparent when a large number of devices need fast data access, or low latency, to transfer requests or state change information. 
+Comparing "raw" bit rates is not meaningful in this context since the strength of a true network system is in allowing multiple queued access without requiring polling or data flow controlling overheads.
+The real strengths of a LAN become apparent when a large number of devices need fast data access, or low latency, to transfer requests or state change information.
 With a LocoNet(R) implementation, a modest bit rate is sufficient on a large railroad layout to give realistic operation.
 Note that a typical LocoNet(R) implementation allows us to achieve about 98% of network traffic capacity with less than 1% collisions.
 
-Another decisive advantage of an optimally designed LAN is the ability to overlay or add new capabilities and thus "scale" the system in features as well as size. 
+Another decisive advantage of an optimally designed LAN is the ability to overlay or add new capabilities and thus "scale" the system in features as well as size.
 Not having to modify a "master control program" each time we wish to reconfigure or expand system features is a very real advantage.
 
-An example of this is the way the Digitrax "Big Boy" can be expanded with DT100's and get a network "fast clock", even though the DT200 master did not itself support this. 
-The soon to be released Digitrax Tetherless throttles (both Radio and IR) can take advantage of the network environment to add a number of different types of features among many interfaces on the same LocoNet (R) network. 
-LocoNet(R) is configured to allow all types of data traffic to flow on a single wiring scheme. 
-This means you do not have to run separate Throttle, Booster, Feedback and PC wiring for the system. 
-Since LocoNet (R) is based on LAN technology, a large LocoNet(R) layout can use Bridging, Routing and Fault isolation techniques as used on commercial networks to expand to a large physical extent. 
+An example of this is the way the Digitrax "Big Boy" can be expanded with DT100's and get a network "fast clock", even though the DT200 master did not itself support this.
+The soon to be released Digitrax Tetherless throttles (both Radio and IR) can take advantage of the network environment to add a number of different types of features among many interfaces on the same LocoNet (R) network.
+LocoNet(R) is configured to allow all types of data traffic to flow on a single wiring scheme.
+This means you do not have to run separate Throttle, Booster, Feedback and PC wiring for the system.
+Since LocoNet (R) is based on LAN technology, a large LocoNet(R) layout can use Bridging, Routing and Fault isolation techniques as used on commercial networks to expand to a large physical extent.
 
-To allow the addition of multiple independently operating PC's around a large physical layout using simple access hardware, the LocoNet(R) was "slowed down" and simplified somewhat over a "raw hardware" driven system capability. 
-This trade off was made to ensure ease of attachment of PC's, and we at Digitrax feel that once the power of "computer assisted modeling" was appreciated, a single PC would rapidly prove inadequate, as task complexity and demands increased. 
+To allow the addition of multiple independently operating PC's around a large physical layout using simple access hardware, the LocoNet(R) was "slowed down" and simplified somewhat over a "raw hardware" driven system capability.
+This trade off was made to ensure ease of attachment of PC's, and we at Digitrax feel that once the power of "computer assisted modeling" was appreciated, a single PC would rapidly prove inadequate, as task complexity and demands increased.
 Also, we feel it is important that PC tasks can be independent, modular and spread out among many different PC's around the layout.
 In particular being able to use slower old "AT" 286's and 386's running DOS and Windows 3.1 etc., was important, since requiring a dedicated new "Wintel PC" costing over US$2,000 seems like a very expensive proposition for what is essentially a hobby!
 
 ## Technical Specification
 
-The normal LocoNet(R) state is IDLE, with no data traffic unless a device has information to send. 
+The normal LocoNet(R) state is IDLE, with no data traffic unless a device has information to send.
 With no traffic flow, the network is RFI quiet.
 
 ### Physical
 
-The full implementation of LocoNet(R) uses a 6 pin USOC RJ12 style TELCO connector. 
-The network is designed to operate "daisy chained" on unterminated 26 AWG 3 pair cable or flat 6 conductor type 120 ohm impedance ribbon cable. 
-It can be cabled in numerous variations. 
-It is designed to be tolerant of cabling environment. 
-It is permissible for the individual wires to loop back on themselves, noting that the 2 Rail_sync lines are of opposite phase and cannot be connected. 
-The connections are balanced to minimize RFI. 
-The connections may be branched in any combination to yield a "Star" or "Bus" or any combination thereof. 
+The full implementation of LocoNet(R) uses a 6 pin USOC RJ12 style TELCO connector.
+The network is designed to operate "daisy chained" on unterminated 26 AWG 3 pair cable or flat 6 conductor type 120 ohm impedance ribbon cable.
+It can be cabled in numerous variations.
+It is designed to be tolerant of cabling environment.
+It is permissible for the individual wires to loop back on themselves, noting that the 2 Rail_sync lines are of opposite phase and cannot be connected.
+The connections are balanced to minimize RFI.
+The connections may be branched in any combination to yield a "Star" or "Bus" or any combination thereof.
 Only a single LocoNet(R) current termination is needed and is typically supplied by the system **master**.
 
 
@@ -101,18 +101,18 @@ Pinouts for the RJ11/6 connector are:
 6. RAIL_SYNC+ {nbsp}{nbsp}{nbsp}{nbsp} [blue]#blue#
 
 
-Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2000{nbsp}ft (609{nbsp}m), with no point-to-point length exceeding 1000{nbsp}ft (304{nbsp}m). 
+Using typical UL6010 6 conductor 26AWG Telephone flat ribbon cable, a network may typically have a total parallel cable length of up to 2000{nbsp}ft (609{nbsp}m), with no point-to-point length exceeding 1000{nbsp}ft (304{nbsp}m).
 This is using the "standard" Long Distance LocoNet(R) termination of a 15 milliamp positive current source on pins 3 and 4 of the connectors.
 The capacitance of 2000{nbsp}ft of this cable is approximately 68{nbsp}nF, and the loop resistance of a pair of these stranded 26AWG conductors is 80{nbsp}ohms per 1000{nbsp}ft.
 
-The maximum amount of parallel cable is limited by the requirement that the minimum RISE TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond. 
+The maximum amount of parallel cable is limited by the requirement that the minimum RISE TIME in the region of +2 Volts to +7 Volts, is 0.35 Volts per microsecond.
 The minimum FALL TIME in the same region should be greater than 0.75 Volts per microsecond.
 
 
 ### Electrical
 
 LocoNet(R) is a "Wired-Or" multiple access linear network using CSMA/CD techniques.
-Repeaters, network buffers and isolators can be implemented. 
+Repeaters, network buffers and isolators can be implemented.
 For the current **single ended** implementation, the 2 LocoNet signals, + and -, are paralleled and the RJ11 cable connections become polarity insensitive, wire resistance is lowered and connection reliability is enhanced.
 
 **Single ended** voltage levels and characteristics are:
@@ -126,14 +126,14 @@ For the current **single ended** implementation, the 2 LocoNet signals, + and -,
 . The transmitter is OPEN COLLECTOR to SIGNAL GROUND and should be able to sink 50 milliamps in the "ON" state at no more than 1.6V, and withstand 35 Volts in the OFF state.
 . One single device shall provide the "Wired-Or" pull-up for the LOCONET+/- signals.
 Typical termination is performed by the packet generating "MASTER" and is a 15 milliamp current source from +12V.
-. Loconet devices may draw up to 15 mA from the RAIL_SYNC +/- lines whenever the voltage is greater than 7V. 
-The unloaded voltage is between 12V and 26V max. 
-It is general practice to provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttle jacks around the layout. 
+. Loconet devices may draw up to 15 mA from the RAIL_SYNC +/- lines whenever the voltage is greater than 7V.
+The unloaded voltage is between 12V and 26V max.
+It is general practice to provide a LOCAL current limited copy of the closest track voltages, to pins 1&6 of Throttle jacks around the layout.
 In this case the master "backbone" copy of RAILSYNC +/- is not on the Throttle jack.
-. The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails. 
+. The RAIL_SYNC+/- are a low power copy of the DCC data to be transmitted to the rails.
 The signals may be received by a differential receiver and boosted to drive the rails.
 . A device with a separate power supply isolated from Loconet may connect to the LOCONET+/- pins 3&4 and SIGNAL GROUND pins 2&5 with a just 2 wires.
-. To use a 1/4" (6.3 mm) stereo 3-pin plug, the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source. 
+. To use a 1/4" (6.3 mm) stereo 3-pin plug, the SIGNAL GROUND should be connected to the Sleeve, the LOCONET +/- connected to the Tip, and the Sleeve may be connected as a power source.
 The power supplied to the Sleeve MUST be a CURRENT SOURCE (from +12V to +26V) and be limited to 20 milliamps maximum, because the Plug shorts the Tip and Ring when initially
 inserted.
 
@@ -143,15 +143,15 @@ NOTE: There must be a typo, Sleeve is mentioned twice, but Ring is not mentioned
 
 LocoNet(R) data is sent in normal asynchronous format using 1 START bit, 8 DATA bits and 1 STOP bit.
 The 8 bit data is transmitted LSB first.
-The bit times are 60.0 uSecs or 16.66 KBaud +/-1.5%. 
+The bit times are 60.0 uSecs or 16.66 KBaud +/-1.5%.
 A PC serial "COM" device can use the convenient rate of 16.457 KBaud.
 This corresponds to a divisor of 07 for the standard NS8250 UART chip or equivalent used by most compatibles.
 Bytes may be transmitted "back-to-back", with a Start bit immediately following the Stop bit of the previous character.
-Normal network "IDLE" is the "MARK" voltage state. 
+Normal network "IDLE" is the "MARK" voltage state.
 Data is sent **half duplex** and transmitters process the transmit echo to monitor network collisions.
 
 CARRIER DETECT (CD) for fundamental network access timing may utilize simple RC time constant "one-shots".
-CD becomes active immediately on any detection of network in the SPACE state. 
+CD becomes active immediately on any detection of network in the SPACE state.
 It then times out for 20 bit times or 1.2 milliseconds as the CD BACKOFF time and goes inactive.
 CD jitter of up to 180uS is acceptable and helps ensure even statistical network access with minimal collisions.
 
@@ -201,21 +201,21 @@ device should _assert the SPACE of the start bit of the message OPCODE within 2 
 
 #### PC access
 
-A simple "COM" port on a PC may access the _[.underline]#network#_ by a more direct method. 
+A simple "COM" port on a PC may access the _[.underline]#network#_ by a more direct method.
 The protocol has been encoded so that a PC may watch the LocoNet(R) message dialog and infer that the network is free because
-the last message decoded does not imply a follow-on response, so that the network is immediately free for a new message dialog. 
-In this situation, the PC may immediately seize the network before the CD BACKOFF time has elapsed. 
-This allows the PC to pre-empt all other devices and completely control the LocoNet(R) to the level desired. Note that the message `<81><7e>` is a "time burner" NOP code sent by a Master to restart the CD Backoff timers, and hence keep the network busy in a hardware sense. 
+the last message decoded does not imply a follow-on response, so that the network is immediately free for a new message dialog.
+In this situation, the PC may immediately seize the network before the CD BACKOFF time has elapsed.
+This allows the PC to pre-empt all other devices and completely control the LocoNet(R) to the level desired. Note that the message `<81><7e>` is a "time burner" NOP code sent by a Master to restart the CD Backoff timers, and hence keep the network busy in a hardware sense.
 This `<81>` opcode should thus be simply stripped and ignored.
 
-Several PC's may share access to LocoNet(R) by subdividing the 20 bit CD BACKOFF delay into priority windows for access. 
+Several PC's may share access to LocoNet(R) by subdividing the 20 bit CD BACKOFF delay into priority windows for access.
 They are responsible for detecting transmit COLLISIONS by checking their TRANSMIT ECHO data and watching a CARRIER DETECT to see if a PC transmit "window" is active already, before attempting to transmit.
 
-If the LOCONET+/- signal remains at a fixed SPACE (low) level for more than 100 milliseconds, a DEVICE will assume a DISCONNECT state is in effect. 
-From this DISCONNECT state or initial start-up state a device will wait a 250 millisecond STARTUP backoff before attempting to access the network. 
-A device will not need to reset its internal state upon DISCONNECT and re-connection, but if it is maintaining a SLOT in the refresh stack it will be required to check the SLOT status matches its internal state before re-using any SLOT. 
+If the LOCONET+/- signal remains at a fixed SPACE (low) level for more than 100 milliseconds, a DEVICE will assume a DISCONNECT state is in effect.
+From this DISCONNECT state or initial start-up state a device will wait a 250 millisecond STARTUP backoff before attempting to access the network.
+A device will not need to reset its internal state upon DISCONNECT and re-connection, but if it is maintaining a SLOT in the refresh stack it will be required to check the SLOT status matches its internal state before re-using any SLOT.
 If a device diconnects from LocoNet(R) and so does not access or reference a slot within the system PURGE time, the master will force the unaccessed SLOT to "COMMON" status so other system devices can use the SLOT.
-The typical purge time of a DT200 operating as a Master is about 200 seconds. 
+The typical purge time of a DT200 operating as a Master is about 200 seconds.
 A good "ping" or Slot update activity is about every 100 seconds, i.e. if a user makes no change to a throttle/slot within 100
 seconds, the throttle/device should automatically send another speed update at the current speed to reset the Purge timeout for that Slot.
 
@@ -276,7 +276,7 @@ the 10 data bytes is not the same as a "normal" slot. See <<later, programmer_tr
 
 ### Standard address selection
 
-To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a locomotive address for use (opcode <<OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ). 
+To request a MOBILE or LOCOMOTIVE decoder task in the refresh stack, a Throttle device requests a locomotive address for use (opcode <<OPC_LOCO_ADR>> `<BF>,<loco adr hi>,<loco adr lo>,<chk>` ).
 The Master (or PC in a Limited Master environment) responds with a <<OPC_SLOT_RD_DATA, SLOT DATA READ>> for the SLOT, (opcode `<E7>...`)>, that contains this locomotive address and all of its state information.
 If the address is currently not in any SLOT, the master will load this NEW locomotive address into a new SLOT (speed=0, FWD, Light/Functions OFF and 128 step mode) and return this as a SLOT DATA READ.
 If no inactive slots are free to load the NEW locomotive address, the response will be the <<OPC_LACK, Long Acknowledgment>> (opcode `<B4>`) with a "fail" code, 0.
@@ -287,7 +287,7 @@ If `<loco adr hi>` is non-zero then the Master will generate NMRA type 14 bit or
 Note that a DT200 Master **does not** process 14 bit address requests and will consider the <loco adr hi> to always be zero.
 You can check the <<arg_slot_trk,`<TRK>`>> return bits to see if the Master is a DT200.
 
-*The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.* 
+*The throttle must then examine the SLOT READ DATA bytes to work out how to process the Master response.*
 [[status1]]If the STATUS1 byte shows the SLOT to be COMMON, IDLE or FREE ("NEW" in original spec) the throttle
 may change the SLOT to IN_USE by performing a NULL MOVE instruction, opcode (<<OPC_MOVE_SLOTS>>
 `<BA>,<slotX>,<slotX>,<chk>`) on this SLOT. *This activation mechanism is used to guarantee proper SLOT usage interlocking in a multi-user asynchronous environment.*
@@ -309,39 +309,39 @@ SLOTs without using the Master to allocate Locomotive addresses
 
 ### Dispatching
 
-Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in the "DISPATCH" mode. 
+Active Locomotives (including Consist TOP) SLOTS may be released for assignment to BT2 throttles in the "DISPATCH" mode.
 In this case a BT2 operating in its normal mode will request a DISPATCH SLOT that has been prepared by a supervisor type device.
 This is included for club-type operations where simpler throttles with limited capabilities are given to Engineers (Operators) by the Hostler or Dispatcher.
 
 To DISPATCH PUT a slot, perform a SLOT MOVE to Slot 0. In this case the Destination Slot 0 is not copied to, but the source SLOT number is marked by the system as the DISPATCH slot.
 This is only a "one-deep stack".
 
-To DISPATCH GET, perform a SLOT MOVE from Slot 0 (no destination needed). 
-If there is a DISPATCH marked slot in the system, a SLOT DATA READ (`<E7>,..`) with the SLOT information will be the response. 
+To DISPATCH GET, perform a SLOT MOVE from Slot 0 (no destination needed).
+If there is a DISPATCH marked slot in the system, a SLOT DATA READ (`<E7>,..`) with the SLOT information will be the response.
 If there is NO DISPATCH slot, the response will be a LONG ACK (opc `<B4>,..`) with the Fail code, 00.
 
 ## Future expansion codes
 
 (still in definition stage)
 
-Immediate codes may be sent to the Master by a device. 
-These are converted to DCC packets and sent as the next packet to the rails. 
-They are not entered into any refresh stack. 
+Immediate codes may be sent to the Master by a device.
+These are converted to DCC packets and sent as the next packet to the rails.
+They are not entered into any refresh stack.
 These are available in a system based on the DCS100/"Chief".
 
-Opcodes for access to an auxiliary Service mode Programming Track are included. 
+Opcodes for access to an auxiliary Service mode Programming Track are included.
 These requests are not entered in the main DCC packet stream .
 
-Note that several confusing expansions and opcode sequences have been stripped from this LocoNet (R) version. 
-An experimenter who implements this protocol correctly should have no problems running on a LocoNet(R) that has other expanded features. 
+Note that several confusing expansions and opcode sequences have been stripped from this LocoNet (R) version.
+An experimenter who implements this protocol correctly should have no problems running on a LocoNet(R) that has other expanded features.
 Again, we recommend resisting the temptation to "optimise" or take shortcuts with this protocol since it will lead to guaranteed future problems with your hardware and software.
 
 ## LocoNet(R) opcode summary
 
 All Copyrights and rights reserved, Digitrax 1997.
 
-NOTE: Any opcodes shown here in _itallics_ are not finalised and are informational only. 
-Do not use. 
+NOTE: Any opcodes shown here in _itallics_ are not finalised and are informational only.
+Do not use.
 All other OPCODES and states are reserved for future expansion.
 
 LocoNet(R) Personal Use version definitions 1.0
@@ -357,13 +357,13 @@ DRAFT DEFINITIONS October 16, 1997 SUBJECT TO REVISION
 
 FORMAT = `<OPC>,<CKSUM>`
 
-|[[OPC_IDLE]]OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO 
+|[[OPC_IDLE]]OPC_IDLE | 0x85 | FORCE IDLE state, B'cast emerg. STOP | NO
 
-|[[OPC_GPON]]OPC_GPON  | 0x83 | GLOBAL power ON request | NO 
+|[[OPC_GPON]]OPC_GPON  | 0x83 | GLOBAL power ON request | NO
 
-|[[OPC_GPOFF]]OPC_GPOFF | 0x82 | GLOBAL power OFF request   | NO 
+|[[OPC_GPOFF]]OPC_GPOFF | 0x82 | GLOBAL power OFF request   | NO
 
-|[[OPC_BUSY]]OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO 
+|[[OPC_BUSY]]OPC_BUSY  | 0x81 | MASTER busy code, NUL    | NO
 
 
 
@@ -372,7 +372,7 @@ FORMAT = `<OPC>,<CKSUM>`
 FORMAT = `<OPC>,<ARG1>,<ARG2>,<CKSUM>`
 
 |[[OPC_LOCO_ADR]]OPC_LOCO_ADR |0xBF |REQ loco ADR | <E7><<OPC_SL_RD_DATA>>
-| 3+| `<0xBF>,<loco adr hi>,<loco adr lo>,<CHK>` 
+| 3+| `<0xBF>,<loco adr hi>,<loco adr lo>,<CHK>`
 
 DATA return `<E7>`, is SLOT#,DATA that ADR was found in.
 
@@ -401,11 +401,11 @@ Response is:
 
 [NOTE]
 --
-JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set in the Command station. 
+JMRI sends this message to command turnout in case "Bypass Bushby Bit" flag is set in the Command station.
 
 With this flag set, normal turnout commands(<<OPC_SW_REQ>>) are not forwarded to DCC by command stations.
 
-See details  
+See details
 https://www.jmri.org/help/en/html/scripthelp/LnBushbyForwarder/LnBushbyForwarder.shtml[here] and
 https://www.jmri.org/jython/LnBushbyForwarder.py[here (a python script to turn normal commands to bushby ones)].
 
@@ -431,7 +431,7 @@ Request slot data / status block
 
 |[[OPC_MOVE_SLOTS]]OPC_MOVE_SLOTS |0xBA |MOVE slot SRC to DEST |<E7><<OPC_SL_RD_DATA>> or <<OPC_LACK>>
 | 3+a|
-`<0xBA> <SRC> <DEST> <CHK>` 
+`<0xBA> <SRC> <DEST> <CHK>`
 
 Move SRC to DEST
 
@@ -439,13 +439,13 @@ If <SRC> slot is not in IN_USE state, clear SRC.
 
 SPECIAL CASES:
 
-* If SRC=0 (DISPATCH Get), return back SLOT READ DATA of DISPATCH Slot. 
-* IF SRC=DEST (NULL move) then SRC(=DEST) slot state is set to IN_USE (if move is legal). 
-* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<OPC_SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> (if move is legal). 
+* If SRC=0 (DISPATCH Get), return back SLOT READ DATA of DISPATCH Slot.
+* IF SRC=DEST (NULL move) then SRC(=DEST) slot state is set to IN_USE (if move is legal).
+* If DEST=0 (DISPATCH Put), mark slot as DISPATCH, return <<OPC_SL_RD_DATA,slot status>> `<0xE7>` of destination slot <DEST> (if move is legal).
 
 NOTE: Probably <SRC> slot needs to be returned if DEST=0.
 
-Return Fail <<OPC_LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`. 
+Return Fail <<OPC_LACK>> code if illegal move `<B4>,<3A>,<0>,<CHK>`.
 It's illegal to move to/from slots 120/127.
 
 
@@ -456,7 +456,7 @@ Make slot SL1 slave to slot SL2.
 
 Master LINKER sets the SL_CONUP/DN flags appropriately
 
-Reply is return of <<OPC_SL_RD_DATA, Slot status>> <0xE7>. 
+Reply is return of <<OPC_SL_RD_DATA, Slot status>> <0xE7>.
 
 Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> <0> <CHK>`
 
@@ -479,16 +479,16 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
 | 3+| `<0xB5>,<SLOT>,<STAT1>,<CHK>`
 
 
-|[[OPC_LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO 
-| 3+a| 
-`<0xB4>,<LOPC>,<ACK1>,<CHK>` 
+|[[OPC_LACK]]OPC_LONG_ACK |0xB4 |Long acknowledge |NO
+| 3+a|
+`<0xB4>,<LOPC>,<ACK1>,<CHK>`
 
 `<LOPC>` is copy of OPCode the LACK is responding to (with MSB set to 0). LOPC=0 (unused OPC) is also valid fail code.
 
 `<ACK1>` is an appropriate response code for the OPCode
 
 
-|OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO 
+|OPC_INPUT_REP |0xB2 | General SENSOR Input codes |NO
 | 3+|; <0xB2>, <IN1>, <IN2>, <CHK>
 <IN1> =<0,A6,A5,A4- A3,A2,A1,A0>, 7 ls adr bits. A1,A0 select 1 of 4 inputs pairs in a DS54
 <IN2> =<0,X,I,L- A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
@@ -498,7 +498,7 @@ Inspect to see result of Link invalid Link will return Long Ack Fail `<B4> <39> 
 "X"=1, control bit , 0 is RESERVED for future!
 
 
-|[[OPC_SW_REP]]OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO 
+|[[OPC_SW_REP]]OPC_SW_REP |0xB1 |Turnout SENSOR state REPORT | NO
 | 3+a|
 `<0xB1>,<SN1>,<SN2>,<CHK>` Report of sensor (turnout) state
 
@@ -514,9 +514,9 @@ L=0 - input level is 0V (LO), =1 - input level > +6V (HI).
 Alternately:
 
 <SN2> =<0,**0**,C,T - A10,A9,A8,A7> Report/status bits and 4 MS adr bits.
-This <B1> opcode encodes current OUTPUT levels. 
+This <B1> opcode encodes current OUTPUT levels.
 
-C=0 - "Closed" output line is OFF, =1 - "Closed" output line is ON (sinks current). 
+C=0 - "Closed" output line is OFF, =1 - "Closed" output line is ON (sinks current).
 
 T=0 - "Thrown" output line is OFF, =1 - "Thrown" output line is ON (sinks current).
 
@@ -543,9 +543,9 @@ There are special values for SW2 for <<stationary_broadcast, stationary broadcas
 
 [NOTE]
 --
-JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set 
+JMRI sends this message to tell turnout to change its state if its "Bypass Bushby Bit" is not set
 
-(by default, it's not set). 
+(by default, it's not set).
 
 Otherwise, <<OPC_SW_ACK>> is used to control turnout.
 
@@ -606,7 +606,7 @@ ID1/ID2 are two 7 bit values encoding a 14 bit unique DEVICE usage ID:
  00/04 to 7F/7E:: normal range for throttles
 
 
-|[[OPC_PEER_XFER]]_OPC_PEER_XFER_ |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO 
+|[[OPC_PEER_XFER]]_OPC_PEER_XFER_ |0xE5 | Move 8 bytes peer to peer, SRC->DST | NO
 | 3+a| `<0xE5>,<10>,<SRC>,<DSTL><DSTH>,<PXCT1>,<D1>,<D2>,<D3>,<D4>,
  <PXCT2>,<D5>,<D6>,<D7>,<D8>,<CHK>`
 
@@ -618,7 +618,7 @@ SRC=0x70-0x7E are reserved.
 
 SRC=7F is throttle msg xfer, <DSTL><DSTH> encode address (ID), <0><0> is throttle broadcast.
 
- ;<PXCT1>=<0,XC2,XC1,XC0 - D4.7,D3.7,D2.7,D1.7>, 
+ ;<PXCT1>=<0,XC2,XC1,XC0 - D4.7,D3.7,D2.7,D1.7>,
  ;XC0-XC2=ADR type CODE-0=7 bit Peer TO Peer addresses
 
  ; 1=><D1>is SRC HI,<D2>is DST HI
@@ -629,7 +629,7 @@ SRC=7F is throttle msg xfer, <DSTL><DSTH> encode address (ID), <0><0> is throttl
 --
 This message is used to work with System Variables (SVs).
 
-This is described in LocoNet Personal Use Extension (see e.g. 
+This is described in LocoNet Personal Use Extension (see e.g.
 http://embeddedloconet.sourceforge.net/SV_Programming_Messages_v13_PE.pdf[embeddedloconet])
 --
 
@@ -659,12 +659,12 @@ NOTE: <E7> for slot 0 read return master config information.
 [start=0]
 0. [[arg_slot_number]]SLOT NUMBER: 0-7FH. 0 is special SLOT, 070H-07FH reserved by DIGITRAX.
 
-1. [[arg_slot_stat]]SLOT STATUS1: 
+1. [[arg_slot_stat]]SLOT STATUS1:
 +
 [horizontal]
 D7 SL_SPURGE::
 1=SLOT purge en, ALSO adrSEL (INTERNAL use only) (not seen on NET!)
-D6 SL_CONUP:: 
+D6 SL_CONUP::
 +
 --
 CONDN/CONUP: bit encoding-Control double linked Consist List
@@ -675,9 +675,9 @@ CONDN/CONUP: bit encoding-Control double linked Consist List
 01:::: LOGICAL CONSIST SUB-MEMBER, Only linked upwards
 00:::: FREE locomotive, no CONSIST indirection/linking
 
-ALLOWS "CONSISTS of CONSISTS". 
-Uplinked means that Slot SPD number is now SLOT adr of SPD/DIR and STATUS of consist, i.e. is an Indirect pointer. 
-This Slot has same BUSY/ACTIVE bits as TOP of Consist. 
+ALLOWS "CONSISTS of CONSISTS".
+Uplinked means that Slot SPD number is now SLOT adr of SPD/DIR and STATUS of consist, i.e. is an Indirect pointer.
+This Slot has same BUSY/ACTIVE bits as TOP of Consist.
 TOP is loco with SPD/DIR for whole consist. (top of list).
 --
 
@@ -694,14 +694,14 @@ D3 SL_CONDN:: Shows other SLOT Consist linked INTO this slot, see SL_CONUP
 
 D2 SL_SPDEX::
 D1 SL_SPD14::
-D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT: 
+D0 SL_SPD28:: 3 BITS for Decoder TYPE encoding for this SLOT:
 +
 [horizontal]
-011:::: send 128 speed mode packets 
-010:::: 14 step MODE 
-001:::: 28 step. + Generate Trinary packets for this Mobile ADR 
-000:::: 28 step/ 3 BYTE PKT regular mode 
-111:::: 128 Step decoder, Allow Advanced DCC consisting 
+011:::: send 128 speed mode packets
+010:::: 14 step MODE
+001:::: 28 step. + Generate Trinary packets for this Mobile ADR
+000:::: 28 step/ 3 BYTE PKT regular mode
+111:::: 128 Step decoder, Allow Advanced DCC consisting
 100:::: 28 Step decoder, Allow Advanced DCC consisting
 
 2. [[arg_slot_adr]]SLOT LOCO ADR: LOCO adr Low 7 bits (byte sent as ARG2 in ADR req opcode <BF>)
@@ -741,7 +741,7 @@ D0:: 1=this slot has SUPPRESSED ADV consist
 
 7. [[arg_slot_loco_adr2]]SLOT LOCO ADR HIGH
 +
-Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address. 
+Locomotive address high 7 bits. If this is 0 then Low address is normal 7 bit NMRA SHORT address.
 If this is not zero then the most significant 6 bits of this address are used in the first LONG address byte (matching CV17).
 The second DCC LONG address byte matches CV18 and includes the Adr Low 7 bit value with the LS bit of ADR high in the MS postion of this track adr byte.
 +
@@ -771,7 +771,7 @@ Broadcast LocoNet Switch adr is then `<SW2>=<0,0,a,D-1,1,1,1>`, `<SW1>=<0,1,1,1-
 
 ### [[stationary_interrogation]] Stationary Interrogate Command:
 
-The DCC packet `<sync>,<1011-1111>,<1100-D c b a> <ecb>` is an Interrogation for all DS54's. 
+The DCC packet `<sync>,<1011-1111>,<1100-D c b a> <ecb>` is an Interrogation for all DS54's.
 This causes a 2 LocoNet `<B1>` messages encoding both Output state and Input state, for each sensor adr a/b/c encodes.
 
 Interrogate LocoNet Switch adr is `<SW2>=<0,0,a,1-0,1,1,1>`, `<SW1>= <0,1,1,1-1,0,c,b>`.
@@ -780,12 +780,12 @@ This is generated by DCS100 at power ON, and scans all 8 inputs of all DS54's.
 
 ## [[programmer_track]] Programmer track:
 
-The programmer track is accessed as Special slot #124 (0x7C). 
+The programmer track is accessed as Special slot #124 (0x7C).
 It is a fully asynchronous shared system resource.
 
-To start Programmer task, write to slot 124. 
-There will be an immediate LACK acknowledge that indicates what programming will be allowed. 
-If a valid programming task is started, then at the final (asynchronous) programming completion, a Slot read <E7> from slot 124 will be sent. 
+To start Programmer task, write to slot 124.
+There will be an immediate LACK acknowledge that indicates what programming will be allowed.
+If a valid programming task is started, then at the final (asynchronous) programming completion, a Slot read <E7> from slot 124 will be sent.
 This is the final task status reply.
 
 ### Programmer task start:
@@ -810,7 +810,7 @@ Any Slot RD from the master will also contain the Programmer Busy status in bit 
 A <PCMD> value of <00> will abort current SERVICE mode programming task and will echo with an
 <E6> RD the command string that was aborted.
 
-<PCMD> Programmer command: defined 
+<PCMD> Programmer command: defined
 
 * D7 = 0
 * D6 -- Write/Read, *1* -- Write, *0* -- Read
@@ -860,7 +860,7 @@ Type codes:
 
 <DATA7>Low 7 BITS OF data to WR or RD COMPARE <0,D6,D5,D4 - D3,D2,D1,D0> ms bit is at CVH bit 1 position.
 
-### Programmer task final reply: 
+### Programmer task final reply:
 
 (if saw LACK <B4>,<7F>,<1>,<chk> code reply at task start)
 
@@ -881,12 +881,19 @@ requested <DATA7> and <CVH> contain the returned data, if the PSTAT indicates a 
 (typically =0). Note that if a Paged Read fails to detect a successful Page write acknowledge when first
 setting the Page register, the read will be aborted, showing no Write acknowledge flag D1=1.
 
-## Fast clock: 
+## Fast clock
 
 The system FAST clock and parameters are implemented in Slot 123 (0x7B).
-Use <<OPC_WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information; Request to read slot 0x7B (<<OPC_RQ_SLOT_DATA, <BB><7B>..>>), will return current System clock information, and other throttles will update to this SYNC. Note that all attached display devices
-keep a current clock calculation based on this SYNC read value, i.e. devices MUST not continuously poll the clock SLOT to generate time, but use this merely to restore SYNC and follow current RATE etc. This clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds , by a single user, so all attached devices can synchronise any phase drifts. Upon seeing a SYNC read, all devices should reset their local
-sub-minute phase counter and invalidate the SYNC update ping generator.
+Use <<OPC_WR_SL_DATA,<EF> WR_SL_DATA>> to write new clock information;
+Request to read slot 0x7B (<<OPC_RQ_SLOT_DATA, <BB><7B>..>>),
+  will return current System clock information, and other throttles will update to this SYNC.
+Note that all attached display devices keep a current clock calculation based on this SYNC read value,
+  i.e. devices MUST not continuously poll the clock SLOT to generate time,
+  but use this merely to restore SYNC and follow current RATE etc.
+This clock slot is typically "pinged" or read SYNC'd every 70 to 100 seconds,
+  by a single user, so all attached devices can synchronise any phase drifts.
+Upon seeing a SYNC read, all devices should reset their local
+  sub-minute phase counter and invalidate the SYNC update ping generator.
 
 ### Clock slot format:
 
@@ -902,5 +909,21 @@ sub-minute phase counter and invalidate the SYNC update ping generator.
 <CLK_CNTRL>:: Clock Control Byte
 D6 -- 1=This is valid Clock information, 0=ignore this `<E6><7B>`, SYNC reply
 <ID1>,<1D2>:: This is device ID last setting the clock. `<00><00>` shows no set has happened; `<7F><7x>` are reserved for PC access.
+
+[NOTE]
+--
+for `256-MINS_60` and `256-HRS_24`,
+JMRI has formula (LocoNetSlot.java):
+```
+MINS = (255 - (60 - minutes)) & 0x7F
+HRS = (256 - (24 - hours)) & 0x7F
+```
+
+LocoNet library has the formulas:
+```
+MINS = minutes + 67
+HRS = hours + 104
+```
+--
 
 +++[END]+++
