@@ -368,20 +368,29 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
     }
 }
 
+constexpr uint32_t TICK_MAX = 0x3FFF;
+
 void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
     if( (msg.clk_cntrl & 0x40) == 0 ) {
         LOGI("Received fast clock message with invalid clock info, ignoring");
         return;
     }
+    // magic numbers are simplified from LocoNetFastClock.cpp in LocoNet2 library.
     unsigned mins = (msg.mins_60 - (127-60));
     unsigned hrs = (msg.hours_24 - (128-24));
     unsigned days = msg.days;
 
-    unsigned ticks = (msg.frac_minsh<<7) | msg.frac_minsl;
+    /*
+    Interpretation of frac_minsh/frac_minsl is device-specific.
+    Standard mandates that upon reception of the packet subinute counter must be reset.
+    */
+    unsigned ticks = TICK_MAX - ((msg.frac_minsh<<7) | msg.frac_minsl);
     unsigned rate = msg.clk_rate;
 
+    clockId = (msg.id1 << 8) | msg.id2;
+
     fast_clock::clock.setRate(rate);
-    fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60 + ticks * 60 / (0x7F*0x7F));
+    fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60);
 
     LOGI("Received fast clock: days=%d, %02d:%02d .%02d, rate=%d:1", days, hrs, mins, ticks, rate);
 }
@@ -391,27 +400,44 @@ void LocoNetSlotManager::sendFastClock() {
     unsigned mins = (seconds / 60) % 60;
     unsigned hrs = (seconds / 3600) % 24;
     unsigned days = seconds / 86400;
-    unsigned tmp = (seconds % 60) * 0x7F*0x7F / 60;
+    // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
+    unsigned ticks = TICK_MAX - (seconds % 60) * 0x7F*0x7F / 60;
 
     LnMsg ret;
     ret.fc.command = OPC_SL_RD_DATA;
     ret.fc.mesg_size = 14;
     ret.fc.slot = FC_SLOT;
     ret.fc.clk_rate = fast_clock::clock.getRate();
-    // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
-    ret.fc.frac_minsl = tmp & 0x7F;
-    ret.fc.frac_minsh = (tmp >> 7) & 0x7F;
+    ret.fc.frac_minsl = ticks & 0x7F;
+    ret.fc.frac_minsh = (ticks >> 7) & 0x7F;
     ret.fc.mins_60 = (mins + (128-60)) & 0x7F;
     ret.fc.track_stat = trkByte();
     ret.fc.hours_24 = (hrs + (128-24)) & 0x7F;
     ret.fc.days = days;
     ret.fc.clk_cntrl = 0x40; // bit 6: 1=data is valid clock info; 0=ignore this reply
-    ret.fc.id1 = 0; // 0 means nobody has set it yet, 7F,7F means PC (by LNWI)
-    ret.fc.id2 = 0;
+    ret.fc.id1 = clockId >> 8;
+    ret.fc.id2 = clockId & 0xFF;
 
     LOGI("Sending fast clock");
 
     writeChecksum(ret);
     _ln->broadcast(ret, this);
 
+}
+
+void LocoNetSlotManager::notification(const fast_clock::ClockChangedEvent &event) {
+    if(isClockMaster && millis() - clockSentTime > CLOCK_SEND_INTL) {
+        clockSentTime = millis();
+        sendFastClock();
+    }
+}
+
+void LocoNetSlotManager::setFastClockMaster(bool v) {
+    if(isClockMaster == v) return;
+    isClockMaster = v;
+    if(isClockMaster) {
+        fast_clock::clock.add_observer(*this);
+    } else {
+        fast_clock::clock.remove_observer(*this);
+    }
 }
