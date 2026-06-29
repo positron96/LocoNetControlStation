@@ -382,12 +382,12 @@ void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
 
     /*
     Interpretation of frac_minsh/frac_minsl is device-specific.
-    Standard mandates that upon reception of the packet subinute counter must be reset.
+    Standard mandates that upon reception of the packet subminute counter must be reset.
     */
     unsigned ticks = TICK_MAX - ((msg.frac_minsh<<7) | msg.frac_minsl);
     unsigned rate = msg.clk_rate;
 
-    clockId = (msg.id1 << 8) | msg.id2;
+    clockSetterId = (msg.id2 << 7) | msg.id1;
 
     fast_clock::clock.setRate(rate);
     fast_clock::clock.setSeconds(days*86400 + hrs*3600 + mins*60);
@@ -401,6 +401,7 @@ void LocoNetSlotManager::sendFastClock() {
     fast_clock::clock.getDHMS(days, hrs, mins, secs);
 
     // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
+    // JMRI sends a completely different value.
     unsigned ticks = TICK_MAX - secs * 0x7F*0x7F / 60;
 
     LnMsg ret;
@@ -410,15 +411,15 @@ void LocoNetSlotManager::sendFastClock() {
     ret.fc.clk_rate = fast_clock::clock.getRate();
     ret.fc.frac_minsl = ticks & 0x7F;
     ret.fc.frac_minsh = (ticks >> 7) & 0x7F;
-    ret.fc.mins_60 = (mins + (128-60)) & 0x7F;
+    ret.fc.mins_60 = (mins + (127-60)) & 0x7F;
     ret.fc.track_stat = trkByte();
     ret.fc.hours_24 = (hrs + (128-24)) & 0x7F;
     ret.fc.days = days;
     ret.fc.clk_cntrl = 0x40; // bit 6: 1=data is valid clock info; 0=ignore this reply
-    ret.fc.id1 = clockId >> 8;
-    ret.fc.id2 = clockId & 0xFF;
+    ret.fc.id1 = clockSetterId & 0x7F;
+    ret.fc.id2 = clockSetterId >> 7;
 
-    LOGI("Sending fast clock");
+    //LOGI("Sending fast clock");
 
     writeChecksum(ret);
     _ln->broadcast(ret, this);

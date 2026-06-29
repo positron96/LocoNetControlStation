@@ -44,7 +44,7 @@ private:
 
     static constexpr uint32_t CLOCK_SEND_INTL = 60'000; // send every minute
     bool isClockMaster{false}; ///< clock master sends periodic clock updates to the bus
-    uint16_t clockId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
+    uint16_t clockSetterId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
     uint32_t clockSentTime{0};
 
     bool slotValid(uint8_t slot) {
