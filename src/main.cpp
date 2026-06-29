@@ -13,6 +13,8 @@
 
 #include "WiThrottle.h"
 
+#include "event_bus.hpp"
+
 #include <LocoNetStream.h>
 
 #include <WiFi.h>
@@ -20,6 +22,8 @@
 #include <WiFiManager.h>
 
 #include <Arduino.h>
+
+#include <etl/message.h>
 
 #include <etl/callback_timer_atomic.h>
 #include <stdio.h>
@@ -85,6 +89,7 @@ TimerType timerController;
 etl::timer::id::type ledTimer;
 etl::timer::id::type checkCurrentTimer;
 
+
 class PowerStatusObserver: public dcc::PowerObserver {
     void notification(const dcc::PowerEvent &event) override {
         if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
@@ -95,10 +100,11 @@ class PowerStatusObserver: public dcc::PowerObserver {
 
                 Serial.println("Overcurrent on prog");
             }
-
         }
+        event_bus.receive(PowerEventMsg{event});
     }
 } powerStatusObserver;
+
 
 void setup() {
 
@@ -212,7 +218,7 @@ void setup() {
 	MDNS.setInstanceName(CS_NAME);
     lbServer.begin();
     withrottleServer.begin();
-    dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
+    get_event_bus().subscribe(withrottleServer);  // withrottle doesn't need prog channel
 
 #endif
 
