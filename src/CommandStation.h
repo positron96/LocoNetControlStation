@@ -76,6 +76,9 @@ public:
              : false;
     }
 
+    const dcc::BaseChannel *getMainTrack() const { return dccMain; }
+    const dcc::BaseChannel *getProgTrack() const { return dccProg; }
+
 
     /* Define turnout object structures */
     struct TurnoutData {
