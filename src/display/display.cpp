@@ -1,6 +1,9 @@
 #include "display.hpp"
 
+#include "../config.hpp"
 #include "../CommandStation.h" // for statusbar stuff
+
+#include "WiFi.h"
 
 namespace display {
 
@@ -94,7 +97,7 @@ namespace display {
 
         // Prog track
         const dcc::BaseChannel *progTrack = CS.getProgTrack();
-        x = 50;
+        x = 55;
         if(progTrack!=nullptr) {
             u8g2.setFont(u8g2_font_helvB12_tr);
             x += u8g2.drawStr(x, y, "P:");

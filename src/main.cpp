@@ -77,8 +77,9 @@ WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_NAME);
 #if USE_DISPLAY==1
 constexpr int PIN_DISP_SDA = 18;
 constexpr int PIN_DISP_SCL = 19;
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
 U8G2 &display::Display::u8g2 = u8g2_;
+display::Display disp;
 display::StatusScreen statusScreen;
 #endif
 
@@ -262,6 +263,8 @@ void setup() {
     #if USE_DISPLAY==1
     statusScreen.wtServer = &withrottleServer;
     statusScreen.lbServer = &lbServer;
+    disp.begin();
+    disp.setScreen(&statusScreen);
     #endif
 #endif
 
@@ -342,9 +345,7 @@ void checkCurrent() {
 
 void tick1s() {
 #if USE_DISPLAY==1
-    u8g2_.clearBuffer();
-    statusScreen.draw();
-    u8g2_.sendBuffer();
+    disp.loop();
 #else
     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
 #endif

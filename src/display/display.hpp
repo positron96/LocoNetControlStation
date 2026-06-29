@@ -9,7 +9,7 @@ namespace display {
     class Display {
     public:
         static U8G2 &u8g2;
-        static const int STATUS_BAR_HEIGHT = 16; // for dual color 128x64 OLEDs
+        static const int STATUS_BAR_HEIGHT = 15; // for dual color 128x64 OLEDs
 
         Display() {
             assert(inst==nullptr);
@@ -32,9 +32,9 @@ namespace display {
 
         static Display *inst;
 
-        Screen *cScreen;
+        Screen *cScreen{nullptr};
 
-        bool dirty;
+        bool dirty{true};
 
         // void processInput() {};
     };
