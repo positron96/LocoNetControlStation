@@ -40,7 +40,7 @@ public:
 
     virtual void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal)=0;
 
-    virtual bool getPower()=0;
+    virtual bool getPower() const = 0;
 
     /**
      */

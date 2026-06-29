@@ -38,6 +38,7 @@ public:
     uint8_t getDCC(SpeedMode mode) const;
     uint8_t getDCCByte(SpeedMode speedMode) const; ///< In addition to getDCC also swaps bits for S28.
     float getFloat() const ;
+    int getPercent() const; /// Returns speed as percentage (0..100) of max speed. Returns -1 for EMGR stop.
 
     bool operator==(const LocoSpeed& rhs) const { return speed128 == rhs.speed128;  }
     bool operator< (const LocoSpeed& rhs) const { return speed128 < rhs.speed128; }

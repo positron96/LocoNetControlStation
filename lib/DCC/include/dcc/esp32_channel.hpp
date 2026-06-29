@@ -40,7 +40,7 @@ public:
         notify_observers(PowerEvent{v, reason, this});
     }
 
-    bool getPower() override {
+    bool getPower() const override {
         return digitalRead(_enPin) == HIGH;
     }
 

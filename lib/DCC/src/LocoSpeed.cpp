@@ -50,6 +50,12 @@
         }
     }
 
+    int LocoSpeed::getPercent() const {
+        if(speed128==DCC_SPEED_EMGR) return -1;
+        if(speed128==DCC_SPEED_IDLE) return 0;
+        return (speed128-1)*100/MAX_SPEED_VAL;
+    }
+
 
 constexpr uint8_t getMaxSpeedVal(SpeedMode s) {
     switch(s) {
