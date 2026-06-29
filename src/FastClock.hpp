@@ -28,6 +28,13 @@ namespace fast_clock {
             return seconds;
         }
 
+        void getDHMS(unsigned &days, uint8_t &hrs, uint8_t &mins, uint8_t &secs) {
+            mins = (seconds / 60) % 60;
+            hrs = (seconds / 3600) % 24;
+            days = seconds / 86400;
+            secs = seconds % 60;
+        }
+
         void setSeconds(rep newSeconds) {
             seconds = newSeconds;
             millis_at_last_update = millis();
@@ -68,7 +75,7 @@ namespace fast_clock {
             seconds += rate;
             bool overflown = seconds % 60 < 30;
             if(close_to_overflow && overflown) {
-                // send event every minute
+                // send event every minute when seconds overflow
                 notify_observers(ClockChangedEvent{seconds, rate, false});
             }
         }

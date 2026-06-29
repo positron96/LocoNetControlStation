@@ -396,12 +396,12 @@ void LocoNetSlotManager::processFastClockMsg(const fastClockMsg &msg) {
 }
 
 void LocoNetSlotManager::sendFastClock() {
-    uint32_t seconds = fast_clock::clock.getSeconds();
-    unsigned mins = (seconds / 60) % 60;
-    unsigned hrs = (seconds / 3600) % 24;
-    unsigned days = seconds / 86400;
+    uint8_t hrs, mins, secs;
+    unsigned days;
+    fast_clock::clock.getDHMS(days, hrs, mins, secs);
+
     // subminute counter; according to LocoNet2 library, a 14 bit counter, a minute is 0x7F*0x7F counts.
-    unsigned ticks = TICK_MAX - (seconds % 60) * 0x7F*0x7F / 60;
+    unsigned ticks = TICK_MAX - secs * 0x7F*0x7F / 60;
 
     LnMsg ret;
     ret.fc.command = OPC_SL_RD_DATA;
