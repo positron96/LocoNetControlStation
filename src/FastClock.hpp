@@ -53,17 +53,17 @@ namespace fast_clock {
             } else {
                 if(timer==nullptr) {
                     timer = xTimerCreate("FastClock", pdMS_TO_TICKS(1000),
-                        pdTRUE, (void*)this, &Clock::timer_func );
+                        pdTRUE, static_cast<void*>(this), &Clock::timer_func );
                 }
                 xTimerStart(timer, 0);
             }
         }
 
     private:
-        rep seconds;
-        uint8_t rate; /// for now, integer multiplier to world clock.
-        uint32_t millis_at_last_update;
-        TimerHandle_t timer = nullptr;
+        rep seconds{0};
+        uint8_t rate{0}; /// for now, integer multiplier to world clock.
+        uint32_t millis_at_last_update{0};
+        TimerHandle_t timer{nullptr};
 
         static void timer_func(TimerHandle_t tim) {
             Clock* inst = static_cast<Clock*>(pvTimerGetTimerID(tim));
