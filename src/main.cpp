@@ -334,16 +334,6 @@ void loop() {
         nextInRead = millis() + 10;
     }
 
-    #if USE_DISPLAY==1
-    static size_t lastStatusDraw = ms;
-    if(ms - lastStatusDraw > 1000) {
-        u8g2_.clearBuffer();
-        statusScreen.draw();
-        u8g2_.sendBuffer();
-        lastStatusDraw = ms;
-    }
-    #endif
-
 }
 
 void checkCurrent() {
@@ -351,12 +341,13 @@ void checkCurrent() {
 }
 
 void tick1s() {
-    if(WiFi.isConnected()) {
-        int rssi = WiFi.RSSI();
-        Serial.printf("RSSI: %d\n", rssi);
-    } else {
-        Serial.printf("No WiFi\n");
-    }
+#if USE_DISPLAY==1
+    u8g2_.clearBuffer();
+    statusScreen.draw();
+    u8g2_.sendBuffer();
+#else
+    Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
+#endif
 }
 
 
