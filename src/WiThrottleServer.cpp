@@ -361,7 +361,7 @@ void WiThrottleServer::ClientData::locosRelease(char th, etl::string_view sLocoA
 }
 
 void WiThrottleServer::ClientData::locoRelease(char th, LocoAddress addr) {
-    String sAddr = addr;
+    String sAddr{addr};
     LOGI("loco release thr=%c; addr=%s", th, sAddr.c_str() );
     sendThrottleMsg(th,'-',addr, "" );
 
@@ -506,11 +506,14 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
 
 String WiThrottleServer::getInfo() const {
     String v;
+    if (clients.empty()) {
+        v = "No clients";
+    }
     for(const auto &p: clients) {
         const ClientData &cc = p.second;
         v += String(" ")+p.first->remoteIP().toString() + " ID: "+cc.hwId + " health:" + cc.health.c_str() + "\n";
         for(const auto &thr: cc.slots) {
-            v += String("  Throttle ")+thr.first+": ";
+            v += String("  ")+thr.first+": ";
             for(const auto &slot: thr.second) {
                 v += String(slot.first) + " ";
             }

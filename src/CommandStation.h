@@ -206,6 +206,7 @@ public:
             // no need to load, it will load itself on setLocoSpeed/setLocoFn
             dd.kickWatchdog();
         } else {
+            // TODO: somehow send 0 speed to track
             dccMain->unloadSlot(dd.addr);
         }
     }

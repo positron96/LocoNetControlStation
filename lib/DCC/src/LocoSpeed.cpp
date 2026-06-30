@@ -2,6 +2,10 @@
 
 #include <cmath>
 
+#ifdef ARDUINO
+#include <WString.h>
+#endif
+
 
     LocoSpeed LocoSpeed::fromFloat(float speed) {
         if(speed<0) return SPEED_EMGR;
@@ -55,6 +59,13 @@
         if(speed128==DCC_SPEED_IDLE) return 0;
         return (speed128-1)*100/MAX_SPEED_VAL;
     }
+
+#ifdef ARDUINO
+    String LocoSpeed::toString() const {
+        if(isEmgr()) return "EMGR";
+        return String(getPercent()) + "%";
+    }
+#endif
 
 
 constexpr uint8_t getMaxSpeedVal(SpeedMode s) {

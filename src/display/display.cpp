@@ -74,42 +74,42 @@ namespace display {
     void drawStatusbar(U8G2 &u8g2) {
 
         unsigned x = 2; // small margin
-        const unsigned y = 0;
+        unsigned y = Display::STATUS_BAR_HEIGHT - 2;
 
-        u8g2.drawLine(
-            0, Display::STATUS_BAR_HEIGHT,
-            u8g2.getWidth(), Display::STATUS_BAR_HEIGHT
-        );
+        u8g2.drawLine(0, y,  u8g2.getWidth(), y);
+        u8g2.setFontPosTop();
+
+        y = 0;
+        const uint8_t * mainFont = u8g2_font_12x6LED_tr; //u8g2_font_8x13B_tr  u8g2_font_nokiafc22_tr
 
         // Main track power
-        u8g2.setFont(u8g2_font_open_iconic_check_2x_t);
+
         const dcc::BaseChannel *mainTrack = CS.getMainTrack();
         if(mainTrack!=nullptr) {
+            u8g2.setFont(mainFont);
+            x += u8g2.drawStr(x, y, "M:");
+            u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
             x += u8g2.drawGlyph(x, y, mainTrack->getPower() ? 0x41 : 0x42);
             x += 2;
-            uint16_t cur = mainTrack->getCurrent();
-            String c = String(cur)+"mA";
-            //u8g2.setFont(u8g2_font_nokiafc22_tr);
-            u8g2.setFont(u8g2_font_helvB12_tr);
+            String c = String(mainTrack->getCurrent())+"mA";
+            u8g2.setFont(mainFont);
             x += u8g2.drawStr(x, y, c.c_str());
-            x += 2;
         }
 
         // Prog track
         const dcc::BaseChannel *progTrack = CS.getProgTrack();
         x = 55;
         if(progTrack!=nullptr) {
-            u8g2.setFont(u8g2_font_helvB12_tr);
+            u8g2.setFont(mainFont);
             x += u8g2.drawStr(x, y, "P:");
-            u8g2.setFont(u8g2_font_open_iconic_check_2x_t);
+            u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
             x += u8g2.drawGlyph(x, y, progTrack->getPower() ? 0x41 : 0x42);
-            x += 2;
         }
 
 #if USE_WIFI==1
         x = u8g2.getWidth() - 30;
 
-        u8g2.setFont(u8g2_font_open_iconic_www_2x_t);
+        u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
         bool conn = WiFi.isConnected();
         x += u8g2.drawGlyph(x,y, 0x51); // wifi icon
         x += 2;

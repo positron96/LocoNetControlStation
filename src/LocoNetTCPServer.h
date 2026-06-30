@@ -93,8 +93,12 @@ public:
 
     String getInfo() const {
         String v;
-        for(const auto &cli: clients) {
-            v += cli->remoteIP().toString() + " ";
+        if (clients.empty()) {
+            v = "No clients";
+        } else {
+            for(const auto &cli: clients) {
+                v += " " + cli->remoteIP().toString() + "\n";
+            }
         }
         return v;
     }

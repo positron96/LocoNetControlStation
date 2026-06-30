@@ -1,17 +1,23 @@
 #pragma once
 #include <cstdint>
 
-/** DCC speed mode. */
-enum class SpeedMode { S14, S28, S128 };
+#ifdef ARDUINO
+#include <WString.h>
+#endif
 
-inline constexpr const char* SpeedModeToStr(SpeedMode sm) {
-    switch(sm) {
-        case SpeedMode::S14: return "S14";
-        case SpeedMode::S28: return "S28";
-        case SpeedMode::S128: return "SS128";
-    }
-    return "?";
-}
+#include <etl/enum_type.h>
+
+/** DCC speed mode. */
+struct SpeedMode {
+    enum enum_type {
+        S14, S28, S128
+    };
+    ETL_DECLARE_ENUM_TYPE(SpeedMode, unsigned)
+    ETL_ENUM_TYPE(S14, "S14")
+    ETL_ENUM_TYPE(S28, "S28")
+    ETL_ENUM_TYPE(S128, "S128")
+    ETL_END_ENUM_TYPE
+};
 
 constexpr uint8_t DCC_SPEED_IDLE = 0; ///< DCC speed value for idle (stop)
 constexpr uint8_t DCC_SPEED_EMGR = 1; ///< DCC speed value for emergency stop
@@ -42,6 +48,11 @@ public:
 
     bool operator==(const LocoSpeed& rhs) const { return speed128 == rhs.speed128;  }
     bool operator< (const LocoSpeed& rhs) const { return speed128 < rhs.speed128; }
+
+#ifdef ARDUINO
+    String toString() const;
+    explicit operator String() const { return toString(); }
+#endif
 
     bool isEmgr() const { return speed128==DCC_SPEED_EMGR; }
 

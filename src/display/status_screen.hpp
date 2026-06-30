@@ -18,7 +18,7 @@ namespace display {
 
         WiThrottleServer *wtServer;
         LbServer *lbServer;
-        int cPage{0};
+        int cur_page{0};
         uint32_t last_page_change{0};
         bool overcurrent[2]{false};
 
@@ -30,11 +30,11 @@ namespace display {
                 last_page_change = millis();
 
                 for(int i=1; i<N_PAGES; i++) {
-                    int nextPage = (cPage+i)%N_PAGES;
+                    int nextPage = (cur_page+i)%N_PAGES;
                     if(nextPage==0 && USE_WIFI==0) continue;
                     if(nextPage==1 && (USE_WIFI==0 || lbServer==nullptr)) continue;
                     if(nextPage==2 && (USE_WIFI==0 || wtServer==nullptr)) continue;
-                    cPage = nextPage;
+                    cur_page = nextPage;
                     break;
                 }
 
@@ -58,14 +58,19 @@ namespace display {
 
         void drawContents() override {
             U8G2 &u8g2 = Display::u8g2;
-            int x = 10;
+            int x = 2;
             int y = Display::STATUS_BAR_HEIGHT;
-            u8g2.setFontPosTop();
-            u8g2.setFont(u8g2_font_helvB12_tr);
 
-            u8g2.drawStr(x, y, String(cPage).c_str()); // debug
+            int scroller_width = u8g2.getWidth() / N_PAGES;
+            u8g2.drawBox(cur_page*scroller_width, y-2, scroller_width, 2);
 
-            switch(cPage) {
+            //u8g2_font_8x13B_tr  u8g2_font_nokiafc22_tr
+            const static uint8_t * mainFont = u8g2_font_12x6LED_tr;
+            u8g2.setFont(mainFont);
+            u8g2.setFontPosBottom();
+            y += u8g2.getMaxCharHeight();
+
+            switch(cur_page) {
             #if USE_WIFI==1
                 case 0:
                     drawWiFiStatus(u8g2, x, y);
@@ -96,33 +101,44 @@ namespace display {
 
         #ifdef USE_WIFI
         void drawWiFiStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            String v = "";
-            bool connected = WiFi.isConnected();
-            v = "WIFI";
-            drawStrCentered(u8g2, y, v.c_str());
-            y += u8g2.getMaxCharHeight();
+            int dy = u8g2.getMaxCharHeight();
+            String v;
 
-            if(!connected) {
-                u8g2.drawStr(x, y, "No WIFI");
-            } else {
+            drawStrCentered(u8g2, y, "WIFI");
+            y += dy;
 
-                v = "AP: "+ String(WiFi.SSID());
-                unsigned t = u8g2.drawStr(x, y, v.c_str());
+            if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
+                v = "AP Name:" + String(WiFi.softAPSSID());
+                u8g2.drawStr(x, y, v.c_str()); y += dy;
 
-                drawWifiBars(u8g2, x+t+2, y, WiFi.RSSI(), 5, 4, 15, 1);
-                y += u8g2.getMaxCharHeight();
+                v = "AP IP:" + WiFi.softAPIP().toString();
+                u8g2.drawStr(x, y, v.c_str()); y += dy;
 
-                v = " IP:" + WiFi.localIP().toString();
-                u8g2.drawStr(x, y, v.c_str());
+                v = WiFi.softAPgetStationNum() + " clients";
+                u8g2.drawStr(x, y, v.c_str()); y += dy;
             }
 
+            if((WiFi.getMode() & WIFI_MODE_STA) != 0) {
+                bool connected = WiFi.isConnected();
+                if(!connected) {
+                    u8g2.drawStr(x, y, "STA Not connected");
+                } else {
+                    v = "STA Name: "+ String(WiFi.SSID());
+                    unsigned t = u8g2.drawStr(x, y, v.c_str());
+
+                    drawWifiBars(u8g2, x+t+2, y, WiFi.RSSI(), 4, 4, 12, 1);
+                    y += dy;
+
+                    v = "STA IP:" + WiFi.localIP().toString();
+                    u8g2.drawStr(x, y, v.c_str());
+                }
+            }
         }
 
         void drawLbServerStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            u8g2.setFont(u8g2_font_8x13B_tr); // use smaller font
             int dy = u8g2.getMaxCharHeight();
 
-            String v = "";
+            String v;
             if(lbServer!=nullptr) {
                 v = "LocoNet TCP";
                 drawStrCentered(u8g2, y, v.c_str());
@@ -134,7 +150,6 @@ namespace display {
         }
 
         void drawWiThrottleStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            u8g2.setFont(u8g2_font_8x13B_tr); // use smaller font
             int dy = u8g2.getMaxCharHeight();
 
             String v = "";
@@ -152,7 +167,7 @@ namespace display {
         void drawTrackPower(U8G2 &u8g2, unsigned x, unsigned y) {
 
             int dy = u8g2.getMaxCharHeight();
-            u8g2.setFont(u8g2_font_helvB12_tr);
+            auto font = u8g2.getU8g2()->font;
 
             String v = "";
             const dcc::BaseChannel *mainTrack = CS.getMainTrack();
@@ -163,23 +178,20 @@ namespace display {
                 tx += u8g2.drawStr(tx, y, v.c_str());
 
                 v = String(mainTrack->getCurrent());
-                u8g2.setFont(u8g2_font_logisoso20_tn); // big numbers
+                u8g2.setFont(u8g2_font_profont17_tn); // big numbers
                 tx += u8g2.drawStr(tx, y, v.c_str());
 
-                u8g2.setFont(u8g2_font_helvB12_tr);
-                u8g2.drawStr(tx, y, "mA");
-
-                y += dy;
+                u8g2.setFont(font);
+                u8g2.drawStr(tx, y, "mA"); y += dy + 5;
             }
 
             const dcc::BaseChannel *progTrack = CS.getProgTrack();
             if(progTrack!=nullptr) {
-                u8g2.setFont(u8g2_font_helvB12_tr);
+                u8g2.setFont(font);
                 v = "Prog: ";
                 v += overcurrent[1] ? "OVP" : progTrack->getPower()?"ON":"OFF";
                 v += " " + String(progTrack->getCurrent()) + "mA";
                 u8g2.drawStr(x, y, v.c_str());
-                y += dy;
             }
         }
 
@@ -190,11 +202,9 @@ namespace display {
             String v = "";
             for(const auto slot: CS.getAllocatedSlots()) {
                 const auto &data = CS.getSlotData(slot);
-                v = String("Slot") + slot + ": " + String(data.addr) + " ";
+                v = String(slot) + ": " + String(data.addr) + " ";
                 if(data.refreshing) {
-                    v += (data.dir==1?"F ":"R ");
-                    if(data.speed.isEmgr()) { v += "EStp"; }
-                    else { v += String(data.speed.getPercent())+"%"; }
+                    v += (data.dir==1?"F ":"R ") + String(data.speed);
                 }
                 u8g2.drawStr(x, y, v.c_str());
                 y += dy;
