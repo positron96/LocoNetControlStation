@@ -59,6 +59,8 @@ namespace display {
 
     protected:
 
+        String title{};
+
         virtual void drawContents() = 0;
 
         // virtual void onButtonPressed(Button bt, int8_t arg) {};
@@ -73,7 +75,6 @@ namespace display {
     private:
 
         friend class Display;
-
     };
 
     // util functions

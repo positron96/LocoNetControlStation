@@ -34,6 +34,10 @@ namespace display {
         u8g2.clearBuffer();
 
         if(cScreen != nullptr) {
+            String title = cScreen->title;
+            u8g2.setFont(u8g2_font_9x6LED_tr);
+            u8g2.setFontPosBottom();
+            u8g2.drawStr(0, STATUS_BAR_HEIGHT-3, title.c_str());
             cScreen->draw();
         }
         drawStatusbar(u8g2);
@@ -71,55 +75,62 @@ namespace display {
         return width;
     }
 
+    u8g2_uint_t drawStrLeft(U8G2 &u8g2, int x, int y, const char *str) {
+        u8g2_uint_t width = u8g2.getStrWidth(str);
+        u8g2.drawStr(x - width, y, str);
+        return width;
+    }
+    u8g2_uint_t drawGlyphLeft(U8G2 &u8g2, int x, int y, const uint16_t c) {
+        u8g2_uint_t width = u8g2_GetGlyphWidth(u8g2.getU8g2(), c);
+        u8g2.drawGlyph(x - width, y, c);
+        return width;
+    }
+
+    int drawTrackStatus(U8G2 &u8g2, int x, int y, const char *name, const dcc::BaseChannel *track) {
+        if(track == nullptr) return x;
+        auto font = u8g2.getU8g2()->font;
+        if(track->getOvercurrentStatus()) {
+            u8g2.setFont(u8g2_font_open_iconic_thing_1x_t);
+            x -= drawGlyphLeft(u8g2, x, y-1, 0x4E);
+        } else {
+            u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
+            x -= drawGlyphLeft(u8g2, x, y-1, track->getPower() ? 0x40 : 0x44);
+        }
+        x -= 2;
+        u8g2.setFont(font);
+        x -= drawStrLeft(u8g2, x, y, name);
+        x -= 4;
+        return x;
+    }
+
     void drawStatusbar(U8G2 &u8g2) {
 
         unsigned x = 2; // small margin
-        unsigned y = Display::STATUS_BAR_HEIGHT - 2;
+        unsigned y = Display::STATUS_BAR_HEIGHT - 3;
 
-        u8g2.drawLine(0, y,  u8g2.getWidth(), y);
-        u8g2.setFontPosTop();
+        u8g2.drawHLine(0, y, u8g2.getWidth());
+        u8g2.setFontPosBottom();
 
-        y = 0;
-        const uint8_t * mainFont = u8g2_font_12x6LED_tr; //u8g2_font_8x13B_tr  u8g2_font_nokiafc22_tr
+        x = u8g2.getWidth();
 
-        // Main track power
-
-        const dcc::BaseChannel *mainTrack = CS.getMainTrack();
-        if(mainTrack!=nullptr) {
-            u8g2.setFont(mainFont);
-            x += u8g2.drawStr(x, y, "M:");
-            u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
-            x += u8g2.drawGlyph(x, y, mainTrack->getPower() ? 0x41 : 0x42);
-            x += 2;
-            String c = String(mainTrack->getCurrent())+"mA";
-            u8g2.setFont(mainFont);
-            x += u8g2.drawStr(x, y, c.c_str());
+        #if USE_WIFI==1
+        x -= 15;
+        bool conn = WiFi.isConnected();
+        //x += u8g2.drawGlyph(x,y, 0x51); // wifi icon
+        if(!conn) {
+            u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
+            u8g2.drawGlyph(x, y-1, 0x4A); // stop sign
+        } else {
+            drawWifiBars(u8g2, x, y-13, WiFi.RSSI());
         }
+        x -= 2;
+        #endif
 
         // Prog track
-        const dcc::BaseChannel *progTrack = CS.getProgTrack();
-        x = 55;
-        if(progTrack!=nullptr) {
-            u8g2.setFont(mainFont);
-            x += u8g2.drawStr(x, y, "P:");
-            u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
-            x += u8g2.drawGlyph(x, y, progTrack->getPower() ? 0x41 : 0x42);
-        }
+        x = drawTrackStatus(u8g2, x, y, "P", CS.getProgTrack());
 
-#if USE_WIFI==1
-        x = u8g2.getWidth() - 30;
-
-        u8g2.setFont(u8g2_font_open_iconic_www_1x_t);
-        bool conn = WiFi.isConnected();
-        x += u8g2.drawGlyph(x,y, 0x51); // wifi icon
-        x += 2;
-        if(!conn) {
-            x += u8g2.drawGlyph(x,y, 0x4A); // stop sign
-        } else {
-            x += drawWifiBars(u8g2, x,y, WiFi.RSSI());
-        }
-        x += 2;
-#endif
+        // Main track power
+        drawTrackStatus(u8g2, x, y, "M", CS.getMainTrack());
 
     }
 

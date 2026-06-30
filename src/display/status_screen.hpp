@@ -20,22 +20,29 @@ namespace display {
         LbServer *lbServer;
         int cur_page{0};
         uint32_t last_page_change{0};
-        bool overcurrent[2]{false};
 
         static constexpr size_t N_PAGES = 5;
 
         void loop() override {
-            if(millis()-last_page_change>5000) {
+            if(millis()-last_page_change>4000) {
 
                 last_page_change = millis();
 
                 for(int i=1; i<N_PAGES; i++) {
                     int nextPage = (cur_page+i)%N_PAGES;
-                    if(nextPage==0 && USE_WIFI==0) continue;
-                    if(nextPage==1 && (USE_WIFI==0 || lbServer==nullptr)) continue;
-                    if(nextPage==2 && (USE_WIFI==0 || wtServer==nullptr)) continue;
+                    if(nextPage==2 && USE_WIFI==0) continue;
+                    if(nextPage==3 && (USE_WIFI==0 || lbServer==nullptr)) continue;
+                    if(nextPage==4 && (USE_WIFI==0 || wtServer==nullptr)) continue;
                     cur_page = nextPage;
                     break;
+                }
+
+                switch(cur_page) {
+                    case 0: title="Track"; break;
+                    case 1: title="Locos"; break;
+                    case 2: title="WiFi"; break;
+                    case 3: title="LnTCP"; break;
+                    case 4: title="WiThrottle"; break;
                 }
 
                 setDirty();
@@ -44,12 +51,6 @@ namespace display {
 
         void notification(const dcc::PowerEvent &event) override {
             setDirty();
-            size_t idx = (event.channel == CS.getMainTrack()) ? 0 : 1;
-            if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
-                overcurrent[idx] = true;
-            } else {
-                overcurrent[idx] = false;
-            }
         }
 
     protected:
@@ -58,44 +59,37 @@ namespace display {
 
         void drawContents() override {
             U8G2 &u8g2 = Display::u8g2;
-            int x = 2;
+            int scroller_width = u8g2.getWidth() / N_PAGES;
+            int x = cur_page*scroller_width;
             int y = Display::STATUS_BAR_HEIGHT;
 
-            int scroller_width = u8g2.getWidth() / N_PAGES;
-            u8g2.drawBox(cur_page*scroller_width, y-2, scroller_width, 2);
+            u8g2.drawHLine(x, y, scroller_width);
 
             //u8g2_font_8x13B_tr  u8g2_font_nokiafc22_tr
-            const static uint8_t * mainFont = u8g2_font_12x6LED_tr;
+            const static uint8_t * mainFont = u8g2_font_9x6LED_tr;
             u8g2.setFont(mainFont);
             u8g2.setFontPosBottom();
-            y += u8g2.getMaxCharHeight();
+            x = 0;
+            y += u8g2.getMaxCharHeight()+1;
 
             switch(cur_page) {
-            #if USE_WIFI==1
                 case 0:
-                    drawWiFiStatus(u8g2, x, y);
-                    break;
-                    [[fallthrough]];
-                case 1:
-                    if(lbServer!=nullptr) {
-                        drawLbServerStatus(u8g2, x, y);
-                        break;
-                    }
-                    [[fallthrough]];
-                case 2:
-                    if(wtServer!=nullptr) {
-                        drawWiThrottleStatus(u8g2, x, y);
-                        break;
-                    }
-                    [[fallthrough]];
-            #endif
-                case 3:
                     drawTrackPower(u8g2, x, y);
                     break;
-                case 4:
-                default:
+                case 1:
                     drawLocoStatus(u8g2, x, y);
                     break;
+            #if USE_WIFI==1
+                case 2:
+                    drawWiFiStatus(u8g2, x, y);
+                    break;
+                case 3:
+                    drawLbServerStatus(u8g2, x, y);
+                    break;
+                case 4:
+                    drawWiThrottleStatus(u8g2, x, y);
+                    break;
+            #endif
             }
         }
 
@@ -103,9 +97,6 @@ namespace display {
         void drawWiFiStatus(U8G2 &u8g2, unsigned x, unsigned y) {
             int dy = u8g2.getMaxCharHeight();
             String v;
-
-            drawStrCentered(u8g2, y, "WIFI");
-            y += dy;
 
             if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
                 v = "AP Name:" + String(WiFi.softAPSSID());
@@ -126,7 +117,7 @@ namespace display {
                     v = "STA Name: "+ String(WiFi.SSID());
                     unsigned t = u8g2.drawStr(x, y, v.c_str());
 
-                    drawWifiBars(u8g2, x+t+2, y, WiFi.RSSI(), 4, 4, 12, 1);
+                    // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
                     y += dy;
 
                     v = "STA IP:" + WiFi.localIP().toString();
@@ -136,78 +127,89 @@ namespace display {
         }
 
         void drawLbServerStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            int dy = u8g2.getMaxCharHeight();
-
             String v;
             if(lbServer!=nullptr) {
-                v = "LocoNet TCP";
-                drawStrCentered(u8g2, y, v.c_str());
-                y += dy;
-
                 v = lbServer->getInfo();
                 u8g2.drawStr(x, y, v.c_str());
             }
         }
 
         void drawWiThrottleStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            int dy = u8g2.getMaxCharHeight();
-
-            String v = "";
+            String v;
             if(wtServer!=nullptr) {
-                v = "WiThrottle";
-                drawStrCentered(u8g2, y, v.c_str());
-                y += dy;
-
                 v = wtServer->getInfo();
                 u8g2.drawStr(x, y, v.c_str());
             }
         }
         #endif
 
-        void drawTrackPower(U8G2 &u8g2, unsigned x, unsigned y) {
-
-            int dy = u8g2.getMaxCharHeight();
+        int drawOneTrackPower(U8G2 &u8g2, unsigned x, unsigned y, String name, const dcc::BaseChannel *track) {
             auto font = u8g2.getU8g2()->font;
+            char v[20];
+            int tx = x;
+            snprintf(v, sizeof(v), "%s: %s",
+                name.c_str(), track->getOvercurrentStatus() ? "OVP" : track->getPower()?"ON":"OFF");
+            tx += u8g2.drawStr(tx, y, v);
 
-            String v = "";
+            tx = x + 50;
+            snprintf(v, sizeof(v), "%03d", track->getCurrent());
+            u8g2.setFont(u8g2_font_profont17_tn); // big numbers
+            int dy = u8g2.getMaxCharHeight();
+            tx += u8g2.drawStr(tx, y+2, v);
+            tx += 2;
+
+            u8g2.setFont(font);
+            u8g2.drawStr(tx, y, "mA"); y += dy;
+            return y;
+        }
+
+        void drawTrackPower(U8G2 &u8g2, unsigned x, unsigned y) {
+            x = 15;
+            y += 3;
+
+            int voltage = 15000;
+            int tx = x;
+            tx += u8g2.drawStr(tx, y, "Volts: ");
+
+            auto font = u8g2.getU8g2()->font;
+            tx = x + 50;
+            char v[20];
+            snprintf(v, sizeof(v), "%02d.%1d", voltage/1000, (voltage/100)%10);
+            u8g2.setFont(u8g2_font_profont17_tn); // big numbers
+            int dy = u8g2.getMaxCharHeight();
+            tx += u8g2.drawStr(tx, y+2, v);
+            tx += 2;
+            u8g2.setFont(font);
+            u8g2.drawStr(tx, y, "V"); y += dy;
+
+
             const dcc::BaseChannel *mainTrack = CS.getMainTrack();
             if(mainTrack!=nullptr) {
-                int tx = x;
-                v = "Main: ";
-                v += overcurrent[0] ? "OVP" : mainTrack->getPower()?"ON":"OFF";
-                tx += u8g2.drawStr(tx, y, v.c_str());
-
-                v = String(mainTrack->getCurrent());
-                u8g2.setFont(u8g2_font_profont17_tn); // big numbers
-                tx += u8g2.drawStr(tx, y, v.c_str());
-
-                u8g2.setFont(font);
-                u8g2.drawStr(tx, y, "mA"); y += dy + 5;
+                y = drawOneTrackPower(u8g2, x, y, "Main", mainTrack);
             }
 
             const dcc::BaseChannel *progTrack = CS.getProgTrack();
             if(progTrack!=nullptr) {
-                u8g2.setFont(font);
-                v = "Prog: ";
-                v += overcurrent[1] ? "OVP" : progTrack->getPower()?"ON":"OFF";
-                v += " " + String(progTrack->getCurrent()) + "mA";
-                u8g2.drawStr(x, y, v.c_str());
+                drawOneTrackPower(u8g2, x, y, "Prog", progTrack);
             }
         }
 
         void drawLocoStatus(U8G2 &u8g2, unsigned x, unsigned y) {
-            u8g2.setFont(u8g2_font_8x13B_tr); // use smaller font
             int dy = u8g2.getMaxCharHeight();
 
-            String v = "";
-            for(const auto slot: CS.getAllocatedSlots()) {
-                const auto &data = CS.getSlotData(slot);
-                v = String(slot) + ": " + String(data.addr) + " ";
-                if(data.refreshing) {
-                    v += (data.dir==1?"F ":"R ") + String(data.speed);
+            String v;
+            if(CS.getAllocatedSlotsCount() == 0) {
+                u8g2.drawStr(x, y, "No locos");
+            } else {
+                for(const auto slot: CS.getAllocatedSlots()) {
+                    const auto &data = CS.getSlotData(slot);
+                    v = String(slot) + ": " + String(data.addr) + " ";
+                    if(data.refreshing) {
+                        v += (data.dir==1?"F ":"R ") + String(data.speed);
+                    }
+                    u8g2.drawStr(x, y, v.c_str());
+                    y += dy;
                 }
-                u8g2.drawStr(x, y, v.c_str());
-                y += dy;
             }
         }
 

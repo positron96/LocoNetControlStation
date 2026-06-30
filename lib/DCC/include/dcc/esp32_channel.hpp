@@ -38,6 +38,7 @@ public:
         DCC_LOGI("setPower(%d)", v);
         digitalWrite(_enPin, v ? HIGH : LOW);
         notify_observers(PowerEvent{v, reason, this});
+        BaseChannel::setPower(v, reason);
     }
 
     bool getPower() const override {

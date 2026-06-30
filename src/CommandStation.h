@@ -190,9 +190,11 @@ public:
     }
 
     /** Return view on slot numbers */
-    auto getAllocatedSlots() {
+    auto getAllocatedSlots() const {
         return etl::views::values(etl::views::as_const(locoSlot));
     }
+
+    size_t getAllocatedSlotsCount() const { return locoSlot.size(); }
 
     void setLocoSlotRefresh(uint8_t slot, bool refresh) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
