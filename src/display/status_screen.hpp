@@ -99,7 +99,7 @@ namespace display {
             String v;
 
             if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
-                v = "AP Name:" + String(WiFi.softAPSSID());
+                v = "AP:" + String(WiFi.softAPSSID());
                 u8g2.drawStr(x, y, v.c_str()); y += dy;
 
                 v = "AP IP:" + WiFi.softAPIP().toString();
@@ -114,7 +114,7 @@ namespace display {
                 if(!connected) {
                     u8g2.drawStr(x, y, "STA Not connected");
                 } else {
-                    v = "STA Name: "+ String(WiFi.SSID());
+                    v = "STA: "+ String(WiFi.SSID());
                     unsigned t = u8g2.drawStr(x, y, v.c_str());
 
                     // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
@@ -143,23 +143,29 @@ namespace display {
         }
         #endif
 
-        int drawOneTrackPower(U8G2 &u8g2, unsigned x, unsigned y, String name, const dcc::BaseChannel *track) {
+        /** Draws a fixed point value.
+         * Value is with 3 decimal places (i.e. float_val*1000)
+         */
+        int drawValue(U8G2 &u8g2, unsigned x, unsigned y, int value, const char* suffix) {
             auto font = u8g2.getU8g2()->font;
             char v[20];
             int tx = x;
-            snprintf(v, sizeof(v), "%s: %s",
-                name.c_str(), track->getOvercurrentStatus() ? "OVP" : track->getPower()?"ON":"OFF");
-            tx += u8g2.drawStr(tx, y, v);
 
             tx = x + 50;
-            snprintf(v, sizeof(v), "%03d", track->getCurrent());
+            // value is fixed-point with 3 decimal places (real_value * 1000)
+            // Convert to N.NN by rounding to the nearest hundredth.
+            long roundedToHundredth = (value >= 0 ? value + 5 : value - 5) / 10;
+            long absRounded = (roundedToHundredth >= 0) ? roundedToHundredth : -roundedToHundredth;
+            long whole = absRounded / 100;
+            long frac = absRounded % 100;
+            snprintf(v, sizeof(v), "%s%ld.%02ld", roundedToHundredth < 0 ? "-" : "", whole, frac);
             u8g2.setFont(u8g2_font_profont17_tn); // big numbers
             int dy = u8g2.getMaxCharHeight();
             tx += u8g2.drawStr(tx, y+2, v);
             tx += 2;
 
             u8g2.setFont(font);
-            u8g2.drawStr(tx, y, "mA"); y += dy;
+            u8g2.drawStr(tx, y, suffix); y += dy;
             return y;
         }
 
@@ -167,30 +173,24 @@ namespace display {
             x = 15;
             y += 3;
 
-            int voltage = 15000;
-            int tx = x;
-            tx += u8g2.drawStr(tx, y, "Volts: ");
+            int voltage = 12345; // mV
+            int tx;
+            tx = u8g2.drawStr(x, y, "Input:");
+            y = drawValue(u8g2, tx, y, voltage, "V");
 
-            auto font = u8g2.getU8g2()->font;
-            tx = x + 50;
-            char v[20];
-            snprintf(v, sizeof(v), "%02d.%1d", voltage/1000, (voltage/100)%10);
-            u8g2.setFont(u8g2_font_profont17_tn); // big numbers
-            int dy = u8g2.getMaxCharHeight();
-            tx += u8g2.drawStr(tx, y+2, v);
-            tx += 2;
-            u8g2.setFont(font);
-            u8g2.drawStr(tx, y, "V"); y += dy;
-
-
+            String v;
             const dcc::BaseChannel *mainTrack = CS.getMainTrack();
             if(mainTrack!=nullptr) {
-                y = drawOneTrackPower(u8g2, x, y, "Main", mainTrack);
+                v = String("Main: ") + (mainTrack->getOvercurrentStatus() ? "OCP" : mainTrack->getPower()?"ON":"OFF");
+                tx = u8g2.drawStr(x, y, v.c_str());
+                y = drawValue(u8g2, tx, y, mainTrack->getCurrent(), "A");
             }
 
             const dcc::BaseChannel *progTrack = CS.getProgTrack();
             if(progTrack!=nullptr) {
-                drawOneTrackPower(u8g2, x, y, "Prog", progTrack);
+                v = String("Prog: ") + (progTrack->getOvercurrentStatus() ? "OCP" : progTrack->getPower()?"ON":"OFF");
+                tx = u8g2.drawStr(x, y, v.c_str());
+                y = drawValue(u8g2, tx, y, progTrack->getCurrent(), "A");
             }
         }
 

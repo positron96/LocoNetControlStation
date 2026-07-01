@@ -90,7 +90,7 @@ public:
     void resetMaxCurrent() { maxCurrent = 0; }
     /** Max current encountered so far after resetMaxCurrent() was called. */
     uint16_t getMaxCurrent() const { return maxCurrent; }
-    /**  Current consumption. */
+    /**  Current consumption in mA */
     uint16_t getCurrent() const { return current; }
     /** Reads current consumption and updates internal state. */
     virtual void updateCurrent() = 0;
