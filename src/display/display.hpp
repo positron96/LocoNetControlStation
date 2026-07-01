@@ -18,7 +18,7 @@ namespace display {
 
         void setDirty(bool fdirty=true) { dirty=fdirty; }
 
-        void begin() { dirty=true; }
+        void begin();
 
         void loop();
 

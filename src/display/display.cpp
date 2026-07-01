@@ -11,6 +11,19 @@ namespace display {
 
     void drawStatusbar(U8G2 &u8g2);
 
+    void Display::begin() {
+        dirty=true;
+        u8g2.begin();
+        u8g2.setFontPosTop();
+
+        // TODO: move it somewhere else later
+        u8g2.setFont(u8g2_font_9x6LED_tr);
+        u8g2.clearBuffer();
+        u8g2.drawStr(16,16, "INIT...");
+        u8g2.sendBuffer();
+    }
+
+    /** Redraws the display if needed. */
     void Display::loop() {
         //processInput();
         if(cScreen!=nullptr) cScreen->loop();

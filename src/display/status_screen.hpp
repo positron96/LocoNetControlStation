@@ -115,7 +115,7 @@ namespace display {
                     u8g2.drawStr(x, y, "STA Not connected");
                 } else {
                     v = "STA: "+ String(WiFi.SSID());
-                    unsigned t = u8g2.drawStr(x, y, v.c_str());
+                    u8g2.drawStr(x, y, v.c_str());
 
                     // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
                     y += dy;
