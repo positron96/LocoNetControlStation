@@ -62,7 +62,7 @@
 
 #ifdef ARDUINO
     String LocoSpeed::toString() const {
-        if(isEmgr()) return "EMGR";
+        if(isEmgr()) return "EStp";
         return String(getPercent()) + "%";
     }
 #endif
