@@ -8,44 +8,59 @@
 #include "../WiThrottleServer.h"
 #include "../LocoNetTCPServer.h"
 
+#include <etl/enum_type.h>
+
 #include <WiFi.h>
 #include <Arduino.h>
 
 namespace ui {
+
+    struct StatusPage {
+        enum enum_type {
+            Tracks,
+            Locos,
+            WiFi,
+            LbServer,
+            WiThrottle
+        };
+        static constexpr size_t N_PAGES = 5;
+        ETL_DECLARE_ENUM_TYPE(StatusPage, uint8_t)
+        ETL_ENUM_TYPE(Tracks, "Tracks")
+        ETL_ENUM_TYPE(Locos, "Locos")
+        ETL_ENUM_TYPE(WiFi,  "WiFi")
+        ETL_ENUM_TYPE(LbServer,  "LnTCP")
+        ETL_ENUM_TYPE(WiThrottle,  "WiThrottle")
+        ETL_END_ENUM_TYPE
+    };
 
     class StatusScreen: public Screen, public dcc::PowerObserver {
     public:
 
         WiThrottleServer *wtServer;
         LbServer *lbServer;
-        int cur_page{0};
+        StatusPage cur_page{StatusPage::Tracks};
         uint32_t last_page_change{0};
 
-        static constexpr size_t N_PAGES = 5;
+        void setPage(StatusPage page) {
+            if(cur_page == page) return;
+            cur_page = page;
+            title = cur_page.c_str();
+            setDirty();
+        }
 
         void loop() override {
             if(millis()-last_page_change>4000) {
 
                 last_page_change = millis();
 
-                for(int i=1; i<N_PAGES; i++) {
-                    int nextPage = (cur_page+i)%N_PAGES;
+                for(int i=1; i<StatusPage::N_PAGES; i++) {
+                    uint8_t nextPage = (cur_page.get_value()+i) % StatusPage::N_PAGES;
                     if(nextPage==2 && USE_WIFI==0) continue;
                     if(nextPage==3 && (USE_WIFI==0 || lbServer==nullptr)) continue;
                     if(nextPage==4 && (USE_WIFI==0 || wtServer==nullptr)) continue;
-                    cur_page = nextPage;
+                    setPage(StatusPage{nextPage});
                     break;
                 }
-
-                switch(cur_page) {
-                    case 0: title="Track"; break;
-                    case 1: title="Locos"; break;
-                    case 2: title="WiFi"; break;
-                    case 3: title="LnTCP"; break;
-                    case 4: title="WiThrottle"; break;
-                }
-
-                setDirty();
             }
         }
 
@@ -59,7 +74,7 @@ namespace ui {
 
         void drawContents() override {
             U8G2 &u8g2 = Display::u8g2;
-            int scroller_width = u8g2.getWidth() / N_PAGES;
+            int scroller_width = u8g2.getWidth() / StatusPage::N_PAGES;
             int x = cur_page*scroller_width;
             int y = Display::STATUS_BAR_HEIGHT;
 
@@ -73,22 +88,12 @@ namespace ui {
             y += u8g2.getMaxCharHeight()+1;
 
             switch(cur_page) {
-                case 0:
-                    drawTrackPower(u8g2, x, y);
-                    break;
-                case 1:
-                    drawLocoStatus(u8g2, x, y);
-                    break;
+                case StatusPage::Tracks: drawTrackPower(u8g2, x, y);  break;
+                case StatusPage::Locos: drawLocoStatus(u8g2, x, y);  break;
             #if USE_WIFI==1
-                case 2:
-                    drawWiFiStatus(u8g2, x, y);
-                    break;
-                case 3:
-                    drawLbServerStatus(u8g2, x, y);
-                    break;
-                case 4:
-                    drawWiThrottleStatus(u8g2, x, y);
-                    break;
+                case StatusPage::WiFi: drawWiFiStatus(u8g2, x, y);  break;
+                case StatusPage::LbServer: drawLbServerStatus(u8g2, x, y); break;
+                case StatusPage::WiThrottle: drawWiThrottleStatus(u8g2, x, y); break;
             #endif
             }
         }

@@ -91,7 +91,6 @@ void ledStartBlinking(uint32_t ms=0, uint8_t val=1);
 void ledStop();
 void ledUpdate();
 
-void checkCurrent();
 
 void tick1s();
 void tick20ms();
@@ -99,7 +98,6 @@ void tick20ms();
 using TimerType = etl::callback_timer_atomic<3, std::atomic_uint>;
 TimerType timerController;
 etl::timer::id::type ledTimer;
-etl::timer::id::type checkCurrentTimer;
 etl::timer::id::type timer20ms;
 etl::timer::id::type timer1s;
 
@@ -193,23 +191,21 @@ void setup() {
     ledTimer = timerController.register_timer(
         TimerType::callback_type::create<ledUpdate>(),
         LED_INTL_NORMAL, true);
-    checkCurrentTimer = timerController.register_timer(
-        TimerType::callback_type::create<checkCurrent>(),
-        1, true);
     timer20ms = timerController.register_timer(
         TimerType::callback_type::create<tick20ms>(),
         20, true);
 
     timerController.enable(true);
-    timerController.start(checkCurrentTimer);
     timerController.start(timer20ms);
     //timerController.start(timer1s);
 
     #if USE_DISPLAY==1
     statusScreen.wtServer = &withrottleServer;
     statusScreen.lbServer = &lbServer;
+    statusScreen.setPage(ui::StatusPage::WiFi);
     disp.begin();
     disp.setScreen(&statusScreen);
+    disp.loop();
     #endif
 
 #if USE_WIFI != 0
@@ -244,7 +240,7 @@ void setup() {
     }
 
     MDNS.begin(CS_SHORT_NAME);
-	MDNS.setInstanceName(CS_FULL_NAME);
+    MDNS.setInstanceName(CS_FULL_NAME);
     lbServer.begin();
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
@@ -322,14 +318,12 @@ void loop() {
 
 }
 
-void checkCurrent() {
-    currentMeter.checkOvercurrent();
-}
 
 void tick20ms() {
 #if USE_DISPLAY==1
     disp.loop();
 #endif
+    currentMeter.checkOvercurrent();
 }
 
 
