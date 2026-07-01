@@ -63,14 +63,13 @@ namespace ui {
 
         u8g2.drawBox(x, y+maxHeight-1, pitch*maxBars, 1);
 
-        for (int i = 0; i < maxBars; i++) {
+        for (int i = 0; i < activeBars; i++) {
             int currentHeight = (int)((i + 1) * heightStep);
             int currentX = x + (i * pitch);
             int currentY = y + (maxHeight - currentHeight);
 
-            if (i < activeBars) {
-                u8g2.drawBox(currentX, currentY, barWidth, currentHeight);
-            }
+            u8g2.drawBox(currentX, currentY, barWidth, currentHeight);
+
         }
         return pitch*maxBars;
     }
