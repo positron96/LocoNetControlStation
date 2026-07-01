@@ -17,8 +17,8 @@
 
 #include <LocoNetStream.h>
 
-#include "display/display.hpp"
-#include "display/status_screen.hpp"
+#include "ui/display.hpp"
+#include "ui/status_screen.hpp"
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -69,9 +69,9 @@ WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 constexpr int PIN_DISP_SDA = 18;
 constexpr int PIN_DISP_SCL = 19;
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
-U8G2 &display::Display::u8g2 = u8g2_;
-display::Display disp;
-display::StatusScreen statusScreen;
+U8G2 &ui::Display::u8g2 = u8g2_;
+ui::Display disp;
+ui::StatusScreen statusScreen;
 #endif
 
 #define PIN_LED  22

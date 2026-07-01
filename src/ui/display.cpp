@@ -5,7 +5,7 @@
 
 #include "WiFi.h"
 
-namespace display {
+namespace ui {
 
     Display *Display::inst{nullptr};
 

@@ -11,7 +11,7 @@
 #include <WiFi.h>
 #include <Arduino.h>
 
-namespace display {
+namespace ui {
 
     class StatusScreen: public Screen, public dcc::PowerObserver {
     public:
@@ -215,4 +215,4 @@ namespace display {
 
     };
 
-}  // namespace display
+}  // namespace ui

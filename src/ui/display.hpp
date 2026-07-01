@@ -2,7 +2,7 @@
 
 #include <U8g2lib.h>
 
-namespace display {
+namespace ui {
 
     class Screen;
 
@@ -84,4 +84,4 @@ namespace display {
 
     u8g2_uint_t drawStrCentered(U8G2 &u8g2, int y, const char *str);
 
-}
+} // namespace ui
