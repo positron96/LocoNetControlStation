@@ -76,6 +76,9 @@ public:
              : false;
     }
 
+    const dcc::BaseChannel *getMainTrack() const { return dccMain; }
+    const dcc::BaseChannel *getProgTrack() const { return dccProg; }
+
 
     /* Define turnout object structures */
     struct TurnoutData {
@@ -187,9 +190,11 @@ public:
     }
 
     /** Return view on slot numbers */
-    auto getAllocatedSlots() {
+    auto getAllocatedSlots() const {
         return etl::views::values(etl::views::as_const(locoSlot));
     }
+
+    size_t getAllocatedSlotsCount() const { return locoSlot.size(); }
 
     void setLocoSlotRefresh(uint8_t slot, bool refresh) {
         if(slot==0) { CS_DEBUGF("invalid slot"); return; }
@@ -203,6 +208,7 @@ public:
             // no need to load, it will load itself on setLocoSpeed/setLocoFn
             dd.kickWatchdog();
         } else {
+            // TODO: somehow send 0 speed to track
             dccMain->unloadSlot(dd.addr);
         }
     }

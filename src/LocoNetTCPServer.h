@@ -3,6 +3,8 @@
  */
 #pragma once
 
+#include "config.hpp"
+
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <AsyncTCP.h>
@@ -44,7 +46,7 @@ public:
             cli->setKeepAlive(10000, 2);
             clients.insert(cli);
             LB_LOGI("onConnect: New client(%X): %s", (intptr_t)cli, cli->remoteIP().toString().c_str() );
-            cli->write("VERSION ESP32 WiFi 0.1");
+            cli->write("VERSION " CS_FULL_NAME " 0.1\n");
 
             cli->onDisconnect([this](void*, AsyncClient* cli) {
                 LB_LOGI("onDisconnect: Client(%X) disconnected", (intptr_t)cli );
@@ -78,11 +80,9 @@ public:
 
 
     void loop() {
-        if (!clients.empty()) {
-            while(!txQueue.empty()) {
-                sendMessage(txQueue.front());
-                txQueue.pop();
-            }
+        while(!txQueue.empty()) {
+            sendMessage(txQueue.front());
+            txQueue.pop();
         }
     }
 
@@ -92,9 +92,16 @@ public:
     }
 
     String getInfo() const {
+        if(server.status() == 0) { // CLOSED in lwip tcp_state
+            return "Stopped";
+        }
         String v;
-        for(const auto &cli: clients) {
-            v += cli->remoteIP().toString() + " ";
+        if (clients.empty()) {
+            v = "No clients";
+        } else {
+            for(const auto &cli: clients) {
+                v += " " + cli->remoteIP().toString() + "\n";
+            }
         }
         return v;
     }
@@ -151,7 +158,9 @@ private:
         }
     }
 
+    /** Sends LocoNet message to TCP clients. */
     void sendMessage(const LnMsg &msg) {
+        if(clients.empty()) return; // don't waste time processing
 
         char buf[LB_BUF_SIZE] = "RECEIVE";
         uint len = strlen(buf);

@@ -1,11 +1,4 @@
-#ifndef USE_WIFI
-#define USE_WIFI 1
-#endif
-
-#ifndef USE_DISPLAY
-#define USE_DISPLAY 1
-#endif
-
+#include "config.hpp"
 
 #include <DCC.h>
 // #include <esp32_timer_channel.hpp>
@@ -24,8 +17,8 @@
 
 #include <LocoNetStream.h>
 
-#include "display/display.hpp"
-#include "display/status_screen.hpp"
+#include "ui/display.hpp"
+#include "ui/status_screen.hpp"
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -47,8 +40,6 @@ LocoNetBus bus;
 #include <LocoNetStreamESP32.h>
 //LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
-
-#define CS_NAME "ESP32CommandStation"
 
 LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
@@ -72,14 +63,15 @@ dcc::ESP32CurrentMeter currentMeter;
 
 LocoNetSlotManager slotMan(&bus);
 
-WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_NAME);
+WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 
 #if USE_DISPLAY==1
 constexpr int PIN_DISP_SDA = 18;
 constexpr int PIN_DISP_SCL = 19;
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
-U8G2 &display::Display::u8g2 = u8g2_;
-display::StatusScreen statusScreen;
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
+U8G2 &ui::Display::u8g2 = u8g2_;
+ui::Display disp;
+ui::StatusScreen statusScreen;
 #endif
 
 #define PIN_LED  22
@@ -99,15 +91,15 @@ void ledStartBlinking(uint32_t ms=0, uint8_t val=1);
 void ledStop();
 void ledUpdate();
 
-void checkCurrent();
 
 void tick1s();
+void tick20ms();
 
 using TimerType = etl::callback_timer_atomic<3, std::atomic_uint>;
 TimerType timerController;
 etl::timer::id::type ledTimer;
-etl::timer::id::type checkCurrentTimer;
-etl::timer::id::type secondTimer;
+etl::timer::id::type timer20ms;
+etl::timer::id::type timer1s;
 
 class PowerStatusObserver: public dcc::PowerObserver {
     void notification(const dcc::PowerEvent &event) override {
@@ -127,7 +119,7 @@ class PowerStatusObserver: public dcc::PowerObserver {
 void setup() {
 
     Serial.begin(115200);
-    Serial.println(CS_NAME);
+    Serial.println(CS_FULL_NAME);
 
     pinMode(PIN_BT, INPUT_PULLUP);
     pinMode(PIN_BT2, INPUT_PULLUP);
@@ -137,17 +129,6 @@ void setup() {
     // pinMode(_debug_pin2, OUTPUT);
 
     digitalWrite(PIN_LED, LOW);
-
-    #if USE_DISPLAY==1
-    u8g2_.begin();
-    u8g2_.setFontPosTop();
-    u8g2_.setFont(u8g2_font_nokiafc22_tr);
-    u8g2_.setDrawColor(1);
-
-    u8g2_.clearBuffer();
-    u8g2_.drawStr(16,16, "INIT...");
-    u8g2_.sendBuffer();
-    #endif
 
     //locoNetPhy.start();
     //lSerial.begin();
@@ -210,16 +191,24 @@ void setup() {
     ledTimer = timerController.register_timer(
         TimerType::callback_type::create<ledUpdate>(),
         LED_INTL_NORMAL, true);
-    checkCurrentTimer = timerController.register_timer(
-        TimerType::callback_type::create<checkCurrent>(),
-        1, true);
-    secondTimer = timerController.register_timer(
-        TimerType::callback_type::create<tick1s>(),
-        1000, true);
+    timer20ms = timerController.register_timer(
+        TimerType::callback_type::create<tick20ms>(),
+        20, true);
 
     timerController.enable(true);
-    timerController.start(checkCurrentTimer);
-    timerController.start(secondTimer);
+    timerController.start(timer20ms);
+    //timerController.start(timer1s);
+
+    #if USE_DISPLAY==1
+    statusScreen.wtServer = &withrottleServer;
+    statusScreen.lbServer = &lbServer;
+    statusScreen.setPage(ui::StatusPage::WiFi);
+    dccMain.add_observer(statusScreen);
+    dccProg.add_observer(statusScreen);
+    disp.begin();
+    disp.setScreen(&statusScreen);
+    disp.loop();
+    #endif
 
 #if USE_WIFI != 0
     WiFi.setSleep(WIFI_PS_NONE);
@@ -228,7 +217,7 @@ void setup() {
         // start AP
         WiFi.persistent(false);
         //WiFi.softAPConfig(IPAddress{192,168,1,0}, IPAddress{192,168,1,1}, IPAddress{255,255,255,0});
-        WiFi.softAP(CS_NAME " AP", "");
+        WiFi.softAP(CS_FULL_NAME " AP", "");
         Serial.println("");
         Serial.println("WiFi AP started.");
         Serial.println("IP address: ");
@@ -237,7 +226,7 @@ void setup() {
     } else {
         WiFiManager wifiManager;
         wifiManager.setConfigPortalTimeout(300); // 5 min
-        if ( !wifiManager.autoConnect(CS_NAME " AP") ) { // sometimes wifi connects during captive portal
+        if ( !wifiManager.autoConnect(CS_FULL_NAME " AP") ) { // sometimes wifi connects during captive portal
             if(WiFi.status() != WL_CONNECTED) {
                 Serial.print("Failed connection");
                 delay(1000);
@@ -252,17 +241,12 @@ void setup() {
         ledStartBlinking();
     }
 
-    MDNS.begin("ESP32Server");
-	//MDNS.addService("http","tcp", DCCppServer_Port);
-	MDNS.setInstanceName(CS_NAME);
+    MDNS.begin(CS_SHORT_NAME);
+    MDNS.setInstanceName(CS_FULL_NAME);
     lbServer.begin();
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 
-    #if USE_DISPLAY==1
-    statusScreen.wtServer = &withrottleServer;
-    statusScreen.lbServer = &lbServer;
-    #endif
 #endif
 
 }
@@ -336,16 +320,17 @@ void loop() {
 
 }
 
-void checkCurrent() {
+
+void tick20ms() {
+#if USE_DISPLAY==1
+    disp.loop();
+#endif
     currentMeter.checkOvercurrent();
 }
 
+
 void tick1s() {
-#if USE_DISPLAY==1
-    u8g2_.clearBuffer();
-    statusScreen.draw();
-    u8g2_.sendBuffer();
-#else
+#if USE_DISPLAY==0
     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
 #endif
 }

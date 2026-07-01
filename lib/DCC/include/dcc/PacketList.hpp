@@ -63,7 +63,7 @@ namespace dcc {
             it->second.packets[0] = packet_from_bytes(bytes); // here is actual putting into table
             enqueue_slot_packet(SlotLocation{it, 0}, speed.isEmgr() ? -100 : 0);
             DCC_LOGI("Addr:%d, spd:%d(%s) %c, %s",
-                addr.addr(), speed.get128(), SpeedModeToStr(mode), fwd?'F':'R',
+                addr.addr(), speed.get128(), mode.c_str(), fwd?'F':'R',
                 fmt_span(bytes));
             return true;
         }

@@ -35,7 +35,7 @@ public:
         size_t aKey = (a.isShort() ? a.num : -a.num + 128);
         return (key < aKey);
     }
-    operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
+    explicit operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
 private:
     int16_t num;
     LocoAddress(int16_t num): num{num} { }

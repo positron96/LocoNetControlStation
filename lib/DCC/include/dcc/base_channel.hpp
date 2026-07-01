@@ -38,9 +38,11 @@ public:
 
     virtual void end()=0;
 
-    virtual void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal)=0;
+    virtual void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal) {
+        if(v) overCurrentFlag = false;
+    }
 
-    virtual bool getPower()=0;
+    virtual bool getPower() const = 0;
 
     /**
      */
@@ -75,16 +77,20 @@ public:
     bool checkOvercurrent() {
         uint16_t mA = getCurrent();
         if(mA > overCurrentThreshold) {
+            overCurrentFlag = true;
             setPower(false, PowerEvent::Reason::Overcurrent);
             return false;
         }
         else return true;
     }
+    bool getOvercurrentStatus() const {
+        return overCurrentFlag;
+    }
 
     void resetMaxCurrent() { maxCurrent = 0; }
     /** Max current encountered so far after resetMaxCurrent() was called. */
     uint16_t getMaxCurrent() const { return maxCurrent; }
-    /**  Current consumption. */
+    /**  Current consumption in mA */
     uint16_t getCurrent() const { return current; }
     /** Reads current consumption and updates internal state. */
     virtual void updateCurrent() = 0;
@@ -95,6 +101,7 @@ protected:
     uint16_t overCurrentThreshold{std::numeric_limits<uint16_t>::max()}; ///< disabled until explicitly set
     std::atomic<uint16_t> current{0};
     std::atomic<uint16_t> maxCurrent{0};
+    bool overCurrentFlag{false};
 
     BasePacketList &packets;
 
