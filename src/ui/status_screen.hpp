@@ -88,17 +88,17 @@ namespace ui {
 
             switch(cur_page) {
                 case StatusPage::Tracks: drawPowerPage(u8g2, x, y);  break;
-                case StatusPage::Locos: drawLocoStatus(u8g2, x, y);  break;
+                case StatusPage::Locos: drawLocosPage(u8g2, x, y);  break;
             #if USE_WIFI==1
-                case StatusPage::WiFi: drawWiFiStatus(u8g2, x, y);  break;
-                case StatusPage::LbServer: drawLbServerStatus(u8g2, x, y); break;
-                case StatusPage::WiThrottle: drawWiThrottleStatus(u8g2, x, y); break;
+                case StatusPage::WiFi: drawWiFiPage(u8g2, x, y);  break;
+                case StatusPage::LbServer: drawLbServerPage(u8g2, x, y); break;
+                case StatusPage::WiThrottle: drawWiThrottlePage(u8g2, x, y); break;
             #endif
             }
         }
 
         #ifdef USE_WIFI
-        void drawWiFiStatus(U8G2 &u8g2, int x, int y) {
+        void drawWiFiPage(U8G2 &u8g2, int x, int y) {
             int dy = u8g2.getMaxCharHeight();
             String v;
 
@@ -130,7 +130,7 @@ namespace ui {
             }
         }
 
-        void drawLbServerStatus(U8G2 &u8g2, int x, int y) {
+        void drawLbServerPage(U8G2 &u8g2, int x, int y) {
             String v;
             if(lbServer!=nullptr) {
                 v = lbServer->getInfo();
@@ -138,7 +138,7 @@ namespace ui {
             }
         }
 
-        void drawWiThrottleStatus(U8G2 &u8g2, int x, int y) {
+        void drawWiThrottlePage(U8G2 &u8g2, int x, int y) {
             String v;
             if(wtServer!=nullptr) {
                 v = wtServer->getInfo();
@@ -214,7 +214,7 @@ namespace ui {
             }
         }
 
-        void drawLocoStatus(U8G2 &u8g2, unsigned x, unsigned y) {
+        void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y) {
             int dy = u8g2.getMaxCharHeight();
 
             String v;
