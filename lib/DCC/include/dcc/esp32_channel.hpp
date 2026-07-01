@@ -35,10 +35,11 @@ public:
     }
 
     void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal) override {
+        if(v == getPower()) return;
         DCC_LOGI("setPower(%d)", v);
         digitalWrite(_enPin, v ? HIGH : LOW);
-        notify_observers(PowerEvent{v, reason, this});
         BaseChannel::setPower(v, reason);
+        notify_observers(PowerEvent{v, reason, this});
     }
 
     bool getPower() const override {

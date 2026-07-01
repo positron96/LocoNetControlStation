@@ -1,5 +1,7 @@
 #include "WiThrottleServer.h"
 
+#include "config.hpp"
+
 #include "dcc/LocoAddress.h"
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
 #include "log.h"
@@ -506,6 +508,9 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
 
 String WiThrottleServer::getInfo() const {
     String v;
+    if(server.status() == 0) { // CLOSED in lwip tcp_state
+        return "Stopped";
+    }
     if (clients.empty()) {
         v = "No clients";
     }
