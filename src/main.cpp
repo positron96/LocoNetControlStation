@@ -203,6 +203,8 @@ void setup() {
     statusScreen.wtServer = &withrottleServer;
     statusScreen.lbServer = &lbServer;
     statusScreen.setPage(ui::StatusPage::WiFi);
+    dccMain.add_observer(statusScreen);
+    dccProg.add_observer(statusScreen);
     disp.begin();
     disp.setScreen(&statusScreen);
     disp.loop();

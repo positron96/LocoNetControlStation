@@ -15,12 +15,6 @@ namespace ui {
         dirty=true;
         u8g2.begin();
         u8g2.setFontPosTop();
-
-        // TODO: move it somewhere else later
-        u8g2.setFont(u8g2_font_9x6LED_tr);
-        u8g2.clearBuffer();
-        u8g2.drawStr(16,16, "INIT...");
-        u8g2.sendBuffer();
     }
 
     /** Redraws the display if needed. */
@@ -67,6 +61,8 @@ namespace ui {
         float heightStep = (float)maxHeight / maxBars;
         int pitch = barWidth + spacing;
 
+        u8g2.drawBox(x, y+maxHeight-1, pitch*maxBars, 1);
+
         for (int i = 0; i < maxBars; i++) {
             int currentHeight = (int)((i + 1) * heightStep);
             int currentX = x + (i * pitch);
@@ -74,8 +70,6 @@ namespace ui {
 
             if (i < activeBars) {
                 u8g2.drawBox(currentX, currentY, barWidth, currentHeight);
-            } else {
-                u8g2.drawFrame(currentX, currentY, barWidth, currentHeight);
             }
         }
         return pitch*maxBars;
@@ -119,7 +113,7 @@ namespace ui {
     void drawStatusbar(U8G2 &u8g2) {
 
         unsigned x = 2; // small margin
-        unsigned y = Display::STATUS_BAR_HEIGHT - 3;
+        unsigned y = Display::STATUS_BAR_HEIGHT - 2;
 
         u8g2.drawHLine(0, y, u8g2.getWidth());
         u8g2.setFontPosBottom();
@@ -138,6 +132,8 @@ namespace ui {
         }
         x -= 2;
         #endif
+
+        u8g2.setFont(u8g2_font_9x6LED_tr);
 
         // Prog track
         x = drawTrackStatus(u8g2, x, y, "P", CS.getProgTrack());

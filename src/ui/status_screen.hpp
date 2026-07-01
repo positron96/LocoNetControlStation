@@ -80,15 +80,14 @@ namespace ui {
 
             u8g2.drawHLine(x, y, scroller_width);
 
-            //u8g2_font_8x13B_tr  u8g2_font_nokiafc22_tr
-            const static uint8_t * mainFont = u8g2_font_9x6LED_tr;
-            u8g2.setFont(mainFont);
+            //u8g2_font_6x13B_tr    u8g2_font_9x6LED_tr
+            u8g2.setFont(u8g2_font_nokiafc22_tr);
             u8g2.setFontPosBottom();
             x = 0;
             y += u8g2.getMaxCharHeight()+1;
 
             switch(cur_page) {
-                case StatusPage::Tracks: drawTrackPower(u8g2, x, y);  break;
+                case StatusPage::Tracks: drawPowerPage(u8g2, x, y);  break;
                 case StatusPage::Locos: drawLocoStatus(u8g2, x, y);  break;
             #if USE_WIFI==1
                 case StatusPage::WiFi: drawWiFiStatus(u8g2, x, y);  break;
@@ -99,15 +98,15 @@ namespace ui {
         }
 
         #ifdef USE_WIFI
-        void drawWiFiStatus(U8G2 &u8g2, unsigned x, unsigned y) {
+        void drawWiFiStatus(U8G2 &u8g2, int x, int y) {
             int dy = u8g2.getMaxCharHeight();
             String v;
 
             if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
-                v = "AP:" + String(WiFi.softAPSSID());
+                v = "AP: " + String(WiFi.softAPSSID());
                 u8g2.drawStr(x, y, v.c_str()); y += dy;
 
-                v = "AP IP:" + WiFi.softAPIP().toString();
+                v = "AP IP: " + WiFi.softAPIP().toString();
                 u8g2.drawStr(x, y, v.c_str()); y += dy;
 
                 v = WiFi.softAPgetStationNum() + " clients";
@@ -125,13 +124,13 @@ namespace ui {
                     // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
                     y += dy;
 
-                    v = "STA IP:" + WiFi.localIP().toString();
+                    v = "STA IP: " + WiFi.localIP().toString();
                     u8g2.drawStr(x, y, v.c_str());
                 }
             }
         }
 
-        void drawLbServerStatus(U8G2 &u8g2, unsigned x, unsigned y) {
+        void drawLbServerStatus(U8G2 &u8g2, int x, int y) {
             String v;
             if(lbServer!=nullptr) {
                 v = lbServer->getInfo();
@@ -139,7 +138,7 @@ namespace ui {
             }
         }
 
-        void drawWiThrottleStatus(U8G2 &u8g2, unsigned x, unsigned y) {
+        void drawWiThrottleStatus(U8G2 &u8g2, int x, int y) {
             String v;
             if(wtServer!=nullptr) {
                 v = wtServer->getInfo();
@@ -151,12 +150,11 @@ namespace ui {
         /** Draws a fixed point value.
          * Value is with 3 decimal places (i.e. float_val*1000)
          */
-        int drawValue(U8G2 &u8g2, unsigned x, unsigned y, int value, const char* suffix) {
+        int drawValue(U8G2 &u8g2, int x, int y, int value, const char* suffix) {
             auto font = u8g2.getU8g2()->font;
             char v[20];
             int tx = x;
 
-            tx = x + 50;
             // value is fixed-point with 3 decimal places (real_value * 1000)
             // Convert to N.NN by rounding to the nearest hundredth.
             long roundedToHundredth = (value >= 0 ? value + 5 : value - 5) / 10;
@@ -170,32 +168,49 @@ namespace ui {
             tx += 2;
 
             u8g2.setFont(font);
-            u8g2.drawStr(tx, y, suffix); y += dy;
+            u8g2.drawStr(tx, y, suffix); y += dy - 2;
             return y;
         }
 
-        void drawTrackPower(U8G2 &u8g2, unsigned x, unsigned y) {
-            x = 15;
-            y += 3;
+        int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track) {
+            auto font = u8g2.getU8g2()->font;
+            int tx = x;
+            tx += u8g2.drawStr(tx, y, name) + 10;
+            if(track->getOvercurrentStatus()) {
+                u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
+                u8g2.drawGlyph(tx, y+1, 0x43);
+                y += u8g2.getMaxCharHeight();
+                u8g2.setFont(font);
+            } else if(track->getPower() == false) {
+                u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
+                u8g2.drawGlyph(tx, y+1, 0x4E);
+                y += u8g2.getMaxCharHeight();
+                u8g2.setFont(font);
+            } else {
+                y = drawValue(u8g2, tx, y, track->getCurrent(), "A");
+            }
+            return y;
+        }
+
+
+        void drawPowerPage(U8G2 &u8g2, int x, int y) {
+            x = 5;
+            y += 5;
 
             int voltage = 12345; // mV
-            int tx;
-            tx = u8g2.drawStr(x, y, "Input:");
-            y = drawValue(u8g2, tx, y, voltage, "V");
+            int tx = x;
+            tx += u8g2.drawStr(x, y, "Input:");
+            y = drawValue(u8g2, tx + 10, y, voltage, "V");
 
             String v;
             const dcc::BaseChannel *mainTrack = CS.getMainTrack();
             if(mainTrack!=nullptr) {
-                v = String("Main: ") + (mainTrack->getOvercurrentStatus() ? "OCP" : mainTrack->getPower()?"ON":"OFF");
-                tx = u8g2.drawStr(x, y, v.c_str());
-                y = drawValue(u8g2, tx, y, mainTrack->getCurrent(), "A");
+                y = drawTrack(u8g2, x, y, "Main:", mainTrack);
             }
 
             const dcc::BaseChannel *progTrack = CS.getProgTrack();
             if(progTrack!=nullptr) {
-                v = String("Prog: ") + (progTrack->getOvercurrentStatus() ? "OCP" : progTrack->getPower()?"ON":"OFF");
-                tx = u8g2.drawStr(x, y, v.c_str());
-                y = drawValue(u8g2, tx, y, progTrack->getCurrent(), "A");
+                drawTrack(u8g2, x, y, "Prog:", progTrack);
             }
         }
 
