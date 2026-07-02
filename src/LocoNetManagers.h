@@ -47,11 +47,11 @@ private:
     uint16_t clockSetterId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
     uint32_t clockSentTime{0};
 
-    bool slotValid(uint8_t slot) {
+    bool isValidLocoSlot(uint8_t slot) {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
     }
 
-    bool haveDispatchedSlot() { return slotValid(dispatchedSlot); }
+    bool haveDispatchedSlot() { return isValidLocoSlot(dispatchedSlot); }
     void removeDispatchedSlot() { dispatchedSlot = 0;}
 
     int locateSlot(uint16_t addr);
@@ -97,7 +97,7 @@ public:
 private:
     LocoNetBus * const _ln;
 
-    bool propagateToDcc{false}; // Called "bushby bit" in spec. Disable for now so that
+    bool propagateToDcc{false}; // Called "bushby bit" in spec. Disable for now
 
     void processSwitchRequest(const swReqMsg &msg, bool is_ack);
 

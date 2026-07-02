@@ -78,7 +78,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         sd.mesg_size = 14;
         sd.slot = slot;
 
-        if(!CS.isSlotAllocated(slot) ) {
+        if(!isValidLocoSlot(slot) || !CS.isSlotAllocated(slot) ) {
             sd.stat = DEC_MODE_128 | LOCO_FREE;
             sd.adr = 0;
             sd.spd = 0;
@@ -89,7 +89,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             sd.snd = 0;
 
             sd.ss2 = 0;
-            sd.id1 = slot;
+            sd.id1 = 0;
             sd.id2 = 0;
         } else {
             const CommandStation::LocoData &d = CS.getSlotData(slot);
@@ -141,12 +141,12 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             case OPC_MOVE_SLOTS: {
                 uint8_t srcSlot = msg->sm.src;
                 uint8_t dstSlot = msg->sm.dest;
-                if( dstSlot==srcSlot && slotValid(srcSlot)) {
+                if( dstSlot==srcSlot && isValidLocoSlot(srcSlot)) {
                     LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", srcSlot );
                     CS.setLocoSlotRefresh(srcSlot, true); // enable refresh
                     sendSlotData(srcSlot);
                 } else
-                if(dstSlot==0 && slotValid(srcSlot) ) {
+                if(dstSlot==0 && isValidLocoSlot(srcSlot) ) {
                     LOGI("OPC_MOVE_SLOTS DISPATCH PUT for slot %d", srcSlot );
                     if(haveDispatchedSlot() ) {
                         sendLack(OPC_MOVE_SLOTS, 0);
@@ -165,7 +165,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                         sendLack(OPC_MOVE_SLOTS, 0);
                     }
                 } else
-                if(slotValid(srcSlot) && slotValid(dstSlot)) {
+                if(isValidLocoSlot(srcSlot) && isValidLocoSlot(dstSlot)) {
                     // a valid move, but we don't support it atm
                     sendLack(OPC_MOVE_SLOTS);
                 } else {
@@ -175,25 +175,25 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             }
             case OPC_SLOT_STAT1: {
                 uint8_t slot = msg->ss.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processStat1(slot, msg->ss.stat);
                 break;
             }
             case OPC_LOCO_SND: {
                 uint8_t slot = msg->ls.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processSnd(slot, msg->ls.snd);
                 break;
             }
             case OPC_LOCO_DIRF: {
                 uint8_t slot = msg->ldf.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_DIRF); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_DIRF); break; }
                 processDirf(slot, msg->ldf.dirf);
                 break;
             }
             case OPC_LOCO_SPD : {
                 uint8_t slot = msg->lsp.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SPD); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SPD); break; }
                 processSpd(slot, msg->lsp.spd);
                 break;
             }
@@ -208,7 +208,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                     processFastClockMsg(msg->fc);
                     break;
                 }
-                if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
                 rwSlotDataMsg _slot;
                 fillSlotMsg(slot, _slot);
 
@@ -236,10 +236,18 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                     sendFastClock();
                     break;
                 }
-                if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;}
+                // JMRI requests slot 0 on connect, so it's probably valid to read.
+                if( isValidLocoSlot(slot) || slot==0) {
                 LOGI("OPC_RQ_SL_DATA slot %d", slot);
                 sendSlotData(slot);
                 break;
+                }
+                // TODO: slot 0x79 is a QuerySlot1, voltage/current meter slot, requested by JMRI on connect
+                //   expected response is OPC_SL_RD_DATA_P2 with 21 bytes length;
+                //   which is unsupported by the library.
+                sendLack(OPC_RQ_SL_DATA);
+                break;
+
             }
             default: break;
         }
