@@ -16,6 +16,8 @@
 
 #include <etl/map.h>
 #include <etl/bitset.h>
+#include <etl/optional.h>
+#include <etl/functional.h> // for reference_wrapper
 
 
 #define CS_DEBUG
@@ -357,6 +359,15 @@ public:
 
     auto getTurnouts() {
         return etl::views::values(etl::views::as_const(turnoutData));
+    }
+
+    /** Might switch to ordinary const pointer in future. */
+    etl::optional<etl::reference_wrapper<const TurnoutData>> findTurnout(const dcc::AccessoryAddress addr) {
+        auto t = turnoutData.find(addr);
+        if(t != turnoutData.end() ) {
+            return etl::cref(t->second);
+        }
+        return etl::nullopt;
     }
 
     size_t getTurnoutCount() { return turnoutData.size(); }

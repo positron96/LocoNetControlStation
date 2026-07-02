@@ -32,7 +32,7 @@ namespace dcc {
             return addr11 == a.addr11;
         }
     private:
-        AccessoryAddress(uint16_t a): addr11{a} {};
+        explicit AccessoryAddress(uint16_t a): addr11{a} {};
         uint16_t addr11;
     };
 

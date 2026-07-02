@@ -209,14 +209,14 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                     break;
                 }
                 if( !isValidLocoSlot(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
-                rwSlotDataMsg _slot;
-                fillSlotMsg(slot, _slot);
+                rwSlotDataMsg curSlot;
+                fillSlotMsg(slot, curSlot);
 
-                if(_slot.stat != m.stat) processStat1(slot, m.stat);
+                if(curSlot.stat != m.stat) processStat1(slot, m.stat);
                 if( !CS.isSlotAllocated(slot) ) break; // stat1 can deallocate slot, do not continue in this case
-                if(_slot.spd != m.spd) processSpd(slot, m.spd);
-                if(_slot.dirf != m.dirf) processDirf(slot, m.dirf);
-                if(_slot.snd != m.snd) processSnd(slot, m.snd);
+                if(curSlot.spd != m.spd) processSpd(slot, m.spd);
+                if(curSlot.dirf != m.dirf) processDirf(slot, m.dirf);
+                if(curSlot.snd != m.snd) processSnd(slot, m.snd);
 
                 if(extra.find(slot) != extra.end() ) {
                     extra[slot] = LnSlotData{};
@@ -276,7 +276,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         LnMsg ret;
         fillSlotMsg(slot, ret.sd);
 
-        LOGI_SLOT("Sending", slot, (ret.sd));
+        LOGI_SLOT("Sending", slot, ret.sd);
 
         writeChecksum(ret);
         _ln->broadcast(ret, this);
@@ -313,7 +313,6 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         auto newSpeedMode = int2SpeedMode(stat);
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
         bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
-        uint8_t locoStat = stat & LOCOSTAT_MASK;
 
         if(CS.isSlotAllocated(slot)) {
             if(!newActive && !newBusy) { // = FREE SLOT
@@ -323,7 +322,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             const LocoData &dd = CS.getSlotData(slot);
             if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
             if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
-        }
+        } // else do we need to allocate this slot? I don't think so.
     }
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {
@@ -498,9 +497,9 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
         }
         case OPC_SW_REQ: {  // switch command, sent to decoders (or command station) from throttles
             const swReqMsg &req = msg->srq;
-            if((req.sw1 & 0b1111'1100 == 0b0111'1000) && (req.sw2 & 0b1101'1111 == 0b0000'0111)) {
+            if((req.sw1 & 0b1111'1100) == 0b0111'1000 && (req.sw2 & 0b1101'1111) == 0b0000'0111) {
                 // interrogate devices on bus, used by JMRI on connection
-                uint8_t bits = (req.sw2 >> 3) & 0b100 | (req.sw1 & 0b11);
+                uint8_t bits = ((req.sw2 >> 3) & 0b100) | (req.sw1 & 0b11);
                 LOGI("Interrogate devices with low bits 0b%d%d%d", (bits>>2)&1, (bits>>1)&1, bits&1);
                 break;
             }
@@ -514,13 +513,12 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
         }
         case OPC_SW_STATE: { // request for switch state
             dcc::AccessoryAddress addr = fromLnSwitchAddr(lnSwitchAddr(msg->srq.sw1, msg->srq.sw2) );
-            for(const auto &tt: CS.getTurnouts()) {
-                if(tt.addr == addr && tt.state != TurnoutState::UNKNOWN) {
-                    uint8_t ret = tt.state == TurnoutState::CLOSED ? OPC_SW_REQ_DIR : 0; // bit 5 = CLOSED
-                    ret |= OPC_SW_REQ_OUT; // bit 4 = ON
-                    ::sendLack(OPC_SW_STATE, ret, _ln, this);
-                    break;
-                }
+            auto tt = CS.findTurnout(addr);
+            if(tt.has_value() && tt.value().get().state != TurnoutState::UNKNOWN) {
+                uint8_t ret = tt.value().get().state == TurnoutState::CLOSED ? OPC_SW_REQ_DIR : 0; // bit 5 = CLOSED
+                ret |= OPC_SW_REQ_OUT; // bit 4 = ON
+                ::sendLack(OPC_SW_STATE, ret, _ln, this);
+                break;
             }
             break;
         }
@@ -533,11 +531,9 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
             bool closed = msg->srp.sn2 & OPC_SW_REP_CLOSED;
             bool thrown = msg->srp.sn2 & OPC_SW_REP_THROWN;
             LOGI("Switch report: addr %d, closed=%d, thrown=%d, external_evt=%d", addr, closed, thrown, external_evt);
-            for(const auto &tt: CS.getTurnouts()) {
-                if(tt.addr == addr) {
-                    LOGI("Found this address in roster, state=%d", (int)tt.state);
-                    break;
-                }
+            auto tt = CS.findTurnout(addr);
+            if(tt.has_value()) {
+                LOGI("Found this address in roster, state=%d", (int)tt.value().get().state);
             }
             break;
         }
