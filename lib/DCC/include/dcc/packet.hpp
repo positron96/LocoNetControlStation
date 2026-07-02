@@ -265,17 +265,18 @@ namespace dcc {
         etl::array<uint8_t, 2> data;
 
         // 10AA'AAAA, where AAAAAA = 6 least significant bits of accessory 9-bit address
-        data[0] = ( addr9 & 0x3F) | 0x80;
+        data[0] = ( addr9 & 0b11'1111) | 0x80;
+
         /*
         "The most significant bits of the 9-bit address are bits 4-6 of the second data byte.
         By convention these bits (bits 4-6 of the second data byte) are in ones complement. "
         https://www.nmra.org/sites/default/files/s-9.2.1_2012_07.pdf
         */
         // 1AAA'CDDR, where C=1(=on), R=throw(0)/close(1)
-        data[1] = ( ((addr9>>6 & 0x7) << 4 ) ^ 0b0111'0000 )
-            | (ch & 0x3) << 1
-            | (thrown?0:1)
-            | 0b1000'1000;
+        data[1] = ( ((addr9>>6 & 0b111) << 4 ) ^ 0b0111'0000 ) // bits 7-9 or addr, inverted
+                | (ch & 0b11) << 1   // 4 output channels
+                | (thrown?0:1)       // thrown/closed bit
+                | 0b1000'1000;
 
         return data;
     }

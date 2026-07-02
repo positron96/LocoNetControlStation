@@ -289,7 +289,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     wifiPrintln(cli, "PTT]\\[Turnouts}|{Turnout]\\[Closed}|{"+String(TURNOUT_CLOSED)+"]\\[Thrown}|{"+String(TURNOUT_THROWN) );
     wifiPrint(cli, "PTL");
     for(const auto &tt: CS.getTurnouts() ) {
-        wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr.longAddr()+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.tStatus) );
+        wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr.longAddr()+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.state) );
     }
     // wifiPrintln(cli, "PW8888"); // Web port
     wifiPrintln(cli, "");

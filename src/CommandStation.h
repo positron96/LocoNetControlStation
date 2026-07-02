@@ -85,7 +85,7 @@ public:
     struct TurnoutData {
         dcc::AccessoryAddress addr;
         int userTag;
-        TurnoutState tStatus;
+        TurnoutState state;
     };
 
     static constexpr int MAX_TURNOUTS = 15;
@@ -378,7 +378,7 @@ public:
     TurnoutState getTurnoutState(const dcc::AccessoryAddress addr) {
         auto t = turnoutData.find(addr);
         if(t != turnoutData.end() ) {
-            return t->second.tStatus;
+            return t->second.state;
         }
         return TurnoutState::UNKNOWN;
     }
@@ -392,12 +392,12 @@ public:
             auto t = turnoutData.find(addr);
             if(t != turnoutData.end() ) {
                 if (action==TurnoutAction::TOGGLE) {
-                    newState = toggleTurnout(t->second.tStatus);
+                    newState = toggleTurnout(t->second.state);
                 } else {  // throw or close
                     newState = actionToState(action);
                 }
 
-                t->second.tStatus = newState;
+                t->second.state = newState;
                 addr = t->second.addr;
             } else {
                 CS_DEBUGF("Did not find turnout in roster");

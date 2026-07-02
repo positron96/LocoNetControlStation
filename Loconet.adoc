@@ -413,12 +413,12 @@ Upon receiving, JMRI treats this OPCode equally to <<OPC_SW_REQ>>.
 --
 
 
-|[[OPC_SW_STATE]]OPC_SW_STATE |0xBC | REQ state of SWITCH | <<OPC_LACK>>
+|[[OPC_SW_STATE]]OPC_SW_STATE |0xBC | Request state of SWITCH | <<OPC_LACK>>
 | 3+a| `<0xBC>,<SW1>,<SW2>,<CHK>`
 
-Request a switch to have specific state.
+Request to a switch to report its state.
 
-<SW1> and <SW2> are same as in <<OPC_SW_ACK>>
+<SW1> and <SW2> are same as in <<OPC_SW_ACK>> (only address bits are used)
 
 NOTE: This message seems to be ignored by JMRI
 
