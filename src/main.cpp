@@ -61,7 +61,8 @@ dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, 
 dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
 dcc::ESP32CurrentMeter currentMeter;
 
-LocoNetSlotManager slotMan(&bus);
+LocoNetSlotManager lnSlotMan(&bus);
+LocoNetTurnoutManager lnTurnoutMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 
