@@ -2,6 +2,7 @@
 
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
+#include "accessory_address.hpp"
 #include "packet.hpp"
 #include "PacketList.hpp"
 #include "power_event.hpp"
@@ -57,11 +58,11 @@ public:
      * @param addr11 is 1-based.
      */
     void sendAccessory(uint16_t addr11, bool thr);
+
     /**
-     * @param addr9 is 1-based
-     * @param ch is 0-based.
+     * @param addr is accessory decoder address.
      */
-    // void sendAccessory(uint16_t addr9, uint8_t ch, bool);
+    void sendAccessory(const AccessoryAddress &addr, bool thr);
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);

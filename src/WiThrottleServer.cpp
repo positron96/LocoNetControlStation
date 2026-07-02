@@ -3,6 +3,8 @@
 #include "config.hpp"
 
 #include "dcc/LocoAddress.h"
+#include "dcc/accessory_address.hpp"
+
 #define FILE_LOG_LEVEL  LEVEL_DEBUG
 #include "log.h"
 
@@ -286,11 +288,8 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     notifyFastClock(cli);
     wifiPrintln(cli, "PTT]\\[Turnouts}|{Turnout]\\[Closed}|{"+String(TURNOUT_CLOSED)+"]\\[Thrown}|{"+String(TURNOUT_THROWN) );
     wifiPrint(cli, "PTL");
-    for(const auto &t: CS.getTurnouts() ) {
-    //for (int t = 0 ; t<CS.getTurnoutCount(); t++) {
-        //const CommandStation::TurnoutData &tt = CS.getTurnout(t);
-        const CommandStation::TurnoutData &tt = t.second;
-        wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr11+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.tStatus) );
+    for(const auto &tt: CS.getTurnouts() ) {
+        wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr.longAddr()+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.tStatus) );
     }
     // wifiPrintln(cli, "PW8888"); // Web port
     wifiPrintln(cli, "");
@@ -494,7 +493,8 @@ void WiThrottleServer::accessoryToggle(unsigned aAddr, char action, bool isNamed
             cc.sendMessage("Unknown turnout command!", true);
             return;
     }
-    TurnoutState newStat = CS.turnoutAction(aAddr, isNamed, a);
+    TurnoutState newStat = CS.turnoutAction(
+        dcc::AccessoryAddress::from11bit(aAddr), isNamed, a);
 
     if(newStat==TurnoutState::UNKNOWN) cc.sendMessage("Could not change turnout!", true);
     char cStat = turnoutState2Chr(newStat);

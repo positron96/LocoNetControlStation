@@ -2,6 +2,7 @@
 
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
+#include "accessory_address.hpp"
 
 #include <etl/vector.h>
 #include <etl/array.h>
@@ -255,8 +256,11 @@ namespace dcc {
         }
     }
 
-    inline auto make_accessory_packet(uint16_t addr9, uint8_t ch, bool thrown) {
+    inline auto make_accessory_packet(const AccessoryAddress &addr, bool thrown) {
         // DCC_LOGI("addr9=%d, ch=%d, %c", addr9, ch, thrown?'T':'C');
+
+        uint8_t addr9 = addr.get9bitAddr();
+        uint8_t ch = addr.getOutputIdx();
 
         etl::array<uint8_t, 2> data;
 
@@ -276,8 +280,5 @@ namespace dcc {
         return data;
     }
 
-    inline auto make_accessory_packet(uint16_t addr11, bool thrown) {
-        return make_accessory_packet((addr11>>2) + 1U, addr11 & 0x3, thrown);
-    }
 
 }

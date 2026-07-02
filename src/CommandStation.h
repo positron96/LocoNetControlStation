@@ -6,9 +6,10 @@
  */
 
 
-#include "dcc/base_channel.hpp"
-#include "dcc/packet.hpp"
-#include "dcc/LocoAddress.h"
+#include <dcc/base_channel.hpp>
+#include <dcc/packet.hpp>
+#include <dcc/LocoAddress.h>
+#include <dcc/accessory_address.hpp>
 #include <LocoNet2.h>
 
 #include "Watchdog.h"
@@ -82,38 +83,21 @@ public:
 
     /* Define turnout object structures */
     struct TurnoutData {
-        uint16_t addr11;
+        dcc::AccessoryAddress addr;
         int userTag;
         TurnoutState tStatus;
     };
 
     static constexpr int MAX_TURNOUTS = 15;
-    using TurnoutMap = etl::map<uint16_t, TurnoutData, MAX_TURNOUTS>;
-    TurnoutMap turnoutData;
-
-    uint16_t getTurnoutCount() { return turnoutData.size(); }
+    using TurnoutMap = etl::map<dcc::AccessoryAddress, TurnoutData, MAX_TURNOUTS>;
 
     void loadTurnouts() {
-        turnoutData[6] = { 6, 0, TurnoutState::CLOSED };
-        turnoutData[7] = { 7, 1, TurnoutState::CLOSED };
-        turnoutData[10] = { 10, 2, TurnoutState::UNKNOWN };
-        turnoutData[11] = { 11, 3, TurnoutState::THROWN };
+        addTurnout({ dcc::AccessoryAddress::from9bit(1, 0), 0, TurnoutState::CLOSED });
+        addTurnout({ dcc::AccessoryAddress::from9bit(1, 1), 1, TurnoutState::CLOSED });
+        addTurnout({ dcc::AccessoryAddress::from9bit(1, 2), 2, TurnoutState::UNKNOWN });
+        addTurnout({ dcc::AccessoryAddress::from9bit(1, 3), 3, TurnoutState::THROWN });
 
-        /*sendDCCppCmd("T");
-        waitForDCCpp();
-        int t = 0;
-        while(Serial.available()>0) {
-            char data[maxCommandLength];
-            sprintf(data, "%s", readResponse().c_str() );
-            if (strlen(data)==0) break;
-            int addr, sub, stat, id;
-            int ret = sscanf(data, "%*c %d %d %d %d", &id, &addr, &sub, &stat );
-            turnoutData[t] = { ((addr-1)*4+1) + (sub&0x3) , id, stat==0 ? 2 : 4};
-            t++;
-        }*/
     }
-
-    //const TurnoutData& getTurnout(uint16_t i) { return turnoutData[i]; }
 
     struct LocoData {
         using Fns = etl::bitset<N_FUNCTIONS>;
@@ -381,29 +365,31 @@ public:
         dccMain->writeCVBitMain(addr, cv, bit, val?1:0);
     }
 
-    const TurnoutMap& getTurnouts() {
-        return turnoutData;
+    auto getTurnouts() {
+        return etl::views::values(etl::views::as_const(turnoutData));
     }
 
-    TurnoutState turnoutToggle(uint16_t aAddr, bool fromRoster) {
-        return turnoutAction(aAddr, fromRoster, TurnoutAction::TOGGLE);
+    size_t getTurnoutCount() { return turnoutData.size(); }
+
+    TurnoutState turnoutToggle(const dcc::AccessoryAddress addr, bool fromRoster) {
+        return turnoutAction(addr, fromRoster, TurnoutAction::TOGGLE);
     }
 
-    TurnoutState getTurnoutState(uint16_t aAddr) {
-        auto t = turnoutData.find(aAddr);
+    TurnoutState getTurnoutState(const dcc::AccessoryAddress addr) {
+        auto t = turnoutData.find(addr);
         if(t != turnoutData.end() ) {
             return t->second.tStatus;
         }
         return TurnoutState::UNKNOWN;
     }
 
-    TurnoutState turnoutAction(uint16_t aAddr, bool fromRoster, TurnoutAction action) {
-        CS_DEBUGF("addr=%d named=%d action=%d", aAddr, fromRoster, (int)action );
+    TurnoutState turnoutAction(dcc::AccessoryAddress addr, bool fromRoster, TurnoutAction action) {
+        CS_DEBUGF("addr11=%d named=%d action=%d", addr.longAddr(), fromRoster, (int)action );
 
         TurnoutState newState = TurnoutState::THROWN;
 
         if(fromRoster) {
-            auto t = turnoutData.find(aAddr);
+            auto t = turnoutData.find(addr);
             if(t != turnoutData.end() ) {
                 if (action==TurnoutAction::TOGGLE) {
                     newState = toggleTurnout(t->second.tStatus);
@@ -411,10 +397,8 @@ public:
                     newState = actionToState(action);
                 }
 
-                //sendDCCppCmd("T "+String(turnoutData[t].id)+" "+newStat);
-                //dccMain.sendAccessory(turnoutData[t].addr, turnoutData[t].subAddr, newStat);
                 t->second.tStatus = newState;
-                aAddr = t->second.addr11;
+                addr = t->second.addr;
             } else {
                 CS_DEBUGF("Did not find turnout in roster");
                 return TurnoutState::UNKNOWN;
@@ -427,22 +411,22 @@ public:
                 newState = actionToState(action);
             }
 
-            if(turnoutData.available()>0) {
+            if(!turnoutData.full()) {
                 // add turnout to roster
-                turnoutData[aAddr] = {aAddr, int(turnoutData.size()+1), newState};
-                CS_DEBUGF("Added new turnout to roster: ID=%d, addr=%d", aAddr, aAddr );
+                addTurnout({addr, int(turnoutData.size()+1), newState});
+                CS_DEBUGF("Added new turnout to roster: ID=%d, addr=%d", addr.get11bitAddr() );
             }
         }
 
         // send to DCC
-        dccMain->sendAccessory(aAddr, newState==TurnoutState::THROWN);
+        dccMain->sendAccessory(addr, newState==TurnoutState::THROWN);
         // send to LocoNet
         // FIXME: this is a dirty hack.
         // If LocoNet calls this function, it will be bounced back to bus.
         // Fortunately, right now, accessory commands from LocoNet do not get propagated to DCC
         // and this command is only called from WiThrottle code.
         if(locoNet!=nullptr) {
-            LnMsg ttt = makeSwRec(aAddr, true, newState==TurnoutState::THROWN);
+            LnMsg ttt = makeSwRec(addr.longAddr(), true, newState==TurnoutState::THROWN);
             locoNet->broadcast(ttt);
         }
 
@@ -460,6 +444,12 @@ private:
 
     LocoData slots[MAX_SLOTS]; ///< slot 1 has index 0 in this array. Slot 0 is invalid.
     inline LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
+
+    TurnoutMap turnoutData;
+
+    void addTurnout(const TurnoutData &dd) {
+        turnoutData[dd.addr] = dd;
+    }
 
 };
 
