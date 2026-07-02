@@ -7,3 +7,4 @@
 #include "dcc/packet.hpp"
 #include "dcc/PacketList.hpp"
 #include "dcc/LocoAddress.h"
+#include "dcc/accessory_address.hpp"

@@ -1,4 +1,6 @@
-#include "LocoNetSlotManager.h"
+#include "LocoNetManagers.h"
+
+#include <dcc/accessory_address.hpp>
 
 #include "FastClock.hpp"
 
@@ -8,18 +10,29 @@
 /// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
-static LocoAddress lnAddr(uint16_t addr) {
+/** Creates LocoAddress (short/long) from LocoNet address. */
+static LocoAddress fromLnAddr(uint16_t addr) {
     if(addr<=127) { return LocoAddress::shortAddr(addr); }
     return LocoAddress::longAddr(addr);
 }
 
 // reverse to ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
-inline static uint8_t addrLo(const LocoAddress &addr) {
+static uint8_t addrLo(const LocoAddress &addr) {
     return addr.addr() & 0b00011111;
 }
 
-inline static uint8_t addrHi(const LocoAddress &addr) {
+static uint8_t addrHi(const LocoAddress &addr) {
     return (addr.addr() >> 7);
+}
+
+/** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
+static uint8_t moveBit1to5(uint8_t normalByte) {
+    return (normalByte & 0x1)<<4 | (normalByte & 0b1'1110)>>1;
+}
+
+/** Puts bit 5 of arg to 0th place, shifts bits 1-4 to left */
+static uint8_t moveBit5to1(uint8_t dccByte) {
+    return (dccByte & 0b0001'0000)>>4 | (dccByte & 0b0000'1111)<<1 ;
 }
 
 using LocoData = CommandStation::LocoData;
@@ -51,6 +64,11 @@ inline uint8_t trkByte() {
     return ret;
 }
 
+void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender) {
+    LnMsg lack = makeLongAck(cmd, arg);
+    _ln->broadcast(lack, sender);
+}
+
     LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
         ln->addConsumer(this);
     }
@@ -60,7 +78,7 @@ inline uint8_t trkByte() {
         sd.mesg_size = 14;
         sd.slot = slot;
 
-        if(!CS.isSlotAllocated(slot) ) {
+        if(!isValidLocoSlot(slot) || !CS.isSlotAllocated(slot) ) {
             sd.stat = DEC_MODE_128 | LOCO_FREE;
             sd.adr = 0;
             sd.spd = 0;
@@ -71,7 +89,7 @@ inline uint8_t trkByte() {
             sd.snd = 0;
 
             sd.ss2 = 0;
-            sd.id1 = slot;
+            sd.id1 = 0;
             sd.id2 = 0;
         } else {
             const CommandStation::LocoData &d = CS.getSlotData(slot);
@@ -101,33 +119,34 @@ inline uint8_t trkByte() {
     void LocoNetSlotManager::processMessage(const lnMsg* msg) {
 
         switch(msg->data[0]) {
-            case OPC_GPON:
+            case OPC_GPON:  // FIXME: this is not related to slots.
                 CS.setPowerState(true);
                 break;
             case OPC_GPOFF:
                 CS.setPowerState(false);
                 break;
             case OPC_LOCO_ADR: {
-                int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
+                uint16_t addr = ADDR(msg->la.adr_hi, msg->la.adr_lo);
+                int slot = findOrAllocateSlot(addr);
                 if(slot<=0) {
-                    LOGI("OPC_LOCO_ADR for addr %d, no available slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
+                    LOGI("OPC_LOCO_ADR for addr %d, no available slots", addr );
                     sendLack(OPC_LOCO_ADR);
                     break;
                 }
 
-                LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                LOGI("OPC_LOCO_ADR for addr %d, found slot %d", addr, slot);
                 sendSlotData(slot);
                 break;
             }
             case OPC_MOVE_SLOTS: {
                 uint8_t srcSlot = msg->sm.src;
                 uint8_t dstSlot = msg->sm.dest;
-                if( dstSlot==srcSlot && slotValid(srcSlot)) {
+                if( dstSlot==srcSlot && isValidLocoSlot(srcSlot)) {
                     LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", srcSlot );
                     CS.setLocoSlotRefresh(srcSlot, true); // enable refresh
                     sendSlotData(srcSlot);
                 } else
-                if(dstSlot==0 && slotValid(srcSlot) ) {
+                if(dstSlot==0 && isValidLocoSlot(srcSlot) ) {
                     LOGI("OPC_MOVE_SLOTS DISPATCH PUT for slot %d", srcSlot );
                     if(haveDispatchedSlot() ) {
                         sendLack(OPC_MOVE_SLOTS, 0);
@@ -146,7 +165,7 @@ inline uint8_t trkByte() {
                         sendLack(OPC_MOVE_SLOTS, 0);
                     }
                 } else
-                if(slotValid(srcSlot) && slotValid(dstSlot)) {
+                if(isValidLocoSlot(srcSlot) && isValidLocoSlot(dstSlot)) {
                     // a valid move, but we don't support it atm
                     sendLack(OPC_MOVE_SLOTS);
                 } else {
@@ -156,25 +175,25 @@ inline uint8_t trkByte() {
             }
             case OPC_SLOT_STAT1: {
                 uint8_t slot = msg->ss.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processStat1(slot, msg->ss.stat);
                 break;
             }
             case OPC_LOCO_SND: {
                 uint8_t slot = msg->ls.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SND); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SND); break; }
                 processSnd(slot, msg->ls.snd);
                 break;
             }
             case OPC_LOCO_DIRF: {
                 uint8_t slot = msg->ldf.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_DIRF); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_DIRF); break; }
                 processDirf(slot, msg->ldf.dirf);
                 break;
             }
             case OPC_LOCO_SPD : {
                 uint8_t slot = msg->lsp.slot;
-                if( !slotValid(slot) ) { sendLack(OPC_LOCO_SPD); break; }
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_LOCO_SPD); break; }
                 processSpd(slot, msg->lsp.spd);
                 break;
             }
@@ -189,15 +208,15 @@ inline uint8_t trkByte() {
                     processFastClockMsg(msg->fc);
                     break;
                 }
-                if( !slotValid(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
-                rwSlotDataMsg _slot;
-                fillSlotMsg(slot, _slot);
+                if( !isValidLocoSlot(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
+                rwSlotDataMsg curSlot;
+                fillSlotMsg(slot, curSlot);
 
-                if(_slot.stat != m.stat) processStat1(slot, m.stat);
-                if( !CS.isSlotAllocated(slot) ) break; // stat1 can set slot to inactive, do not continue in this case
-                if(_slot.spd != m.spd) processSpd(slot, m.spd);
-                if(_slot.dirf != m.dirf) processDirf(slot, m.dirf);
-                if(_slot.snd != m.snd) processSnd(slot, m.snd);
+                if(curSlot.stat != m.stat) processStat1(slot, m.stat);
+                if( !CS.isSlotAllocated(slot) ) break; // stat1 can deallocate slot, do not continue in this case
+                if(curSlot.spd != m.spd) processSpd(slot, m.spd);
+                if(curSlot.dirf != m.dirf) processDirf(slot, m.dirf);
+                if(curSlot.snd != m.snd) processSnd(slot, m.snd);
 
                 if(extra.find(slot) != extra.end() ) {
                     extra[slot] = LnSlotData{};
@@ -217,10 +236,18 @@ inline uint8_t trkByte() {
                     sendFastClock();
                     break;
                 }
-                if( !slotValid(slot) ) { sendLack(OPC_RQ_SL_DATA); break;}
-                LOGI("OPC_RQ_SL_DATA slot %d", slot);
-                sendSlotData(slot);
+                // JMRI requests slot 0 on connect, so it's probably valid to read.
+                if( isValidLocoSlot(slot) || slot==0) {
+                    LOGI("OPC_RQ_SL_DATA slot %d", slot);
+                    sendSlotData(slot);
+                    break;
+                }
+                // TODO: slot 0x79 is a QuerySlot1, voltage/current meter slot, requested by JMRI on connect
+                //   expected response is OPC_SL_RD_DATA_P2 with 21 bytes length;
+                //   which is unsupported by the library.
+                sendLack(OPC_RQ_SL_DATA);
                 break;
+
             }
             default: break;
         }
@@ -228,9 +255,8 @@ inline uint8_t trkByte() {
     }
 
 
-
-    int LocoNetSlotManager::locateSlot(uint8_t hi, uint8_t lo) {
-        LocoAddress addr = (hi==0) ? LocoAddress::shortAddr(lo) : LocoAddress::longAddr(ADDR(hi,lo));
+    int LocoNetSlotManager::findOrAllocateSlot(uint16_t ln_addr) {
+        LocoAddress addr = fromLnAddr(ln_addr);
         uint8_t slot = CS.findLocoSlot(addr);
         if(slot==0) {
             slot = CS.locateFreeSlot();
@@ -250,15 +276,14 @@ inline uint8_t trkByte() {
         LnMsg ret;
         fillSlotMsg(slot, ret.sd);
 
-        LOGI_SLOT("Sending", slot, (ret.sd));
+        LOGI_SLOT("Sending", slot, ret.sd);
 
         writeChecksum(ret);
         _ln->broadcast(ret, this);
     }
 
     void LocoNetSlotManager::sendLack(uint8_t cmd, uint8_t arg) {
-        LnMsg lack = makeLongAck(cmd, arg);
-        _ln->broadcast(lack, this);
+        ::sendLack(cmd, arg, _ln, this);
     }
 
     void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
@@ -275,19 +300,29 @@ inline uint8_t trkByte() {
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {
-        LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
+        LOGI("OPC_SLOT_STAT1 slot=%d stat1=%02x", slot, stat);
+
+        /*
+        For bits D5(SL_BUSY) | D4(SL_ACTIVE):
+        11 = IN_USE    loco adr in SLOT  -     REFRESHED
+        10 = IDLE      loco adr in SLOT  - NOT refreshed
+        01 = COMMON    loco adr IN SLOT  -     refreshed
+        00 = FREE SLOT, no valid DATA    - not refreshed
+        */
 
         auto newSpeedMode = int2SpeedMode(stat);
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
         bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
-        if( !newBusy ) {
-            releaseSlot(slot);
-            return;
-        }
 
-        const LocoData &dd = CS.getSlotData(slot);
-        if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
-        if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
+        if(CS.isSlotAllocated(slot)) {
+            if(!newActive && !newBusy) { // = FREE SLOT
+                releaseSlot(slot);
+                return;
+            }
+            const LocoData &dd = CS.getSlotData(slot);
+            if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
+            if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
+        } // else do we need to allocate this slot? I don't think so.
     }
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {
@@ -354,11 +389,11 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
             case OPS_BYTE_NO_FEEDBACK:
                 LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
-                CS.writeCvMain(lnAddr(addr), cv, val);
+                CS.writeCvMain(fromLnAddr(addr), cv, val);
                 break;
             /*case OPS_BIT_NO_FEEDBACK:
                 sendLack(0x7F, 0x40); // ack ok, no reply will follow
-                CS.writeCvMainBit(lnAddr(addr), cv, val);
+                CS.writeCvMainBit(fromLnAddr(addr), cv, val);
                 break;*/
             default:
                 sendLack(PROG_LACK, 0x7F); // not implemented
@@ -440,5 +475,96 @@ void LocoNetSlotManager::setFastClockMaster(bool v) {
         fast_clock::clock.add_observer(*this);
     } else {
         fast_clock::clock.remove_observer(*this);
+    }
+}
+
+
+
+static uint16_t lnSwitchAddr(uint8_t hi, uint8_t lo) {
+    return (lo & 0b1111111) | ((hi & 0b1111)<<7); // +1 ?
+}
+
+static dcc::AccessoryAddress fromLnSwitchAddr(uint16_t ln_addr) {
+    return dcc::AccessoryAddress::from11bit(ln_addr);
+}
+
+
+void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
+    switch(msg->data[0]) {
+        case OPC_SW_ACK: {  // switch command, sent to a command station from PC, command station emits DCC packets.
+            processSwitchRequest(msg->srq, true);
+            break;
+        }
+        case OPC_SW_REQ: {  // switch command, sent to decoders (or command station) from throttles
+            const swReqMsg &req = msg->srq;
+            if((req.sw1 & 0b1111'1100) == 0b0111'1000 && (req.sw2 & 0b1101'1111) == 0b0000'0111) {
+                // interrogate devices on bus, used by JMRI on connection
+                uint8_t bits = ((req.sw2 >> 3) & 0b100) | (req.sw1 & 0b11);
+                LOGI("Interrogate devices with low bits 0b%d%d%d", (bits>>2)&1, (bits>>1)&1, bits&1);
+                break;
+            }
+            if((req.sw2 & 0b1100'0000) == 0b0100'0000) {
+                // switch input report?
+                break;
+            }
+            if(propagateToDcc)
+                processSwitchRequest(req, false);
+            break;
+        }
+        case OPC_SW_STATE: { // request for switch state
+            dcc::AccessoryAddress addr = fromLnSwitchAddr(lnSwitchAddr(msg->srq.sw1, msg->srq.sw2) );
+            auto tt = CS.findTurnout(addr);
+            if(tt.has_value() && tt.value().get().state != TurnoutState::UNKNOWN) {
+                uint8_t ret = tt.value().get().state == TurnoutState::CLOSED ? OPC_SW_REQ_DIR : 0; // bit 5 = CLOSED
+                ret |= OPC_SW_REQ_OUT; // bit 4 = ON
+                ::sendLack(OPC_SW_STATE, ret, _ln, this);
+                break;
+            }
+            break;
+        }
+        case OPC_SW_REP: {
+            // sent by switch decoder:
+            // external_evt=1: when decoder input (e.g. button) changes
+            // external_evt=0: after it moves a switch (either from LocoNet command or button)
+            bool external_evt = (msg->srp.sn2 & OPC_SW_REP_INPUTS) != 0;
+            dcc::AccessoryAddress addr = fromLnSwitchAddr(lnSwitchAddr(msg->srp.sn1, msg->srp.sn2));
+            bool closed = msg->srp.sn2 & OPC_SW_REP_CLOSED;
+            bool thrown = msg->srp.sn2 & OPC_SW_REP_THROWN;
+            LOGI("Switch report: addr %d, closed=%d, thrown=%d, external_evt=%d", addr, closed, thrown, external_evt);
+            auto tt = CS.findTurnout(addr);
+            if(tt.has_value()) {
+                LOGI("Found this address in roster, state=%d", (int)tt.value().get().state);
+            }
+            break;
+        }
+        case OPC_INPUT_REP: { // sensor report, sent by occupancy detectors etc
+            const inputRepMsg &ir = msg->ir;
+            uint16_t addr = (ir.in1 & 0b0111'1111) << 1  // address bits 1..7
+                | (ir.in2 & 0b1111) << 8                 // address bits 8..11
+                | bitRead(ir.in2, 5);                    // address bit 0,
+                                                         //  on DS64 0=AUX(A1..A4) 1=Switch(A1..A4)
+            bool state = bitRead(ir.in2, 4);
+            LOGI("Input report: addr=%d, state=%d", addr, state);
+        }
+
+        default: break;
+    }
+}
+
+void LocoNetTurnoutManager::processSwitchRequest(const swReqMsg &msg, bool is_ack) {
+    uint16_t addr = lnSwitchAddr(msg.sw1, msg.sw2);
+    bool on = (msg.sw2 & 0b1'0000) != 0;
+    bool thrown = (msg.sw2 & 0b10'0000) != 0;
+    LOGI("OPC_SW_REQ for addr %d, thrown=%d, no=%d", addr, thrown, on);
+
+    if (on) {
+        CS.turnoutAction(fromLnSwitchAddr(addr), false,
+            thrown ? TurnoutAction::THROW : TurnoutAction::CLOSE);
+        ::sendLack(is_ack ? OPC_SW_ACK : OPC_SW_REQ, 0x7F, _ln, this);
+
+    } else {
+        //TODO: DCC packet supports this bit too, it's just not exposed in CommandStation and DCC library
+        LOGI("OPC_SW_REQ with off bit - ignored");
+        ::sendLack(is_ack ? OPC_SW_ACK : OPC_SW_REQ, 0, _ln, this);
     }
 }

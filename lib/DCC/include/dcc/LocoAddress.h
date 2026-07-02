@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <math.h>
 
+/** Maximum value of short address by DCC standard (S-9.2.1). */
+constexpr uint8_t MAX_SHORT_ADDR = 127;
+
 /**
  * Represents a DCC address.
  *
@@ -19,7 +22,7 @@
  */
 class LocoAddress {
 public:
-    LocoAddress() : num(0) {}
+    LocoAddress() : num{0} {}
     /** Creates short address. */
     static LocoAddress shortAddr(uint8_t addr) {  return LocoAddress{addr}; }
     /** Creates long address. */
@@ -29,14 +32,19 @@ public:
     /** Returns numeric value of this address. */
     uint16_t addr() const { return abs(num); }
     bool isValid() const { return num!=0; }
+    bool isBroadcast() const { return num == 0; }
     bool operator < (const LocoAddress& a) const {
-        // long address must be "larger" than short one
-        size_t key = (isShort() ? num : -num + 128);
-        size_t aKey = (a.isShort() ? a.num : -a.num + 128);
-        return (key < aKey);
+        return comp_key() < a.comp_key();
+    }
+    bool operator == (const LocoAddress& a) const {
+        return num == a.num;
     }
     explicit operator String() const {  return String( (isShort() ? 'S' : 'L') )+addr(); }
 private:
     int16_t num;
+
     LocoAddress(int16_t num): num{num} { }
+
+    /** For comparison, long address must be "larger" than short one */
+    size_t comp_key() const { return isShort() ? num : -num + MAX_SHORT_ADDR; }
 };

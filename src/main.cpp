@@ -8,7 +8,7 @@
 
 #include "CommandStation.h"
 
-#include "LocoNetSlotManager.h"
+#include "LocoNetManagers.h"
 
 #include "LocoNetSerial.h"
 #include "LocoNetTCPServer.h"
@@ -61,7 +61,8 @@ dcc::ESP32RMTChannel dccMain(DCC_MAIN_PIN, DCC_MAIN_PIN_EN, DCC_MAIN_PIN_SENSE, 
 dcc::ESP32RMTChannel dccProg(DCC_PROG_PIN, DCC_PROG_PIN_EN, DCC_PROG_PIN_SENSE, dcc_packets_prog);
 dcc::ESP32CurrentMeter currentMeter;
 
-LocoNetSlotManager slotMan(&bus);
+LocoNetSlotManager lnSlotMan(&bus);
+LocoNetTurnoutManager lnTurnoutMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 
@@ -139,29 +140,6 @@ void setup() {
         Serial.printf("onPacket: %s\n", tmp);
     });
 
-
-    parser.onSwitchRequest([](uint16_t address, bool output, bool direction) {
-        Serial.print("Switch Request: ");
-        Serial.print(address, DEC);
-        Serial.print(':');
-        Serial.print(direction ? "Closed" : "Thrown");
-        Serial.print(" - ");
-        Serial.println(output ? "On" : "Off");
-    });
-    parser.onSwitchReport([](uint16_t address, bool state, bool sensor) {
-        Serial.print("Switch/Sensor Report: ");
-        Serial.print(address, DEC);
-        Serial.print(':');
-        Serial.print(sensor ? "Switch" : "Aux");
-        Serial.print(" - ");
-        Serial.println(state ? "Active" : "Inactive");
-    });
-    parser.onSensorChange([](uint16_t address, bool state) {
-        Serial.print("Sensor: ");
-        Serial.print(address, DEC);
-        Serial.print(" - ");
-        Serial.println(state ? "Active" : "Inactive");
-    });
 
     dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
     dccMain.setOvercurrentThreshold(2000);
@@ -330,7 +308,7 @@ void tick20ms() {
 
 
 void tick1s() {
-#if USE_DISPLAY==0
+#if USE_DISPLAY==0 && USE_WIFI==1
     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
 #endif
 }
