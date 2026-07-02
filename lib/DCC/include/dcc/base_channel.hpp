@@ -55,11 +55,6 @@ public:
     void sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn);
 
     /**
-     * @param addr11 is 1-based.
-     */
-    void sendAccessory(uint16_t addr11, bool thr);
-
-    /**
      * @param addr is accessory decoder address.
      */
     void sendAccessory(const AccessoryAddress &addr, bool thr);

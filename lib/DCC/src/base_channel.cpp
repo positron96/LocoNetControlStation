@@ -31,12 +31,6 @@ void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t f
 
 }
 
-void BaseChannel::sendAccessory(uint16_t addr11, bool thrown) {
-    DCC_LOGI("addr11=%d, %c", addr11, thrown?'T':'C');
-
-    packets.put_accessory_packet(AccessoryAddress::from11bit(addr11), thrown);
-}
-
 void BaseChannel::sendAccessory(const AccessoryAddress &addr, bool thr) {
     DCC_LOGI("addr11=%d, %c", addr.get11bitAddr(), thr?'T':'C');
 
