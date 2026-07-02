@@ -127,7 +127,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                 break;
             case OPC_LOCO_ADR: {
                 uint16_t addr = ADDR(msg->la.adr_hi, msg->la.adr_lo);
-                int slot = locateSlot(addr);
+                int slot = findOrAllocateSlot(addr);
                 if(slot<=0) {
                     LOGI("OPC_LOCO_ADR for addr %d, no available slots", addr );
                     sendLack(OPC_LOCO_ADR);
@@ -213,7 +213,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                 fillSlotMsg(slot, _slot);
 
                 if(_slot.stat != m.stat) processStat1(slot, m.stat);
-                if( !CS.isSlotAllocated(slot) ) break; // stat1 can set slot to inactive, do not continue in this case
+                if( !CS.isSlotAllocated(slot) ) break; // stat1 can deallocate slot, do not continue in this case
                 if(_slot.spd != m.spd) processSpd(slot, m.spd);
                 if(_slot.dirf != m.dirf) processDirf(slot, m.dirf);
                 if(_slot.snd != m.snd) processSnd(slot, m.snd);
@@ -238,9 +238,9 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                 }
                 // JMRI requests slot 0 on connect, so it's probably valid to read.
                 if( isValidLocoSlot(slot) || slot==0) {
-                LOGI("OPC_RQ_SL_DATA slot %d", slot);
-                sendSlotData(slot);
-                break;
+                    LOGI("OPC_RQ_SL_DATA slot %d", slot);
+                    sendSlotData(slot);
+                    break;
                 }
                 // TODO: slot 0x79 is a QuerySlot1, voltage/current meter slot, requested by JMRI on connect
                 //   expected response is OPC_SL_RD_DATA_P2 with 21 bytes length;
@@ -255,8 +255,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
     }
 
 
-
-    int LocoNetSlotManager::locateSlot(uint16_t ln_addr) {
+    int LocoNetSlotManager::findOrAllocateSlot(uint16_t ln_addr) {
         LocoAddress addr = fromLnAddr(ln_addr);
         uint8_t slot = CS.findLocoSlot(addr);
         if(slot==0) {
@@ -301,19 +300,30 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {
-        LOGI("OPC_SLOT_STAT1 slot %d stat1 %02x", slot, stat);
+        LOGI("OPC_SLOT_STAT1 slot=%d stat1=%02x", slot, stat);
+
+        /*
+        For bits D5(SL_BUSY) | D4(SL_ACTIVE):
+        11 = IN_USE    loco adr in SLOT  -     REFRESHED
+        10 = IDLE      loco adr in SLOT  - NOT refreshed
+        01 = COMMON    loco adr IN SLOT  -     refreshed
+        00 = FREE SLOT, no valid DATA    - not refreshed
+        */
 
         auto newSpeedMode = int2SpeedMode(stat);
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
         bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
-        if( !newBusy ) {
-            releaseSlot(slot);
-            return;
-        }
+        uint8_t locoStat = stat & LOCOSTAT_MASK;
 
-        const LocoData &dd = CS.getSlotData(slot);
-        if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
-        if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
+        if(CS.isSlotAllocated(slot)) {
+            if(!newActive && !newBusy) { // = FREE SLOT
+                releaseSlot(slot);
+                return;
+            }
+            const LocoData &dd = CS.getSlotData(slot);
+            if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
+            if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
+        }
     }
 
     void LocoNetSlotManager::processSpd(uint8_t slot, uint8_t spd) {

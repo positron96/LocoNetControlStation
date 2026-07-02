@@ -54,7 +54,7 @@ private:
     bool haveDispatchedSlot() { return isValidLocoSlot(dispatchedSlot); }
     void removeDispatchedSlot() { dispatchedSlot = 0;}
 
-    int locateSlot(uint16_t addr);
+    int findOrAllocateSlot(uint16_t addr);
 
     void releaseSlot(uint8_t slot);
 
