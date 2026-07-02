@@ -307,7 +307,7 @@ void tick20ms() {
 
 
 void tick1s() {
-#if USE_DISPLAY==0
+#if USE_DISPLAY==0 && USE_WIFI==1
     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
 #endif
 }
