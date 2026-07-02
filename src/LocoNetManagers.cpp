@@ -472,7 +472,7 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
             break;
         }
         case OPC_SW_REQ: {  // switch command, sent to decoders (or command station) from throttles
-            if(msg->srq.sw2 & 0b1100'0000 != 0b0100'0000) {
+            if((msg->srq.sw2 & 0b1100'0000) != 0b0100'0000) {
                 // switch input report?
                 break;
             }
@@ -516,8 +516,8 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
 
 void LocoNetTurnoutManager::processSwitchRequest(const swReqMsg &msg, bool is_ack) {
     uint16_t addr = SWITCH_ADDR(msg.sw1, msg.sw2);
-    bool on = msg.sw2 & 0b1'0000 != 0;
-    bool thrown = msg.sw2 & 0b10'0000 != 0;
+    bool on = (msg.sw2 & 0b1'0000) != 0;
+    bool thrown = (msg.sw2 & 0b10'0000) != 0;
     LOGI("OPC_SW_REQ for addr %d, thrown=%d, no=%d", addr, thrown, on);
 
     if (on) {
