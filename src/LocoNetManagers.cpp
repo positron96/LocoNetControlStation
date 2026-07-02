@@ -479,12 +479,19 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
             break;
         }
         case OPC_SW_REQ: {  // switch command, sent to decoders (or command station) from throttles
-            if((msg->srq.sw2 & 0b1100'0000) != 0b0100'0000) {
+            const swReqMsg &req = msg->srq;
+            if((req.sw1 & 0b1111'1100 == 0b0111'1000) && (req.sw2 & 0b1101'1111 == 0b0000'0111)) {
+                // interrogate devices on bus, used by JMRI on connection
+                uint8_t bits = (req.sw2 >> 3) & 0b100 | (req.sw1 & 0b11);
+                LOGI("Interrogate devices with low bits 0b%d%d%d", (bits>>2)&1, (bits>>1)&1, bits&1);
+                break;
+            }
+            if((req.sw2 & 0b1100'0000) == 0b0100'0000) {
                 // switch input report?
                 break;
             }
             if(propagateToDcc)
-                processSwitchRequest(msg->srq, false);
+                processSwitchRequest(req, false);
             break;
         }
         case OPC_SW_STATE: { // request for switch state
