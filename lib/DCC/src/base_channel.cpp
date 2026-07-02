@@ -62,6 +62,27 @@ bool BaseChannel::checkCurrentResponse(uint baseline) const {
     return ret;
 }
 
+
+bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms) {
+    size_t remaining_ms = timeout_ms;
+
+    // First phase: try to enqueue within the timeout budget.
+    while (!packets.put_generic_packet(packet, nRepeat)) {
+        if (remaining_ms == 0) return false;
+        delay(1);
+        remaining_ms--;
+    }
+
+    // Second phase: wait for queue drain using the remaining budget.
+    while (!packets.is_queue_empty()) {
+        if (remaining_ms == 0) return false;
+        delay(1);
+        remaining_ms--;
+    }
+
+    return true;
+}
+
 int16_t BaseChannel::readCVProg(int cv) {
 	uint8_t packet[4];
 	int ret;
@@ -75,13 +96,14 @@ int16_t BaseChannel::readCVProg(int cv) {
 
     int baseline = getBaselineCurrent();
 
+    //TODO: verify that channel does not starve with this waiting implementation
 	for (uint8_t i = 0; i<8; i++) {
 		packet[2] = 0xE8 | i;
 
-		loadPacket(resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
+		sendPacketFully(resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
         resetMaxCurrent();
-		loadPacket(packet, 3, 5);               // NMRA recommends 5 verify packets
-		loadPacket(resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+		sendPacketFully(packet, 3, 5);               // NMRA recommends 5 verify packets
+		sendPacketFully(resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
         bool bitVal = checkCurrentResponse(baseline);
         if(bitVal) bitSet(ret, i);
@@ -103,12 +125,12 @@ bool BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
     packet[1] = lowByte(cv);
 	packet[2] = bValue;
 
-    loadPacket(resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
-    loadPacket(resetPacket, 2, 3);
+    sendPacketFully(resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
+    sendPacketFully(resetPacket, 2, 3);
     uint baseline = getBaselineCurrent();
     resetMaxCurrent();
-	loadPacket(packet, 3, 5);         // NMRA recommends 5 verify packets
-	loadPacket(resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+	sendPacketFully(packet, 3, 5);         // NMRA recommends 5 verify packets
+	sendPacketFully(resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
     return checkCurrentResponse(baseline);
 
@@ -124,19 +146,19 @@ bool BaseChannel::writeCVByteProg(int cv, uint8_t bValue) {
     packet[1]=lowByte(cv);
     packet[2]=bValue;
 
-    loadPacket(resetPacket,2,1);
-    loadPacket(packet,3,4);
-    loadPacket(resetPacket,2,1);
-    loadPacket(idlePacket,2,10);
+    sendPacketFully(resetPacket,2,1);
+    sendPacketFully(packet,3,4);
+    sendPacketFully(resetPacket,2,1);
+    sendPacketFully(idlePacket,2,10);
 
     baseline = getBaselineCurrent();
 
     packet[0]=0x74 | (highByte(cv)&0x03);   // set-up to re-verify entire byte
 
-    loadPacket(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    sendPacketFully(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
     resetMaxCurrent();
-    loadPacket(packet,3,5);               // NMRA recommends 5 verfy packets
-    loadPacket(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
+    sendPacketFully(packet,3,5);               // NMRA recommends 5 verfy packets
+    sendPacketFully(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
 
     return checkCurrentResponse(baseline);
 
@@ -154,19 +176,19 @@ bool BaseChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
     packet[1] = lowByte(cv);
     packet[2] = 0xF0 | bValue<<3 | bNum;
 
-    loadPacket(resetPacket,2,1);
-    loadPacket(packet,3,4);
-    loadPacket(resetPacket,2,1);
-    loadPacket(idlePacket,2,10);
+    sendPacketFully(resetPacket,2,1);
+    sendPacketFully(packet,3,4);
+    sendPacketFully(resetPacket,2,1);
+    sendPacketFully(idlePacket,2,10);
 
     baseline = getBaselineCurrent();
 
     bitClear(packet[2],4);              // change instruction code from Write Bit to Verify Bit
 
-    loadPacket(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    sendPacketFully(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
     resetMaxCurrent();
-    loadPacket(packet,3,5);               // NMRA recommends 5 verfy packets
-    loadPacket(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
+    sendPacketFully(packet,3,5);               // NMRA recommends 5 verfy packets
+    sendPacketFully(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
 
     return checkCurrentResponse(baseline);
 
@@ -188,7 +210,7 @@ void BaseChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
     packet[nB++] = lowByte(cv);
     packet[nB++] = bValue;
 
-    loadPacket(packet,nB,4);
+    sendPacketFully(packet,nB,4);
 
 }
 
@@ -211,7 +233,7 @@ void BaseChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t
     b[nB++]=lowByte(cv);
     b[nB++]=0xF0 | bValue<<3 | bNum;
 
-    loadPacket(b,nB,4);
+    sendPacketFully(b,nB,4);
 
 }
 

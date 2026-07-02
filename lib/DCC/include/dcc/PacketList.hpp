@@ -105,6 +105,10 @@ namespace dcc {
             return put_generic_packet(bytes, ACCESSORY_PACKET_REPEATS);
         }
 
+        bool is_queue_empty() const {
+            return queue_packets.empty();
+        }
+
         void clear_loco(const LocoAddress addr) {
             auto it = loco_slots.find(addr);
             if(it != loco_slots.end() ) {

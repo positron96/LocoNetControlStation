@@ -101,15 +101,8 @@ protected:
 
     BasePacketList &packets;
 
-    /** Tries to load a packet for a specified duration. */
-    bool loadPacket(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
-        //TODO: original code probably waited until packet appeared on tracks, while this just waits for space in queue.
-        for(size_t i=0; i<timeout_ms; i++) {
-            if (packets.put_generic_packet(packet, nRepeat)) return true;
-            delay(1);
-        }
-        return false;
-    }
+    /** Tries to schedule a packet for a specified duration and waits until it's sent to tracks. */
+    bool sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000);
 
     uint getBaselineCurrent() const;
     bool checkCurrentResponse(uint baseline) const;
