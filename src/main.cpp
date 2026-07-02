@@ -8,7 +8,7 @@
 
 #include "CommandStation.h"
 
-#include "LocoNetSlotManager.h"
+#include "LocoNetManagers.h"
 
 #include "LocoNetSerial.h"
 #include "LocoNetTCPServer.h"

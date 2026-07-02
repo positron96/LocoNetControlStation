@@ -1,4 +1,6 @@
-#include "LocoNetSlotManager.h"
+#include "LocoNetManagers.h"
+
+#include <dcc/accessory_address.hpp>
 
 #include "FastClock.hpp"
 
@@ -11,6 +13,15 @@ constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 static LocoAddress lnAddr(uint16_t addr) {
     if(addr<=127) { return LocoAddress::shortAddr(addr); }
     return LocoAddress::longAddr(addr);
+}
+
+static LocoAddress lnAddr(uint8_t hi, uint8_t lo) {
+    if(hi==0) return LocoAddress::shortAddr(lo);
+    return LocoAddress::longAddr(ADDR(hi, lo));
+}
+
+static uint16_t SWITCH_ADDR(uint8_t hi, uint8_t lo) {
+    return (lo & 0b1111111) | ((hi & 0b1111)<<7); // +1 ?
 }
 
 // reverse to ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
@@ -49,6 +60,11 @@ inline uint8_t trkByte() {
     uint8_t ret = GTRK_IDLE | GTRK_MLOK1; // no emgr across layout, & Loconet 1.1 by default;
     if(CS.getPowerState()) ret |= GTRK_POWER;
     return ret;
+}
+
+void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender) {
+    LnMsg lack = makeLongAck(cmd, arg);
+    _ln->broadcast(lack, sender);
 }
 
     LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
@@ -101,21 +117,22 @@ inline uint8_t trkByte() {
     void LocoNetSlotManager::processMessage(const lnMsg* msg) {
 
         switch(msg->data[0]) {
-            case OPC_GPON:
+            case OPC_GPON:  // FIXME: this is not related to slots.
                 CS.setPowerState(true);
                 break;
             case OPC_GPOFF:
                 CS.setPowerState(false);
                 break;
             case OPC_LOCO_ADR: {
-                int slot = locateSlot( msg->la.adr_hi,  msg->la.adr_lo );
+                uint16_t addr = ADDR(msg->la.adr_hi, msg->la.adr_lo);
+                int slot = locateSlot(addr);
                 if(slot<=0) {
-                    LOGI("OPC_LOCO_ADR for addr %d, no available slots", ADDR(msg->la.adr_hi, msg->la.adr_lo) );
+                    LOGI("OPC_LOCO_ADR for addr %d, no available slots", addr );
                     sendLack(OPC_LOCO_ADR);
                     break;
                 }
 
-                LOGI("OPC_LOCO_ADR for addr %d, found slot %d", ADDR(msg->la.adr_hi, msg->la.adr_lo), slot);
+                LOGI("OPC_LOCO_ADR for addr %d, found slot %d", addr, slot);
                 sendSlotData(slot);
                 break;
             }
@@ -229,8 +246,8 @@ inline uint8_t trkByte() {
 
 
 
-    int LocoNetSlotManager::locateSlot(uint8_t hi, uint8_t lo) {
-        LocoAddress addr = (hi==0) ? LocoAddress::shortAddr(lo) : LocoAddress::longAddr(ADDR(hi,lo));
+    int LocoNetSlotManager::locateSlot(uint16_t ln_addr) {
+        LocoAddress addr = lnAddr(ln_addr);
         uint8_t slot = CS.findLocoSlot(addr);
         if(slot==0) {
             slot = CS.locateFreeSlot();
@@ -257,8 +274,7 @@ inline uint8_t trkByte() {
     }
 
     void LocoNetSlotManager::sendLack(uint8_t cmd, uint8_t arg) {
-        LnMsg lack = makeLongAck(cmd, arg);
-        _ln->broadcast(lack, this);
+        ::sendLack(cmd, arg, _ln, this);
     }
 
     void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
@@ -440,5 +456,78 @@ void LocoNetSlotManager::setFastClockMaster(bool v) {
         fast_clock::clock.add_observer(*this);
     } else {
         fast_clock::clock.remove_observer(*this);
+    }
+}
+
+
+dcc::AccessoryAddress fromLnAddr(uint16_t ln_addr) {
+    return dcc::AccessoryAddress::from11bit(ln_addr);
+}
+
+
+void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
+    switch(msg->data[0]) {
+        case OPC_SW_ACK: {  // switch command, sent to a command station from PC, command station emits DCC packets.
+            processSwitchRequest(msg->srq, true);
+            break;
+        }
+        case OPC_SW_REQ: {  // switch command, sent to decoders (or command station) from throttles
+            if(msg->srq.sw2 & 0b1100'0000 != 0b0100'0000) {
+                // switch input report?
+                break;
+            }
+            if(propagateToDcc)
+                processSwitchRequest(msg->srq, false);
+            break;
+        }
+        case OPC_SW_STATE: { // request for switch state
+            const uint16_t addr = SWITCH_ADDR(msg->srq.sw1, msg->srq.sw2);
+            for(const auto &tt: CS.getTurnouts()) {
+                if(tt.addr.longAddr() == addr && tt.state != TurnoutState::UNKNOWN) {
+                    uint8_t ret = tt.state == TurnoutState::CLOSED ? OPC_SW_REQ_DIR : 0; // bit 5 = CLOSED
+                    ret |= OPC_SW_REQ_OUT; // bit 4 = ON
+                    ::sendLack(OPC_SW_STATE, ret, _ln, this);
+                    break;
+                }
+            }
+            break;
+        }
+        case OPC_SW_REP: {
+            bool external_evt = (msg->srp.sn2 & OPC_SW_REP_INPUTS) != 0;
+            // sent by switch decoder:
+            // external_evt=1: when decoder input (e.g. button) changes
+            // external_evt=0: after it moves a switch (either from LocoNet command or button)
+            uint16_t addr = SWITCH_ADDR(msg->srp.sn1, msg->srp.sn2);
+            bool closed = msg->srp.sn2 & OPC_SW_REP_CLOSED;
+            bool thrown = msg->srp.sn2 & OPC_SW_REP_THROWN;
+            LOGI("Switch report: addr %d, closed=%d, thrown=%d, external_evt=%d", addr, closed, thrown, external_evt);
+            for(const auto &tt: CS.getTurnouts()) {
+                if(tt.addr.longAddr() == addr) {
+                    LOGI("Found this address in roster, state=%d", (int)tt.state);
+                    break;
+                }
+            }
+            break;
+        }
+
+        default: break;
+    }
+}
+
+void LocoNetTurnoutManager::processSwitchRequest(const swReqMsg &msg, bool is_ack) {
+    uint16_t addr = SWITCH_ADDR(msg.sw1, msg.sw2);
+    bool on = msg.sw2 & 0b1'0000 != 0;
+    bool thrown = msg.sw2 & 0b10'0000 != 0;
+    LOGI("OPC_SW_REQ for addr %d, thrown=%d, no=%d", addr, thrown, on);
+
+    if (on) {
+        CS.turnoutAction(fromLnAddr(addr), false,
+            thrown ? TurnoutAction::THROW : TurnoutAction::CLOSE);
+        ::sendLack(is_ack ? OPC_SW_ACK : OPC_SW_REQ, 0x7F, _ln, this);
+
+    } else {
+        //TODO: DCC packet supports this bit too, it's just not exposed in CommandStation and DCC library
+        LOGI("OPC_SW_REQ with off bit - ignored");
+        ::sendLack(is_ack ? OPC_SW_ACK : OPC_SW_REQ, 0, _ln, this);
     }
 }

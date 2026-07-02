@@ -54,7 +54,7 @@ private:
     bool haveDispatchedSlot() { return slotValid(dispatchedSlot); }
     void removeDispatchedSlot() { dispatchedSlot = 0;}
 
-    int locateSlot(uint8_t hi, uint8_t lo);
+    int locateSlot(uint16_t addr);
 
     void releaseSlot(uint8_t slot);
 
@@ -79,5 +79,26 @@ private:
     void processFastClockMsg(const fastClockMsg &msg);
 
     void sendFastClock();
+
+};
+
+
+class LocoNetTurnoutManager: public LocoNetConsumer  {
+public:
+    LocoNetTurnoutManager(LocoNetBus * const ln);
+
+    LN_STATUS onMessage(const lnMsg& msg) override {
+        processMessage(&msg);
+        return LN_IDLE;
+    }
+
+    void processMessage(const lnMsg* msg);
+
+private:
+    LocoNetBus * const _ln;
+
+    bool propagateToDcc{false}; // Called "bushby bit" in spec. Disable for now so that
+
+    void processSwitchRequest(const swReqMsg &msg, bool is_ack);
 
 };

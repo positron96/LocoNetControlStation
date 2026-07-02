@@ -3,6 +3,12 @@
 #include <LocoNet2.h>
 #include <Stream.h>
 
+/**
+ * Very simple LocoNet to Serial bridge.
+ *
+ * It doesn't propagate state of serial bus to LocoNet
+ *  and always returns SUCCESS in onMessage.
+ */
 class LocoNetSerial: public LocoNetConsumer {
 
 public:
