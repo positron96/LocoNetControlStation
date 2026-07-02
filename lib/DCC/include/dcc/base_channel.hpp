@@ -39,7 +39,11 @@ public:
     virtual void end()=0;
 
     virtual void setPower(bool v, PowerEvent::Reason reason = PowerEvent::Reason::Normal) {
-        if(v) overCurrentFlag = false;
+        if(v) {
+            // clear overcurrent states
+            overCurrentFlag = false;
+            overCurrentEventPending = false;
+        }
     }
 
     virtual bool getPower() const = 0;
@@ -74,14 +78,13 @@ public:
 
     /** Different channels may have different thresholds. */
     void setOvercurrentThreshold(uint16_t mA) { overCurrentThreshold = mA; }
+    /** Should be called periodically to broadcast overcurrent events. */
     bool checkOvercurrent() {
-        uint16_t mA = getCurrent();
-        if(mA > overCurrentThreshold) {
-            overCurrentFlag = true;
-            setPower(false, PowerEvent::Reason::Overcurrent);
-            return false;
+        if(overCurrentEventPending) {
+            overCurrentEventPending = false;
+            notify_observers(PowerEvent{false, PowerEvent::Reason::Overcurrent, this});
         }
-        else return true;
+        return overCurrentFlag;
     }
     bool getOvercurrentStatus() const {
         return overCurrentFlag;
@@ -101,7 +104,8 @@ protected:
     uint16_t overCurrentThreshold{std::numeric_limits<uint16_t>::max()}; ///< disabled until explicitly set
     std::atomic<uint16_t> current{0};
     std::atomic<uint16_t> maxCurrent{0};
-    bool overCurrentFlag{false};
+    bool overCurrentFlag{false}; // retained until power is turned back on.
+    bool overCurrentEventPending{false}; // set when overcurrent is detected, checked in checkOvercurrent()
 
     BasePacketList &packets;
 
