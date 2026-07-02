@@ -10,27 +10,29 @@
 /// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
-static LocoAddress lnAddr(uint16_t addr) {
+/** Creates LocoAddress (short/long) from LocoNet address. */
+static LocoAddress fromLnAddr(uint16_t addr) {
     if(addr<=127) { return LocoAddress::shortAddr(addr); }
     return LocoAddress::longAddr(addr);
 }
 
-static LocoAddress lnAddr(uint8_t hi, uint8_t lo) {
-    if(hi==0) return LocoAddress::shortAddr(lo);
-    return LocoAddress::longAddr(ADDR(hi, lo));
-}
-
-static uint16_t SWITCH_ADDR(uint8_t hi, uint8_t lo) {
-    return (lo & 0b1111111) | ((hi & 0b1111)<<7); // +1 ?
-}
-
 // reverse to ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
-inline static uint8_t addrLo(const LocoAddress &addr) {
+static uint8_t addrLo(const LocoAddress &addr) {
     return addr.addr() & 0b00011111;
 }
 
-inline static uint8_t addrHi(const LocoAddress &addr) {
+static uint8_t addrHi(const LocoAddress &addr) {
     return (addr.addr() >> 7);
+}
+
+/** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
+static uint8_t moveBit1to5(uint8_t normalByte) {
+    return (normalByte & 0x1)<<4 | (normalByte & 0b1'1110)>>1;
+}
+
+/** Puts bit 5 of arg to 0th place, shifts bits 1-4 to left */
+static uint8_t moveBit5to1(uint8_t dccByte) {
+    return (dccByte & 0b0001'0000)>>4 | (dccByte & 0b0000'1111)<<1 ;
 }
 
 using LocoData = CommandStation::LocoData;
@@ -247,7 +249,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
 
 
     int LocoNetSlotManager::locateSlot(uint16_t ln_addr) {
-        LocoAddress addr = lnAddr(ln_addr);
+        LocoAddress addr = fromLnAddr(ln_addr);
         uint8_t slot = CS.findLocoSlot(addr);
         if(slot==0) {
             slot = CS.locateFreeSlot();
@@ -370,11 +372,11 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
             case OPS_BYTE_NO_FEEDBACK:
                 LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 0x40); // ack ok, no reply will follow
-                CS.writeCvMain(lnAddr(addr), cv, val);
+                CS.writeCvMain(fromLnAddr(addr), cv, val);
                 break;
             /*case OPS_BIT_NO_FEEDBACK:
                 sendLack(0x7F, 0x40); // ack ok, no reply will follow
-                CS.writeCvMainBit(lnAddr(addr), cv, val);
+                CS.writeCvMainBit(fromLnAddr(addr), cv, val);
                 break;*/
             default:
                 sendLack(PROG_LACK, 0x7F); // not implemented
@@ -460,7 +462,12 @@ void LocoNetSlotManager::setFastClockMaster(bool v) {
 }
 
 
-dcc::AccessoryAddress fromLnAddr(uint16_t ln_addr) {
+
+static uint16_t lnSwitchAddr(uint8_t hi, uint8_t lo) {
+    return (lo & 0b1111111) | ((hi & 0b1111)<<7); // +1 ?
+}
+
+static dcc::AccessoryAddress fromLnSwitchAddr(uint16_t ln_addr) {
     return dcc::AccessoryAddress::from11bit(ln_addr);
 }
 
@@ -481,9 +488,9 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
             break;
         }
         case OPC_SW_STATE: { // request for switch state
-            const uint16_t addr = SWITCH_ADDR(msg->srq.sw1, msg->srq.sw2);
+            dcc::AccessoryAddress addr = fromLnSwitchAddr(lnSwitchAddr(msg->srq.sw1, msg->srq.sw2) );
             for(const auto &tt: CS.getTurnouts()) {
-                if(tt.addr.longAddr() == addr && tt.state != TurnoutState::UNKNOWN) {
+                if(tt.addr == addr && tt.state != TurnoutState::UNKNOWN) {
                     uint8_t ret = tt.state == TurnoutState::CLOSED ? OPC_SW_REQ_DIR : 0; // bit 5 = CLOSED
                     ret |= OPC_SW_REQ_OUT; // bit 4 = ON
                     ::sendLack(OPC_SW_STATE, ret, _ln, this);
@@ -493,21 +500,30 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
             break;
         }
         case OPC_SW_REP: {
-            bool external_evt = (msg->srp.sn2 & OPC_SW_REP_INPUTS) != 0;
             // sent by switch decoder:
             // external_evt=1: when decoder input (e.g. button) changes
             // external_evt=0: after it moves a switch (either from LocoNet command or button)
-            uint16_t addr = SWITCH_ADDR(msg->srp.sn1, msg->srp.sn2);
+            bool external_evt = (msg->srp.sn2 & OPC_SW_REP_INPUTS) != 0;
+            dcc::AccessoryAddress addr = fromLnSwitchAddr(lnSwitchAddr(msg->srp.sn1, msg->srp.sn2));
             bool closed = msg->srp.sn2 & OPC_SW_REP_CLOSED;
             bool thrown = msg->srp.sn2 & OPC_SW_REP_THROWN;
             LOGI("Switch report: addr %d, closed=%d, thrown=%d, external_evt=%d", addr, closed, thrown, external_evt);
             for(const auto &tt: CS.getTurnouts()) {
-                if(tt.addr.longAddr() == addr) {
+                if(tt.addr == addr) {
                     LOGI("Found this address in roster, state=%d", (int)tt.state);
                     break;
                 }
             }
             break;
+        }
+        case OPC_INPUT_REP: { // sensor report, sent by occupancy detectors etc
+            const inputRepMsg &ir = msg->ir;
+            uint16_t addr = (ir.in1 & 0b0111'1111) << 1  // address bits 1..7
+                | (ir.in2 & 0b1111) << 8                 // address bits 8..11
+                | bitRead(ir.in2, 5);                    // address bit 0,
+                                                         //  on DS64 0=AUX(A1..A4) 1=Switch(A1..A4)
+            bool state = bitRead(ir.in2, 4);
+            LOGI("Input report: addr=%d, state=%d", addr, state);
         }
 
         default: break;
@@ -515,13 +531,13 @@ void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
 }
 
 void LocoNetTurnoutManager::processSwitchRequest(const swReqMsg &msg, bool is_ack) {
-    uint16_t addr = SWITCH_ADDR(msg.sw1, msg.sw2);
+    uint16_t addr = lnSwitchAddr(msg.sw1, msg.sw2);
     bool on = (msg.sw2 & 0b1'0000) != 0;
     bool thrown = (msg.sw2 & 0b10'0000) != 0;
     LOGI("OPC_SW_REQ for addr %d, thrown=%d, no=%d", addr, thrown, on);
 
     if (on) {
-        CS.turnoutAction(fromLnAddr(addr), false,
+        CS.turnoutAction(fromLnSwitchAddr(addr), false,
             thrown ? TurnoutAction::THROW : TurnoutAction::CLOSE);
         ::sendLack(is_ack ? OPC_SW_ACK : OPC_SW_REQ, 0x7F, _ln, this);
 

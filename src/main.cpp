@@ -140,29 +140,6 @@ void setup() {
     });
 
 
-    parser.onSwitchRequest([](uint16_t address, bool output, bool direction) {
-        Serial.print("Switch Request: ");
-        Serial.print(address, DEC);
-        Serial.print(':');
-        Serial.print(direction ? "Closed" : "Thrown");
-        Serial.print(" - ");
-        Serial.println(output ? "On" : "Off");
-    });
-    parser.onSwitchReport([](uint16_t address, bool state, bool sensor) {
-        Serial.print("Switch/Sensor Report: ");
-        Serial.print(address, DEC);
-        Serial.print(':');
-        Serial.print(sensor ? "Switch" : "Aux");
-        Serial.print(" - ");
-        Serial.println(state ? "Active" : "Inactive");
-    });
-    parser.onSensorChange([](uint16_t address, bool state) {
-        Serial.print("Sensor: ");
-        Serial.print(address, DEC);
-        Serial.print(" - ");
-        Serial.println(state ? "Active" : "Inactive");
-    });
-
     dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
     dccMain.setOvercurrentThreshold(2000);
     currentMeter.addChannel(dccMain);

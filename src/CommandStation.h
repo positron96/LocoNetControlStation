@@ -40,16 +40,6 @@ inline TurnoutState actionToState(const TurnoutAction s) {
     return s==TurnoutAction::THROW ? TurnoutState::THROWN : TurnoutState::CLOSED;
 }
 
-/** Puts bit 0 of arg to 5th place, shifts bits 1-4 to right */
-inline static uint8_t moveBit1to5(uint8_t normalByte) {
-    return (normalByte & 0x1)<<4 | (normalByte & 0b1'1110)>>1;
-}
-
-/** Puts bit 5 of arg to 0th place, shifts bits 1-4 to left */
-inline static uint8_t moveBit5to1(uint8_t dccByte) {
-    return (dccByte & 0b0001'0000)>>4 | (dccByte & 0b0000'1111)<<1 ;
-}
-
 class CommandStation {
 public:
 
