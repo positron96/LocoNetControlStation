@@ -33,6 +33,7 @@ private:
 
     uint8_t dispatchedSlot;
 
+    /** Contains extra LocoNet slot data that is not used by command station. */
     struct LnSlotData {
         uint8_t ss2;
         uint8_t id1;
@@ -40,14 +41,15 @@ private:
         LnSlotData(): ss2(0),id1(0),id2(0) {}
     };
 
-    etl::map<uint8_t, LnSlotData, CommandStation::MAX_SLOTS> extra;
+    etl::array<LnSlotData, CommandStation::MAX_SLOTS> extras;
+    LnSlotData &getExtra(uint8_t slot) { return extras[slot-1]; }
 
     static constexpr uint32_t CLOCK_SEND_INTL = 60'000; // send every minute
     bool isClockMaster{false}; ///< clock master sends periodic clock updates to the bus
     uint16_t clockSetterId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
     uint32_t clockSentTime{0};
 
-    bool isValidLocoSlot(uint8_t slot) {
+    bool isValidLocoSlot(uint8_t slot) const {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
     }
 

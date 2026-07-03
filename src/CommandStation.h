@@ -101,14 +101,18 @@ public:
         Fns fn;
         bool refreshing;
         Watchdog<PURGE_DELAY, 500> wdt;
+        void* owner; /// throttle that uses this slot
         bool allocated() const { return addr.isValid(); }
         void deallocate() { addr = LocoAddress(); }
         void kickWatchdog() { wdt.kick(); }
+        bool hasOwner() const { return owner!=nullptr;}
         uint8_t dccSpeedByte();
     };
 
+    static bool isSlotSupported(uint8_t slot) { return slot>0 && slot<=MAX_SLOTS; }
+
     bool isSlotAllocated(uint8_t slot) const {
-        if(slot<1 || slot>MAX_SLOTS) return true;
+        if(!isSlotSupported(slot)) return true;
         return slots[slot-1].allocated();
     }
 
@@ -143,6 +147,7 @@ public:
         _slot.refreshing = false;
         _slot.speed = LocoSpeed{};
         _slot.speedMode = SpeedMode::S128;
+        _slot.owner = nullptr;
         _slot.kickWatchdog();
         locoSlot[addr] = slot;
     }
@@ -288,6 +293,10 @@ public:
 
     uint8_t getLocoDir(uint8_t slot) {
         return getSlot(slot).dir;
+    }
+
+    void setSlotOwner(uint8_t slot, void* o) {
+        getSlot(slot).owner = o;
     }
 
     /**

@@ -16,6 +16,8 @@ static LocoAddress fromLnAddr(uint16_t addr) {
     return LocoAddress::longAddr(addr);
 }
 
+#define MAKE14BITS(hi,lo)  (   (lo) | (( (hi) & 0x0F ) << 7)    )
+
 // reverse to ADDR(hi,lo)  (   ((lo) | (((hi) & 0x0F ) << 7))    )
 static uint8_t addrLo(const LocoAddress &addr) {
     return addr.addr() & 0b00011111;
@@ -73,6 +75,23 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         ln->addConsumer(this);
     }
 
+/** Returns LocoNet stat1 byte (busy/active 2 bits) */
+uint8_t getSlotStat(const LocoData &dd) {
+    /*
+        For bits D5(SL_BUSY) | D4(SL_ACTIVE):
+        11 = IN_USE    loco in slot  -     refreshed - has owner
+        10 = IDLE      loco in slot  - not refreshed -  no owner
+        01 = COMMON    loco in slot  -     refreshed -  no owner
+        00 = FREE SLOT,no loco       - not refreshed -  no owner
+        maps to:
+                    CS.isSlotAllocated LocoData.refreshing LocoData.hasOwner
+    */
+
+    if(!dd.allocated()) return LOCO_FREE; // no address -> FREE
+    if(!dd.refreshing) return LOCO_IDLE; // address, not refreshing -> IDLE
+    return dd.hasOwner() ? LOCO_IN_USE : LOCO_COMMON;
+}
+
     void LocoNetSlotManager::fillSlotMsg(uint8_t slot, rwSlotDataMsg &sd) {
         sd.command = OPC_SL_RD_DATA;
         sd.mesg_size = 14;
@@ -94,7 +113,9 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         } else {
             const CommandStation::LocoData &d = CS.getSlotData(slot);
             uint32_t fns = d.fn.value<uint32_t>();
-            sd.stat = speedMode2int(d.speedMode) | STAT1_SL_BUSY;
+
+            sd.stat = speedMode2int(d.speedMode);
+            sd.stat |= getSlotStat(d);
             if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
             sd.adr = addrLo(d.addr);
             sd.spd = d.speed.get128();
@@ -103,7 +124,7 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             sd.adr2 = addrHi(d.addr);
             sd.snd = (fns & 0b1'1110'0000)>>5;
 
-            const LnSlotData & e = extra[slot];
+            const LnSlotData &e = getExtra(slot);
             sd.ss2 = e.ss2;
             sd.id1 = e.id1;
             sd.id2 = e.id2;
@@ -112,9 +133,15 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
         sd.trk = trkByte();
     }
 
-    #define LOGI_SLOT(TAG, I, S) LOGI( TAG \
-        " slot %d: ADDR=%d STAT=%02X(%s) ID=%02X%02X", I, \
-        ADDR(S.adr2, S.adr), S.stat, LOCO_STAT(S.stat), S.id1, S.id2 )
+    void logSlot(const char* tag, const rwSlotDataMsg &msg) {
+        // if LOGI is disabled, this would be noop
+        LOGI("%s slot %d: ADDR=%d STAT=0x%02X(%s, %s, %s) ID=0x%04X", tag,
+            msg.slot, ADDR(msg.adr2,msg.adr), msg.stat,
+            LOCO_STAT(msg.stat), DEC_MODE(msg.stat), CONSIST_STAT(msg.stat),
+            MAKE14BITS(msg.id2, msg.id1)
+        );
+    }
+    #define LOGI_SLOT(TAG, S) logSlot(TAG, S);
 
     void LocoNetSlotManager::processMessage(const lnMsg* msg) {
 
@@ -143,7 +170,20 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                 uint8_t dstSlot = msg->sm.dest;
                 if( dstSlot==srcSlot && isValidLocoSlot(srcSlot)) {
                     LOGI("OPC_MOVE_SLOTS NULL MOVE for slot %d", srcSlot );
-                    CS.setLocoSlotRefresh(srcSlot, true); // enable refresh
+                    if(!CS.isSlotSupported(srcSlot)) {
+                        // slot not supported by CS, refuse
+                        sendLack(OPC_MOVE_SLOTS, 0);
+                        break;
+                    }
+                    const auto& dd = CS.getSlotData(srcSlot);
+                    if(!dd.allocated() || getSlotStat(dd)==LOCO_IN_USE) {
+                        // not allocated or already in-use, refuse
+                        sendLack(OPC_MOVE_SLOTS, 0);
+                        break;
+                    }
+                    // mark IN_USE
+                    CS.setSlotOwner(srcSlot, this);
+                    CS.setLocoSlotRefresh(srcSlot, true);
                     sendSlotData(srcSlot);
                 } else
                 if(dstSlot==0 && isValidLocoSlot(srcSlot) ) {
@@ -208,6 +248,8 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                     processFastClockMsg(msg->fc);
                     break;
                 }
+
+                LOGI_SLOT("OPC_WR_SL_DATA", m);
                 if( !isValidLocoSlot(slot) ) { sendLack(OPC_WR_SL_DATA); break; }
                 rwSlotDataMsg curSlot;
                 fillSlotMsg(slot, curSlot);
@@ -218,16 +260,10 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
                 if(curSlot.dirf != m.dirf) processDirf(slot, m.dirf);
                 if(curSlot.snd != m.snd) processSnd(slot, m.snd);
 
-                if(extra.find(slot) != extra.end() ) {
-                    extra[slot] = LnSlotData{};
-                }
-                LnSlotData &e = extra[slot];
+                LnSlotData &e = getExtra(slot);
                 e.ss2 = m.ss2;
                 e.id1 = m.id1;
                 e.id2 = m.id2;
-
-                LOGI_SLOT("OPC_WR_SL_DATA", slot, m);
-
                 break;
             }
             case OPC_RQ_SL_DATA: {
@@ -262,21 +298,22 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
             slot = CS.locateFreeSlot();
             if(slot==0) { return 0; }
             CS.initLocoSlot(slot, addr);
-            extra[slot] = LnSlotData{};
+            auto &e = getExtra(slot);
+            e = LnSlotData{};
         }
         return slot;
     }
 
     void LocoNetSlotManager::releaseSlot(uint8_t slot) {
         CS.releaseLocoSlot(slot);
-        extra.erase(slot);
+        // no need to clean extras
     }
 
     void LocoNetSlotManager::sendSlotData(uint8_t slot) {
         LnMsg ret;
         fillSlotMsg(slot, ret.sd);
 
-        LOGI_SLOT("Sending", slot, ret.sd);
+        LOGI_SLOT("Sending", ret.sd);
 
         writeChecksum(ret);
         _ln->broadcast(ret, this);
@@ -300,28 +337,23 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
     }
 
     void LocoNetSlotManager::processStat1(uint8_t slot, uint8_t stat) {
-        LOGI("OPC_SLOT_STAT1 slot=%d stat1=%02x", slot, stat);
-
-        /*
-        For bits D5(SL_BUSY) | D4(SL_ACTIVE):
-        11 = IN_USE    loco adr in SLOT  -     REFRESHED
-        10 = IDLE      loco adr in SLOT  - NOT refreshed
-        01 = COMMON    loco adr IN SLOT  -     refreshed
-        00 = FREE SLOT, no valid DATA    - not refreshed
-        */
+        LOGI("OPC_SLOT_STAT1 slot=%d stat1=0x%02x(%s)", slot, stat, LOCO_STAT(stat) );
 
         auto newSpeedMode = int2SpeedMode(stat);
+        uint8_t newLocoStat = stat & LOCOSTAT_MASK;
         bool newActive = (stat & STAT1_SL_ACTIVE) == STAT1_SL_ACTIVE;
-        bool newBusy = (stat & STAT1_SL_BUSY) == STAT1_SL_BUSY;
 
         if(CS.isSlotAllocated(slot)) {
-            if(!newActive && !newBusy) { // = FREE SLOT
+            if(newLocoStat == LOCO_FREE) {
                 releaseSlot(slot);
                 return;
             }
             const LocoData &dd = CS.getSlotData(slot);
+
             if(newSpeedMode != dd.speedMode) CS.setLocoSpeedMode(slot, newSpeedMode);
             if(newActive != dd.refreshing) CS.setLocoSlotRefresh(slot, newActive);
+            // only IN_USE means "has owner"
+            CS.setSlotOwner(slot, newLocoStat == LOCO_IN_USE ? this : nullptr);
         } // else do we need to allocate this slot? I don't think so.
     }
 
@@ -488,6 +520,9 @@ static dcc::AccessoryAddress fromLnSwitchAddr(uint16_t ln_addr) {
     return dcc::AccessoryAddress::from11bit(ln_addr);
 }
 
+LocoNetTurnoutManager::LocoNetTurnoutManager(LocoNetBus * const ln): _ln(ln) {
+    ln->addConsumer(this);
+}
 
 void LocoNetTurnoutManager::processMessage(const lnMsg* msg) {
     switch(msg->data[0]) {
