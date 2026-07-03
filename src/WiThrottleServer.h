@@ -71,7 +71,7 @@ public:
     void notifyFastClock(AsyncClient *c=nullptr) {
         uint32_t seconds = fast_clock::clock.getSeconds();
         unsigned rate = fast_clock::clock.getRate();
-        String s = String("PFT")+ seconds + "<;>"+rate;
+        String s = String("PFT")+ seconds + DELIM + rate;
         if(c==nullptr) {
             for (auto p: clients) {
                 wifiPrintln(p.first, s);
@@ -91,6 +91,8 @@ private:
     constexpr static int MAX_CLIENTS = 3;
     constexpr static int MAX_THROTTLES_PER_CLIENT = 6;
     constexpr static int MAX_LOCOS_PER_THROTTLE = 2;
+
+    constexpr static const char* DELIM = "<;>";
 
     constexpr static millis_t HEARTBEAT_INTL = 20; ///< in seconds
 
@@ -123,6 +125,7 @@ private:
         size_t rxpos = 0;
 
         String hwId;
+        String name;
 
         using AddrToSlotMap = etl::map<LocoAddress, uint8_t, MAX_LOCOS_PER_THROTTLE>;
         // each client can have up to 6 multi throttles, each MT can have multiple locos (and slots)

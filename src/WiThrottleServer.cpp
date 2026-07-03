@@ -17,8 +17,6 @@
 #define TURNOUT_CLOSED '2'
 #define TURNOUT_THROWN '4'
 
-#define DELIM "<;>"
-
 
 String addr2str(const LocoAddress & a) {
     return (a.isShort() ? 'S' : 'L') + String(a.addr());
@@ -180,7 +178,7 @@ void WiThrottleServer::loop() {
 }
 
 void WiThrottleServer::notifyHearbeatStatus(ClientData &c) {
-    wifiPrintln(c.cli, "*" + String(HEARTBEAT_INTL));
+    wifiPrintln(c.cli, String("*") + HEARTBEAT_INTL);
 }
 
 void WiThrottleServer::processCmd(ClientData & cc) {
@@ -219,22 +217,23 @@ void WiThrottleServer::processCmd(ClientData & cc) {
     }
     case 'N': { // device name
         auto remoteName = dataStr.substr(1);
-        LOGI("Device name: '%s'",  remoteName.data());
+        cc.name = String(remoteName.data(), remoteName.length());
+        LOGI("Device name: '%s'",  cc.name.c_str());
         notifyHearbeatStatus(cc);
         break;
     }
     case 'H': {
         if(dataStr[1]=='U') {
             auto hwId = dataStr.substr(2);
-            LOGI("Hardware ID: '%s'", hwId.data() );
-            cc.hwId = String(hwId.data());
+            cc.hwId = String(hwId.data(), hwId.length());
+            LOGI("Hardware ID: '%s'", cc.hwId.c_str() );
             // kill other clients with same ID (assume it's reconnect from same device)
             const auto cli = cc.cli;
             for(auto it = clients.cbegin(); it!=clients.cend(); ) {
                 const auto &c = it->first;
                 if(c == cli) {it++; continue;}
-                if(it->second.hwId == hwId.data()) {
-                    LOGW(" There is a client(%X) with this ID already. Kicking it!", (intptr_t)c);
+                if(it->second.hwId == cc.hwId) {
+                    LOGW(" There is a client(%X) with this ID already. Kicking it!", (uintptr_t)c);
                     cc = it->second;  // copy ClientData
                     cc.rxpos = 0;
                     cc.cli = cli;
@@ -260,7 +259,7 @@ void WiThrottleServer::processCmd(ClientData & cc) {
         auto actionVal = actionData.substr(delimiter+3);
         switch(action) {
             case '+': cc.locoAdd(th, actionKey); break;
-            case 'S': cc.locoAdd(th, actionKey, true); break; // add forcibly
+            case 'S': cc.locoAdd(th, actionKey, true); break; // Confirmed steal, add forcibly
             case '-': cc.locosRelease(th, actionKey); break;
             case 'A': cc.locosAction(th, actionKey, actionVal); break;
         }
@@ -285,7 +284,7 @@ void WiThrottleServer::clientStart(AsyncClient *cli) {
     wifiPrintln(cli, "RL0"); // roster list is size 0
     notifyPowerStatus(cli);
     notifyFastClock(cli);
-    wifiPrintln(cli, "PTT]\\[Turnouts}|{Turnout]\\[Closed}|{"+String(TURNOUT_CLOSED)+"]\\[Thrown}|{"+String(TURNOUT_THROWN) );
+    wifiPrintln(cli, String("PTT]\\[Turnouts}|{Turnout]\\[Closed}|{")+TURNOUT_CLOSED+"]\\[Thrown}|{"+TURNOUT_THROWN );
     wifiPrint(cli, "PTL");
     for(const auto &tt: CS.getTurnouts() ) {
         wifiPrint(cli, String("]\\[")+TURNOUT_PREF+tt.addr.longAddr()+"}|{"+tt.userTag+"}|{"+turnoutState2Chr(tt.state) );
@@ -322,7 +321,7 @@ void WiThrottleServer::clientStop(ClientData &client) {
 
 void WiThrottleServer::ClientData::locoAdd(char th, etl::string_view sLocoAddr, bool force) {
     LocoAddress addr = str2addr(sLocoAddr);
-    AddrToSlotMap &slotmap = slots[th];
+    AddrToSlotMap &slotmap = slots[th]; // here a new entry in slots is created implicitly
     if(slotmap.available()==0 && slotmap.find(addr)==slotmap.end() ) {
         sendMessage("No space for new loco", true);
         LOGI("locoAdd(thr=%c, addr=%d) no space for new loco\n", th, addr.addr() );
@@ -403,16 +402,16 @@ void WiThrottleServer::ClientData::locosAction(char th, etl::string_view sLocoAd
     }
 }
 
-void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, etl::string_view actionVal) {
+void WiThrottleServer::ClientData::locoAction(char th, LocoAddress locoAddr, etl::string_view actionVal) {
     auto &throttle = slots[th];
-    auto it = throttle.find(iLocoAddr);
+    auto it = throttle.find(locoAddr);
     if(it == throttle.end()) {
-        LOGW("No loco '%s' in this throttle", String(iLocoAddr).c_str());
+        LOGW("No loco '%s' in this throttle", String(locoAddr).c_str());
         return;
     }
     uint8_t slot = it->second;
 
-    LOGI("loco action thr=%c; addr=%s; action=%s", th, String(iLocoAddr).c_str(), actionVal.data() );
+    LOGI("loco action thr=%c; addr=%s; action=%s", th, String(locoAddr).c_str(), actionVal.data() );
     switch(actionVal[0] ) {
         case 'F': {
             uint8_t fKey = etl::to_arithmetic<uint8_t>(actionVal.substr(2)).value();
@@ -421,18 +420,18 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, et
                 val = !val;
                 CS.setLocoFn(slot, fKey, val);
             }
-            sendThrottleMsg(th, 'A', iLocoAddr, (val?"F1":"F0")+String(fKey) );
+            sendThrottleMsg(th, 'A', locoAddr, String(val?"F1":"F0")+fKey);
             break;
         }
         case 'q':
             switch(actionVal[1]) {
                 case 'V':
                     //DEBUGS("query speed for loco "+String(dccLocoAddr) );
-                    sendThrottleMsg(th,'A', iLocoAddr, String("V")+speed2int(CS.getLocoSpeed(slot)) );
+                    sendThrottleMsg(th,'A', locoAddr, String("V")+speed2int(CS.getLocoSpeed(slot)) );
                     break;
                 case 'R':
                     //DEBUGS("query dir for loco "+String(dccLocoAddr) );
-                    sendThrottleMsg(th,'A', iLocoAddr, String("R")+String(CS.getLocoDir(slot) ));
+                    sendThrottleMsg(th,'A', locoAddr, String("R")+CS.getLocoDir(slot));
                     break;
             }
             CS.kickSlot(slot);
@@ -446,7 +445,7 @@ void WiThrottleServer::ClientData::locoAction(char th, LocoAddress iLocoAddr, et
             break;
         case 'R':
             //DEBUGS("Sending dir to addr "+String(dccLocoAddr) );
-            CS.setLocoDir(slot, etl::to_arithmetic<uint8_t>(actionVal.substr(1)).value() );
+            CS.setLocoDir(slot, actionVal[1]=='0'?0:1 );
             break;
         case 'X': // EMGR stop
             CS.setLocoSpeed(slot, SPEED_EMGR);
