@@ -48,6 +48,13 @@ public:
 
     void updateCurrent() override {
         const uint16_t mv = analogReadMilliVolts(_sensePin);
+
+        if(current > overCurrentThreshold) {
+            overCurrentFlag = true;
+            overCurrentEventPending = true;
+            digitalWrite(_enPin, LOW); // act immediately and without notifications
+        }
+
         current = static_cast<uint16_t>(mv * _mvTomA);
         if (current > maxCurrent) {
             maxCurrent = current.load();
