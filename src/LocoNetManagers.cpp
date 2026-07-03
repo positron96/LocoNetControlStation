@@ -71,9 +71,9 @@ void sendLack(uint8_t cmd, uint8_t arg, LocoNetBus *_ln, LocoNetConsumer *sender
     _ln->broadcast(lack, sender);
 }
 
-    LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
-        ln->addConsumer(this);
-    }
+LocoNetSlotManager::LocoNetSlotManager(LocoNetBus * const ln): _ln(ln) {
+    ln->addConsumer(this);
+}
 
 /** Returns LocoNet stat1 byte (busy/active 2 bits) */
 uint8_t getSlotStat(const LocoData &dd) {

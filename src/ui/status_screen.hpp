@@ -227,6 +227,9 @@ namespace ui {
                     if(data.refreshing) {
                         v += (data.dir==1?"F ":"R ") + String(data.speed);
                     }
+                    if(!data.hasOwner()) {
+                        v += " (orphan)";
+                    }
                     u8g2.drawStr(x, y, v.c_str());
                     y += dy;
                 }

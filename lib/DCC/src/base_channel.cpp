@@ -20,7 +20,7 @@ PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
-    DCC_LOGI("addr %d, speed=%d(mode %d) %c", addr.addr(), sp.get128(), (int)sm, fwd?'F':'B');
+    DCC_LOGI("addr %d, speed=%d(%s) %c", addr.addr(), sp.get128(), sm.c_str(), fwd?'F':'R');
     packets.put_loco_speed_dir_packet(addr, sp, sm, fwd);
 }
 

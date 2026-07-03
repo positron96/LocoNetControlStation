@@ -94,7 +94,6 @@ public:
     struct LocoData {
         using Fns = etl::bitset<N_FUNCTIONS>;
         LocoAddress addr;
-        //uint8_t speed128; ///< <0=stop, 1=emgr, 2..127 = speed 0..max
         LocoSpeed speed;
         SpeedMode speedMode;
         int8_t dir; ///< 1 = FWD, 0 = REW
@@ -129,7 +128,7 @@ public:
     }
 
     uint8_t locateFreeSlot() {
-        if(locoSlot.size() < MAX_SLOTS) {
+        if(!locoSlot.full()) {
             for(int i=0; i<MAX_SLOTS; i++) {
                 if(!slots[i].allocated() ) {
                     return i+1;
@@ -152,6 +151,7 @@ public:
         locoSlot[addr] = slot;
     }
 
+    /** @returns 0 if slot wasn't created (no space) */
     uint8_t findOrAllocateLocoSlot(LocoAddress addr) {
         uint8_t slot = findLocoSlot(addr);
         if(slot==0) {
@@ -453,7 +453,7 @@ private:
     etl::map<LocoAddress, uint8_t, MAX_SLOTS> locoSlot;
 
     LocoData slots[MAX_SLOTS]; ///< slot 1 has index 0 in this array. Slot 0 is invalid.
-    inline LocoData & getSlot(uint8_t slot) { return slots[slot-1]; }
+    LocoData &getSlot(uint8_t slot) { return slots[slot-1]; }
 
     TurnoutMap turnoutData;
 
