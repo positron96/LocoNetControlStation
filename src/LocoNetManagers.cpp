@@ -103,7 +103,7 @@ uint8_t getSlotStat(const LocoData &dd) {
             sd.spd = 0;
             sd.spd = 0;
             sd.spd = 0;
-            sd.dirf = DIRF_DIR;  // FWD
+            sd.dirf = 0; // FWD
             sd.adr2 = 0;
             sd.snd = 0;
 
@@ -119,7 +119,7 @@ uint8_t getSlotStat(const LocoData &dd) {
             if(d.refreshing) sd.stat |= STAT1_SL_ACTIVE;
             sd.adr = addrLo(d.addr);
             sd.spd = d.speed.get128();
-            sd.dirf = d.dir==1 ? DIRF_DIR : 0;
+            sd.dirf = d.dir==1 ? 0 : DIRF_DIR;
             sd.dirf |= moveBit1to5(fns);
             sd.adr2 = addrHi(d.addr);
             sd.snd = (fns & 0b1'1110'0000)>>5;
