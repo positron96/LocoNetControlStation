@@ -33,6 +33,7 @@ private:
 
     uint8_t dispatchedSlot;
 
+    /** Contains extra LocoNet slot data that is not used by command station. */
     struct LnSlotData {
         uint8_t ss2;
         uint8_t id1;
@@ -40,21 +41,22 @@ private:
         LnSlotData(): ss2(0),id1(0),id2(0) {}
     };
 
-    etl::map<uint8_t, LnSlotData, CommandStation::MAX_SLOTS> extra;
+    etl::array<LnSlotData, CommandStation::MAX_SLOTS> extras;
+    LnSlotData &getExtra(uint8_t slot) { return extras[slot-1]; }
 
     static constexpr uint32_t CLOCK_SEND_INTL = 60'000; // send every minute
     bool isClockMaster{false}; ///< clock master sends periodic clock updates to the bus
     uint16_t clockSetterId{0}; ///< who set the clock. 0 means nobody has set it yet, 7F,7x means PC
     uint32_t clockSentTime{0};
 
-    bool slotValid(uint8_t slot) {
+    bool isValidLocoSlot(uint8_t slot) const {
         return (slot>=1) && (slot < CommandStation::MAX_SLOTS);
     }
 
-    bool haveDispatchedSlot() { return slotValid(dispatchedSlot); }
+    bool haveDispatchedSlot() { return isValidLocoSlot(dispatchedSlot); }
     void removeDispatchedSlot() { dispatchedSlot = 0;}
 
-    int locateSlot(uint8_t hi, uint8_t lo);
+    int findOrAllocateSlot(uint16_t addr);
 
     void releaseSlot(uint8_t slot);
 
@@ -79,5 +81,26 @@ private:
     void processFastClockMsg(const fastClockMsg &msg);
 
     void sendFastClock();
+
+};
+
+
+class LocoNetTurnoutManager: public LocoNetConsumer  {
+public:
+    LocoNetTurnoutManager(LocoNetBus * const ln);
+
+    LN_STATUS onMessage(const lnMsg& msg) override {
+        processMessage(&msg);
+        return LN_IDLE;
+    }
+
+    void processMessage(const lnMsg* msg);
+
+private:
+    LocoNetBus * const _ln;
+
+    bool propagateToDcc{false}; // Called "bushby bit" in spec. Disable for now
+
+    void processSwitchRequest(const swReqMsg &msg, bool is_ack);
 
 };

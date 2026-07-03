@@ -54,6 +54,8 @@ public:
     explicit operator String() const { return toString(); }
 #endif
 
+    bool isStopped() const { return speed128==DCC_SPEED_EMGR || speed128==DCC_SPEED_IDLE; }
+    bool isMoving() const { return !isStopped(); }
     bool isEmgr() const { return speed128==DCC_SPEED_EMGR; }
 
 private:

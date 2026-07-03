@@ -2,6 +2,7 @@
 
 #include "LocoAddress.h"
 #include "LocoSpeed.h"
+#include "accessory_address.hpp"
 #include "packet.hpp"
 #include "PacketList.hpp"
 #include "power_event.hpp"
@@ -54,14 +55,9 @@ public:
     void sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn);
 
     /**
-     * @param addr11 is 1-based.
+     * @param addr is accessory decoder address.
      */
-    void sendAccessory(uint16_t addr11, bool thr);
-    /**
-     * @param addr9 is 1-based
-     * @param ch is 0-based.
-     */
-    // void sendAccessory(uint16_t addr9, uint8_t ch, bool);
+    void sendAccessory(const AccessoryAddress &addr, bool thr);
 
     int16_t readCVProg(int cv);
     bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
@@ -105,15 +101,8 @@ protected:
 
     BasePacketList &packets;
 
-    /** Tries to load a packet for a specified duration. */
-    bool loadPacket(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000) {
-        //TODO: original code probably waited until packet appeared on tracks, while this just waits for space in queue.
-        for(size_t i=0; i<timeout_ms; i++) {
-            if (packets.put_generic_packet(packet, nRepeat)) return true;
-            delay(1);
-        }
-        return false;
-    }
+    /** Tries to schedule a packet for a specified duration and waits until it's sent to tracks. */
+    bool sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000);
 
     uint getBaselineCurrent() const;
     bool checkCurrentResponse(uint baseline) const;

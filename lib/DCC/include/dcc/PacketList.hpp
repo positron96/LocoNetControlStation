@@ -99,10 +99,14 @@ namespace dcc {
             return true;
         }
 
-        bool put_accessory_packet(uint16_t addr11, bool thrown) {
+        bool put_accessory_packet(const AccessoryAddress &addr, bool thrown) {
             if(queue_packets.full()) return false;
-            auto bytes = make_accessory_packet(addr11, thrown);
+            auto bytes = make_accessory_packet(addr, thrown);
             return put_generic_packet(bytes, ACCESSORY_PACKET_REPEATS);
+        }
+
+        bool is_queue_empty() const {
+            return queue_packets.empty();
         }
 
         void clear_loco(const LocoAddress addr) {
