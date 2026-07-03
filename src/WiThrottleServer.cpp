@@ -530,9 +530,9 @@ String WiThrottleServer::getInfo() const {
     }
     for(const auto &p: clients) {
         const ClientData &cc = p.second;
-        v += String(" ")+p.first->remoteIP().toString() + " ID: "+cc.hwId + " health:" + cc.health.c_str() + "\n";
+        v += cc.name + " (" + p.first->remoteIP().toString() + ")\nHealth:" + cc.health.c_str() + "\n";
         for(const auto &thr: cc.slots) {
-            v += String("  ")+thr.first+": ";
+            v += String("  ") + thr.first + ": ";
             for(const auto &slot: thr.second) {
                 v += String(slot.first) + " ";
             }
