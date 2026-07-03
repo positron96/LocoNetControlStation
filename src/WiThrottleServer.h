@@ -135,7 +135,7 @@ private:
             return iit->second;
         }
 
-        void locoAdd(char th, etl::string_view sLocoAddr);
+        void locoAdd(char th, etl::string_view sLocoAddr, bool force=false);
 
         void locosRelease(char th, etl::string_view  sLocoAddr);
         void locoRelease(char th, LocoAddress addr);
