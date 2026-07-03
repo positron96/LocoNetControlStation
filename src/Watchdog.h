@@ -22,17 +22,16 @@ public:
 
     void kick() { lastUpdate = millis()-FUTURE_COMPENSATION; }
 
-    millis_t getLastUpdate() { return lastUpdate; }
+    millis_t getLastUpdate() const { return lastUpdate; }
 
-    bool timedOut() {
+    bool timedOut() const {
         millis_t ms = millis();
         //if(ms-lastUpdate >= TIMEOUT) W_LOGI("timeout at %ld, last update was at %ld", ms, getLastUpdate() );
         return ms-lastUpdate >= TIMEOUT;
     }
 
     template <millis_t X=TIMEOUT2>
-    std::enable_if_t<X!=0, bool> timedOut2() {
+    std::enable_if_t<X!=0, bool> timedOut2() const {
         return millis()-lastUpdate >= TIMEOUT2;
     }
 };
-

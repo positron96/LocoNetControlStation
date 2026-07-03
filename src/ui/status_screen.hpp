@@ -227,9 +227,16 @@ namespace ui {
                     if(data.refreshing) {
                         v += (data.dir==1?"F ":"R ") + String(data.speed);
                     }
-                    if(!data.hasOwner()) {
-                        v += " (orphan)";
+                    if(data.hasOwner()) {
+                        const uintptr_t o = (const uintptr_t)data.owner;
+                        v += " h" + String(o & 0xFF, HEX);
                     }
+
+                    int32_t t = (millis() - data.wdt.getLastUpdate())/1000;
+                    if(t>60) {
+                        v += " (" + String(t)+ "s ago)";
+                    }
+
                     u8g2.drawStr(x, y, v.c_str());
                     y += dy;
                 }

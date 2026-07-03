@@ -49,7 +49,8 @@ public:
 
     static constexpr uint8_t MAX_SLOTS = 10;
 
-    static constexpr millis_t PURGE_DELAY = 200*1000; //200s
+    static constexpr millis_t PURGE_TIMEOUT = 120*1000; // 2min
+    static constexpr millis_t SMALL_PURGE_TIMEOUT = 30'000;  // 30sec
 
     CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) {
         loadTurnouts();
@@ -99,13 +100,15 @@ public:
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
         bool refreshing;
-        Watchdog<PURGE_DELAY, 500> wdt;
+        Watchdog<PURGE_TIMEOUT, 500, SMALL_PURGE_TIMEOUT> wdt;
         void* owner; /// throttle that uses this slot
         bool allocated() const { return addr.isValid(); }
-        void deallocate() { addr = LocoAddress(); }
-        void kickWatchdog() { wdt.kick(); }
+        void resetWatchdog() { wdt.kick(); }
         bool hasOwner() const { return owner!=nullptr;}
-        uint8_t dccSpeedByte();
+        uint8_t dccSpeedByte() const;
+    private:
+        void deallocate() { addr = LocoAddress(); }
+        friend class CommandStation;
     };
 
     static bool isSlotSupported(uint8_t slot) { return slot>0 && slot<=MAX_SLOTS; }
@@ -147,7 +150,7 @@ public:
         _slot.speed = LocoSpeed{};
         _slot.speedMode = SpeedMode::S128;
         _slot.owner = nullptr;
-        _slot.kickWatchdog();
+        _slot.resetWatchdog();
         locoSlot[addr] = slot;
     }
 
@@ -162,15 +165,15 @@ public:
     }
 
     void releaseLocoSlot(uint8_t slot) {
-        if(slot==0) { CS_DEBUGF("invalid slot"); return; }
-        uint8_t i = slot-1;
-        CS_DEBUGF("releasing slot %d", slot);
-        setLocoSlotRefresh(slot, false);
-        locoSlot.erase( slots[i].addr );
-        slots[i].deallocate();
+        auto it = locoSlot.find(getSlot(slot).addr);
+        if(it == locoSlot.end()) {
+            CS_DEBUGF("invalid slot");
+            return;
+        }
+        releaseLocoSlot(it);
     }
 
-    /** Return view on slot numbers */
+    /** Return view on allocated slot data */
     auto getAllocatedSlots() const {
         return etl::views::values(etl::views::as_const(locoSlot));
     }
@@ -178,16 +181,16 @@ public:
     size_t getAllocatedSlotsCount() const { return locoSlot.size(); }
 
     void setLocoSlotRefresh(uint8_t slot, bool refresh) {
-        if(slot==0) { CS_DEBUGF("invalid slot"); return; }
+        if(!isSlotSupported(slot)) { CS_DEBUGF("invalid slot"); return; }
         LocoData &dd = getSlot(slot);
         if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
         if(dd.refreshing == refresh) return;
         CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N');
         dd.refreshing = refresh;
 
+        dd.resetWatchdog();
         if(refresh) {
-            // no need to load, it will load itself on setLocoSpeed/setLocoFn
-            dd.kickWatchdog();
+            // no need to do anything, DCC will start on setLocoSpeed/setLocoFn
         } else {
             // TODO: somehow send 0 speed to track
             dccMain->unloadSlot(dd.addr);
@@ -195,9 +198,10 @@ public:
     }
 
     void kickSlot(uint8_t slot) {
+        assert(isSlotSupported(slot));
         LocoData &dd = getSlot(slot);
         if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
-        dd.kickWatchdog();
+        dd.resetWatchdog();
     }
 
     LocoAddress getLocoAddr(uint8_t slot) {
@@ -206,12 +210,13 @@ public:
     }
 
     const LocoData &getSlotData(uint8_t slot) {
+        //assert(isSlotSupported(slot));
         return getSlot(slot);
     }
 
     void setLocoSpeedMode(uint8_t slot, SpeedMode mode) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         if(dd.speedMode == mode) return;
         dd.speedMode = mode;
         if(dd.refreshing)
@@ -225,7 +230,7 @@ public:
     /** Changes one function. */
     void setLocoFn(uint8_t slot, uint8_t fn, bool val) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         if(dd.fn[fn] == val) return;
         // CS_DEBUGF("slot %d FN%d=%d", slot, fn, val);
 
@@ -240,7 +245,7 @@ public:
     /** Changes bits of DCC function group. */
     void setLocoFns(uint8_t slot, dcc::fn_group fg, uint32_t vals) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         uint32_t current = dd.fn.value<uint32_t>();
         uint32_t mask = dcc::fn_group_mask(fg);
         vals = (current & ~mask) | (vals & mask);
@@ -254,7 +259,7 @@ public:
     /** Changes bits across multiple function groups. */
     void setLocoFns(uint8_t slot, uint32_t mask, uint32_t vals ) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         vals = vals & mask; // only take bits in mask, ignore others
         uint32_t current = dd.fn.value<uint32_t>();
         vals = (current & ~mask) | vals; // updated value for all bits
@@ -284,7 +289,7 @@ public:
      * */
     void setLocoDir(uint8_t slot, uint8_t dir) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         if(dd.dir==dir) return;
         dd.dir = dir;
         if(dd.refreshing)
@@ -296,28 +301,51 @@ public:
     }
 
     void setSlotOwner(uint8_t slot, void* o) {
-        getSlot(slot).owner = o;
+        LocoData &dd = getSlot(slot);
+        dd.owner = o;
+        dd.resetWatchdog();
     }
 
     /**
-     * Updates slots that have not been used for a long time (PURGE_DELAY)
+     * Updates slots that have not been used for a long time (PURGE_TIMEOUT)
      */
     void loop() {
-        for(const auto &i: locoSlot) {
-            uint8_t slot = i.second;
+        millis_t ms = millis();
+        auto it = locoSlot.begin();
+        while(it != locoSlot.end()) {
+            bool slotRemoved = false;
+            uint8_t slot = it->second;
             LocoData &dd = getSlot(slot);
-            if(dd.refreshing && dd.wdt.timedOut()) {
-                    CS_DEBUGF("slot %d timed out, current %lds, last update was at %lds", slot,
-                        millis()/1000, dd.wdt.getLastUpdate()/1000 );
+            // Slots that are refreshed will stop refreshing after a timeout.
+            // Those that have no owner expire faster.
+            // Slots that aren't refreshed get removed after a second timeout.
+            if(dd.refreshing) {
+                if(( dd.hasOwner() && dd.wdt.timedOut()) ||
+                   (!dd.hasOwner() && dd.wdt.timedOut2())
+                ) {
+                    CS_DEBUGF("slot %d %s stopping after %lds", slot,
+                        !dd.hasOwner() ? "(without owner)" : "",
+                        (ms - dd.wdt.getLastUpdate())/1000 );
                     setLocoSlotRefresh(slot, false);
+                    dd.resetWatchdog();
+                }
+            } else {
+                // non-refreshing slots get removed
+                if(dd.wdt.timedOut()) {
+                    CS_DEBUGF("slot %d clearing after %lds", slot,
+                        (ms - dd.wdt.getLastUpdate())/1000 );
+                    it = releaseLocoSlot(it);
+                    slotRemoved = true;
+                }
             }
+            if(!slotRemoved) it++;
         }
     }
 
     /// Sets speed
     void setLocoSpeed(uint8_t slot, LocoSpeed spd) {
         LocoData &dd = getSlot(slot);
-        dd.kickWatchdog();
+        dd.resetWatchdog();
         if(dd.speed == spd) return;
         dd.speed = spd;
         if(dd.refreshing)
@@ -450,7 +478,8 @@ private:
     dcc::BaseChannel * dccProg;
     LocoNetBus* locoNet;
 
-    etl::map<LocoAddress, uint8_t, MAX_SLOTS> locoSlot;
+    using LocoSlotMap = etl::map<LocoAddress, uint8_t, MAX_SLOTS>;
+    LocoSlotMap locoSlot;
 
     LocoData slots[MAX_SLOTS]; ///< slot 1 has index 0 in this array. Slot 0 is invalid.
     LocoData &getSlot(uint8_t slot) { return slots[slot-1]; }
@@ -459,6 +488,14 @@ private:
 
     void addTurnout(const TurnoutData &dd) {
         turnoutData[dd.addr] = dd;
+    }
+
+    LocoSlotMap::iterator releaseLocoSlot(LocoSlotMap::iterator it) {
+        uint8_t slot = it->second;
+        CS_DEBUGF("Releasing slot %d", slot);
+        setLocoSlotRefresh(slot, false);
+        slots[slot-1].deallocate();
+        return locoSlot.erase(it);
     }
 
 };

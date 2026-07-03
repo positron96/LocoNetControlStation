@@ -102,7 +102,7 @@ namespace ui {
             u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
             x -= drawGlyphLeft(u8g2, x, y-1, track->getPower() ? 0x40 : 0x44);
         }
-        x -= 2;
+        x -= 1;
         u8g2.setFont(font);
         x -= drawStrLeft(u8g2, x, y, name);
         x -= 4;
@@ -138,7 +138,8 @@ namespace ui {
         x = drawTrackStatus(u8g2, x, y, "P", CS.getProgTrack());
 
         // Main track power
-        drawTrackStatus(u8g2, x, y, "M", CS.getMainTrack());
+        size_t t = CS.getAllocatedSlotsCount();
+        drawTrackStatus(u8g2, x, y, t==0 ? "M" : String(t).c_str(), CS.getMainTrack());
 
     }
 
