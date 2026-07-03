@@ -9,6 +9,8 @@
 #include "../LocoNetTCPServer.h"
 
 #include <etl/enum_type.h>
+#include <etl/string_view.h>
+#include <etl/string_utilities.h>
 
 #include <WiFi.h>
 #include <Arduino.h>
@@ -99,18 +101,18 @@ namespace ui {
 
         #ifdef USE_WIFI
         void drawWiFiPage(U8G2 &u8g2, int x, int y) {
-            int dy = u8g2.getMaxCharHeight();
+            int h = u8g2.getMaxCharHeight() + 1;
             String v;
 
             if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
                 v = "AP: " + String(WiFi.softAPSSID());
-                u8g2.drawStr(x, y, v.c_str()); y += dy;
+                u8g2.drawStr(x, y, v.c_str()); y += h;
 
                 v = "AP IP: " + WiFi.softAPIP().toString();
-                u8g2.drawStr(x, y, v.c_str()); y += dy;
+                u8g2.drawStr(x, y, v.c_str()); y += h;
 
                 v = WiFi.softAPgetStationNum() + " clients";
-                u8g2.drawStr(x, y, v.c_str()); y += dy;
+                u8g2.drawStr(x, y, v.c_str()); y += h;
             }
 
             if((WiFi.getMode() & WIFI_MODE_STA) != 0) {
@@ -122,7 +124,7 @@ namespace ui {
                     u8g2.drawStr(x, y, v.c_str());
 
                     // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
-                    y += dy;
+                    y += h;
 
                     v = "STA IP: " + WiFi.localIP().toString();
                     u8g2.drawStr(x, y, v.c_str());
@@ -130,19 +132,33 @@ namespace ui {
             }
         }
 
-        void drawLbServerPage(U8G2 &u8g2, int x, int y) {
-            String v;
-            if(lbServer!=nullptr) {
-                v = lbServer->getInfo();
-                u8g2.drawStr(x, y, v.c_str());
+        void drawStrView(U8G2 &u8g2, int x, int y, const etl::string_view s) {
+            for(char c: s) {
+                x+=u8g2.drawGlyph(x, y, c);
             }
         }
 
+        void drawMultiStr(U8G2 &u8g2, int x, int y, const etl::string_view s) {
+            int h = u8g2.getMaxCharHeight() + 1;
+            etl::optional<etl::string_view> token;
+            while ((token = etl::get_token(s, "\n\r", token, true))) {
+                drawStrView(u8g2, x, y, token.value());
+                y += h;
+            }
+        }
+
+        void drawLbServerPage(U8G2 &u8g2, int x, int y) {
+            if(lbServer!=nullptr) {
+                String v = lbServer->getInfo();
+                drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
+            }
+        }
+
+
         void drawWiThrottlePage(U8G2 &u8g2, int x, int y) {
-            String v;
             if(wtServer!=nullptr) {
-                v = wtServer->getInfo();
-                u8g2.drawStr(x, y, v.c_str());
+                String v = wtServer->getInfo();
+                drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
             }
         }
         #endif
@@ -163,12 +179,12 @@ namespace ui {
             long frac = absRounded % 100;
             snprintf(v, sizeof(v), "%s%ld.%02ld", roundedToHundredth < 0 ? "-" : "", whole, frac);
             u8g2.setFont(u8g2_font_profont17_tn); // big numbers
-            int dy = u8g2.getMaxCharHeight();
+            int h = u8g2.getMaxCharHeight();
             tx += u8g2.drawStr(tx, y+2, v);
             tx += 2;
 
             u8g2.setFont(font);
-            u8g2.drawStr(tx, y, suffix); y += dy - 2;
+            u8g2.drawStr(tx, y, suffix); y += h - 2;
             return y;
         }
 
@@ -195,7 +211,7 @@ namespace ui {
 
         void drawPowerPage(U8G2 &u8g2, int x, int y) {
             x = 5;
-            y += 5;
+            y += 10;
 
             int voltage = 12345; // mV
             int tx = x;
@@ -215,12 +231,12 @@ namespace ui {
         }
 
         void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y) {
-            int dy = u8g2.getMaxCharHeight();
+            int h = u8g2.getMaxCharHeight() + 1;
 
-            String v;
             if(CS.getAllocatedSlotsCount() == 0) {
                 u8g2.drawStr(x, y, "No locos");
             } else {
+                String v;
                 for(const auto slot: CS.getAllocatedSlots()) {
                     const auto &data = CS.getSlotData(slot);
                     v = String(slot) + ": " + String(data.addr) + " ";
@@ -229,7 +245,7 @@ namespace ui {
                     }
                     if(data.hasOwner()) {
                         const uintptr_t o = (const uintptr_t)data.owner;
-                        v += " h" + String(o & 0xFF, HEX);
+                        v += " h" + String(o & 0xFFFF, HEX);
                     }
 
                     int32_t t = (millis() - data.wdt.getLastUpdate())/1000;
@@ -238,7 +254,7 @@ namespace ui {
                     }
 
                     u8g2.drawStr(x, y, v.c_str());
-                    y += dy;
+                    y += h;
                 }
             }
         }
