@@ -7,6 +7,8 @@
 #define LOG_LEVEL  LEVEL_INFO
 #include "log.h"
 
+constexpr uint8_t MAX_LOCO_SLOT = 120; // in traditional LocoNet (more in DCS240 and up)
+
 /// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
@@ -273,7 +275,9 @@ uint8_t getSlotStat(const LocoData &dd) {
                     break;
                 }
                 // JMRI requests slot 0 on connect, so it's probably valid to read.
-                if( isValidLocoSlot(slot) || slot==0) {
+                // Another option is to send blank data for valid but unsopported slots.
+                // But throttles might think it's supported then.
+                if( isValidLocoSlot(slot) || slot==0) {  //if( slot <= MAX_LOCO_SLOT ) {
                     LOGI("OPC_RQ_SL_DATA slot %d", slot);
                     sendSlotData(slot);
                     break;
