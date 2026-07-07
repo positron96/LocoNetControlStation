@@ -1,31 +1,38 @@
-# A LocoNet Command station for model railroad based on ESP32
+# A Command station for model railroad, based on ESP32, with LocoNet and WiThrottle
 
 image:https://api.codacy.com/project/badge/Grade/6a41f43541d4424987b09b8cc7de2da1[link="https://app.codacy.com/gh/positron96/LocoNetControlStation?utm_source=github.com&utm_medium=referral&utm_content=positron96/LocoNetControlStation&utm_campaign=Badge_Grade"]
 
-**Status:** Version from 2021 (v1.0) is stable.
+**Status:** Current stable version is v1.0 (from 2021).
 Version from 2026 has updated ESP-IDF SDK and Arduino core,
-  but DCC signal generation suffers from occasional timing glitches,
-  so it not as reliable as the old one.
-
+  has more features, but wasn't extensively tested in the wild.
 
 Video demo:
 
 image:https://img.youtube.com/vi/KVks68XLQuE/mqdefault.jpg[link=https://youtu.be/KVks68XLQuE]
 
 The command station is based on ESP32 chip.
-Development is done with Arduino core for ESP32 on PlatformIO.
+Development is done with Arduino core for ESP32 using PlatformIO framework and vscode IDE.
 
-Planned features are:
+Feature list:
 
 * [x] Running locos on main track via DCC
+** [x] Constant refreshing of loco speed and first 12 functions
+** [x] Priority-based DCC packet queue (more important packets are sent out first)
 * [x] Ops mode programming via DCC (reading CVs works)
-* Loconet interface with routing from several sources:
-** [x] Physical LocoNet bus
-** [x] LbServer (LocoNet over TCP) over WiFi
-** [x] USB-Serial interface (not tested)
+* [x] Fast clock (full master mode needs a compilation flag)
+* Loconet interface
+** Routing LocoNet messages to/from several sources:
+*** [x] Physical LocoNet bus
+*** [x] LbServer (LocoNet over TCP) over WiFi
+*** [x] USB-Serial interface (present, but not used)
+** [x] "Dispatch" of LocoNet slots
+** [x] Fast clock
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
+* [x] OLED Display for informational display
 * [ ] Stored turnout roster (partially done)
-* [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)+++
+* [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)
+* [ ] RailCom gap generation and reading (low priority)
+* [ ] LCC interface (low priority)
 
 The intended primary interface of the command station is LocoNet.
 LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB.
@@ -34,8 +41,26 @@ WiThrottle protocol is used to connect WiFi throttle to Command station and does
 
 ## Hardware
 
-The current iteration of project is designed to work on a custom-designed PCB with Lolin32 Lite ESP32 module
-(that's one of the cheapest ESP32 board).
+While the firmware can work on any ESP32 on a breadboard
+  (provided pinout is followed or adjusted),
+  main target for the project is a custom-designed PCB.
+
+### v2 [WIP]
+
+Second version of the hardware is being developed with these goals in mind:
+
+* Fit the Command station into a DIN rail enclosure.
+* Update DCC circuitry to modern ICs (instead of old L298N) to ease reading of current.
+* Use official ESP32-DevKitC board instead of Lolin32 Lite to avoid problems with availability and quality.
+* Modularize the design to allow adding new features without PCB redesign.
+* Use USB-PD to power the board, use switching regulator instead of LM7805.
+* Add a small OLED display for status and diagnostics.
+* Limit current of LocoNet RailSync to better follow specs.
+
+### v1
+
+Version 1 PCB was designed in ~2021 with Lolin32 Lite ESP32 board
+(due to it being one of the cheapest ESP32 board).
 The board has L298N chip for DCC generation for both main and program tracks.
 
 LocoNet part uses LM393 comparator with resistors adapted for 3.3V VCC levels.
@@ -43,11 +68,11 @@ This circuitry is common in DIY LocoNet projects{empty}footnote:[http://www.spco
 
 The PCB is open-source and is available here: https://oshwlab.com/positron96/loconet-command-station.
 
-The project will also work on a breadboard with a L298N board (a red one with current sensing pins)
+The project will also work on a breadboard with a L298N module (a red module is required as it exposes current sensing pins)
 and DIP versions of components.
 Other available LocoNet breakout boards will also work.
-They must operate at 3.3V.
-5V levels on ESP32 GPIOs are out of spec (though it'll probably work).
+They must operate at 3.3V,
+  5V levels on ESP32 GPIOs are out of spec (though it'll probably survive).
 
 ## Pin functions
 
@@ -69,61 +94,102 @@ These pins are used on ESP32 for the following purposes:
 ** Mode button - 13 (IN)
 ** User button - 15 (IN)
 
-Pins are used as generic GPIO in/out/analog mode, so can be changed freely.
+Extra functionality in v2:
+
+* Voltage sensing: 34 (AIN)
+* OLED display:
+** SDA - 21
+** SCL - 22 (replaces LED, which is on GPIO12)
+* UART: 2,4 - for potential serial DCC++ or LocoNet interfaces.
+* LCC(CAN bus): 14, 27 - for potential future use
+* SPI - for potential future use:
+** MOSI: 23,
+** MISO: 19,
+** SCK: 18
+** SS: 5
+* ADC for potential future use: 35
+
+
+A lot of the pins can changed freely.
 
 Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
 
 ## Code architecture:
 
-* lib/DCC/DCC.h/.cpp: DCC packet generation link:lib/DCC[library].
-** `IDCCChannel` - an interface for working with one track (main/programming).
-** `DCCESP32Channel`- implementation of IDCCChannel.
-Contains structures to store packets, switch between allocated slots.
-A lot of architecture is derived from DCC++.
-** `DCCESP32SignalGenerator` - a class that runs timer for DCC waveform generation.
-Contains references for 2 instances of IDCCChannel, so for both tracks only one timer is used.
+* link:lib/DCC[DCC library]: DCC packet generation and track output backend.
+** Public include is `lib/DCC/include/DCC.h`; most internals live under `lib/DCC/include/dcc/` and `lib/DCC/src/`.
+** `dcc::PacketList` (in `PacketList.hpp`) stores outgoing DCC packets and decouples packet preparation and scheduling from low-level transmission.
+    Used internally by `BaseChannel`
+** `dcc::BaseChannel` (in `base_channel.hpp`) is the abstract track interface (both main and program).
+** `dcc::ESP32RMTChannel` (in `esp32_rmtcont_channel.hpp`) is the current ESP32 output implementation used by this project.
+    This implementation has perfect timing, but maximum DCC packet size is limited by size of RMT blocks
+    (ESP32 has plenty, but newer chips have much less).
+** `dcc::ESP32RMTChannel` (in `esp32_channel.hpp`) is the previous ESP32 output implementation used by this project.
+    It has some timing glitches every now and then.
+** `dcc::ESP32TimerChannel` in `esp32_timer_channel.hpp` is the previous ESP32 output implementation, based on HW timer.
+    Its timing accuracy was broken after update to newer ESP32 SDK.
+** `dcc::PowerEvent` / `dcc::PowerObserver` (in `power_event.hpp`) are used for power and overcurrent notifications.
 
-* CommandStation.h/.cpp: an API for a command station.
-The class finds, allocates, releases locomotive slots, sends programming data on programming tracks, stores turnout list.
-Calls functions from DCC.h to generate DCC packets.
+* link:lib/esp32-rmt-cont[ESP32 RMT continuous library]:
+    An extract of legacy ESP32 RMT driver from ESP-IDF v5. Has its own link:lib/esp32-rmt-cont/README.md[README].
 
-* LocoNetSlotManager.h/.cpp: a class that parses and generates LocoNet messages concerning command station functions.
-Does slot managing and programming.
-Calls functions from CommandStation.h for actual access to locomotives and tracks.
+* `src/CommandStation.h/.cpp`: high-level command station API.
+Handles locomotive slot allocation/ownership, speed/direction/functions,
+  CV programming, turnout roster/state. Sends commands to DCC channel objects.
 
-* WiThrottle.h/.cpp: class for WiFi-based throttles (EngineDriver, WiThrottle and such).
-Calls functions from CommandStation.h for actual access to locomotives and tracks.
+* `src/LocoNetManagers.h/.cpp`: LocoNet-related functionality.
+** `LocoNetSlotManager` handles slot/programming/clock related LocoNet traffic.
+** `LocoNetTurnoutManager` handles switch/accessory requests.
 
-* LbServer.h: http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html[LocoNet over TCP] protocol implementation (for PC to connect wirelessly over WiFi).
-Parses data from TCP, injects LocoNet packets into LocoNet bus, sends back result of sending packet over physical bus.
-Packets from the bus are sent to TCP.
+* `src/LocoNetTCPServer.h`: `LbServer` implementation of http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html[LocoNet over TCP].
+It parses TCP frames, injects messages into LocoNet bus, and forwards bus traffic back to TCP clients.
 
-* LocoNetSerial: an implementation of LocoNet over UART (for connecting to PC with USB cable).
-Since the connection does not allow controlling of RTS/DTR lines, usefulness of this function is limited.
-Not used at the moment, as serial port is used for debugging output.
+* `src/LocoNetSerial.h`: LocoNet over UART transport.
+Can be used for a serial PC-LocoNet link, but for now WiFi is used instead.
 
-### LocoNet routing
+* `src/WiThrottleServer.h/.cpp`: server-side link:https://www.jmri.org/help/en/package/jmri/jmrit/withrottle/Protocol.shtml[WiThrottle protocol] implementation.
+  Connects WiThrottle clients to command station data.
 
-Since this project is an Ultimate Command Station, it must accepts Loconet messages from different sources: physical LocoNet bus, USB-Serial, LbServer (LocoNet over TCP). All messages must be transparently routed to between all connected buses. It means that:
+* `src/ui/`: UI components for OLED status display (`display.hpp/.cpp`, `status_screen.hpp`).
+
+* `src/main.cpp`: contains wiring information and starts up the rest of the system.
+    Initializes DCC channels, LocoNet bus/parsers/managers,
+    WiFi services (LbServer/WiThrottle), timers, and display.
+    Home to Arduino's `setup()` and `loop()` functions.
+
+### LocoNet message routing
+
+The project must accept Loconet messages from different sources:
+  physical LocoNet bus, USB-Serial, LbServer (LocoNet over TCP).
+All messages must be transparently routed to between all connected buses.
+
+It means that:
 
  * There must be a routing mechanism for broadcasting messages from one source to others.
- * Existing frontend classes (e.g. Throttle) must be separated from hardware backend and conncted to other sources.
- When command station itself generates a message (e.g. a reply to throttle), it must be broadcasted to all handlers.
- * Result of sending a message to the bus is only taken into account for real LocoNet bus; it is assumed that USB and WiFi always send packets successfully.
+ * User components (e.g. Locomotive slot or Fast clock) must be separated from hardware backend and take messages from other sources.
+ When command station itself generates a message (e.g. a reply to throttle),
+   it must be broadcasted to all handlers.
+ * Result of sending a message to the bus is only taken into account for real LocoNet bus;
+   it is assumed that USB and WiFi always send packets successfully.
 
 With this in mind, the LocoNet2 library was heavily redesigned and refactored.
-The LocoNet class is now separated into hardware backend (LocoNetPhy), a message parser (LocoNetDispatcher), and a routing bus (LocoNetBus) between them.
+The LocoNet class is now separated into hardware backend (LocoNetPhy),
+  a message parser (LocoNetDispatcher), and a routing bus (LocoNetBus) between them.
 Other sources of messages extend LocoNetConsumer class and are connected to the bus. and messages.
 Frontend classes (Throttle, FastClock, SystemVariable etc) are connected to the message parser instead of hardware class and so can handle messages from all sources.
 
-The implementation is based on these libraries:
+The project implementation is based on these libraries:
 
- *  https://github.com/positron96/LocoNet2[LocoNet2] - LocoNet bus support. The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks.
+ *  https://github.com/positron96/LocoNet2[LocoNet2] (https://github.com/mrrwa/LocoNet2[upstream original]) - LocoNet bus support.
+   The library is heavily modified to support several sources of loconet messages and to better use timers and RTOS tasks.
+   (most of the changes were merged into upstream original, but there differences anyway).
 
- * link:lib/DCC[DCC] library is based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project] (heavily modified). Used for DCC packet generation.
+ * Historically, link:lib/DCC[DCC] library was based on https://github.com/positron96/DCCpp[DCCpp library] and https://github.com/DccPlusPlus/BaseStation[DCC++ project].
+   Since then it was gradually changed and shares no code, architecture or implementation with those projects.
 
- * https://github.com/positron96/withrottle[WifiThrottle] WiThrottle protocol. Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] sources.
+ * https://github.com/positron96/withrottle[WifiThrottle] ESP8266 WiThrottle to DCC++ bridge.
+   Mostly rewritten from scratch with the help of https://www.jmri.org/[JMRI] documentation and sources.
 
  * https://www.etlcpp.com/[Embedded Template Library] for statically-sized maps, vectors, bitsets etc.
 
@@ -150,7 +216,7 @@ I am looking at this TI https://www.ti.com/product/INA180[INA180].
 I've returned to work on this project after a long break.
 The main goal is to remake the PCB for a DIN rail enclosure,
   but I started with adding support for periodic refreshing locomotive functions
-  (they were one shot before) and upgrading thecodebase to
+  (they were one shot before) and upgrading the codebase to
   use modern  versions of SDK and libraries and C++ standard.
 Last version before redesign is marked 1.0.
 
@@ -163,3 +229,36 @@ So, while the new version mostly works (and has some important fixes to existing
   it needs a reimplementation of DCC.
 The options I'm considering is back-porting of older RMT driver
   or trying an built-in ULP co-processor.
+
+### 2026-07
+
+Since June-July 2026, the project received a large set of functional and architectural updates.
+The most important changes are:
+
+* DCC core and timing work:
+** Reworked DCC internals to allow periodic sending of function packets in addition to speed/dir packets.
+** Migrated and iterated on ESP32 RMT-based signal generation, including 0-delay streaming work and compatibility adjustments for newer ESP-IDF.
+
+* Safety and power handling:
+** Response to overcurrent is immediately executed from `current_meter.cpp` code, not from `main.cpp` code.
+   (Notifications are still sent from `main.cpp` to not block current-reading task).
+** Refactored current monitoring and introduced event-based power handling.
+
+* LocoNet and command station behavior:
+** Expanded slot handling and ownership logic.
+** Added/improved support for accessories and turnout workflows (including dedicated turnout manager integration).
+** Improved slot stop/clear behavior and corrected STAT1 handling.
+
+* WiThrottle and network control:
+** Added steal support.
+
+* Fast clock:
+** Added fast clock support into core, LocoNet protocol and wiThrottle protocol.
+   It wasn't heavily tested though.
+
+* OLED display support.
+** Instead of LEDs, the project now has a small OLED display for status and diagnostics.
+
+Current state:
+the 2026 branch has substantially improved feature completeness
+  (clock, diagnostics, slot/accessory behavior, safety handling).
