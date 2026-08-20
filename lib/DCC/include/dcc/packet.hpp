@@ -66,8 +66,7 @@ namespace dcc {
         for(int i=1; i<len; i++)
             crc ^= src[i];
 
-        // don't care about endianness, we don't write multi-bytes
-        etl::bit_stream_writer s(dst.data(), dst.size(), etl::endian::big);
+        etl::bit_stream_writer s(dst, etl::endian::big);
         if(preamble_bits != 0) s.write(0xFFFFFFFF, preamble_bits);  // preamble (max 32 bits)
         for(size_t i=0; i<len; i++) {
             s.write(0, 1); // data start bit

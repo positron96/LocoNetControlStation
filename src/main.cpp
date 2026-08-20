@@ -172,10 +172,13 @@ void setup() {
     timer20ms = timerController.register_timer(
         TimerType::callback_type::create<tick20ms>(),
         20, true);
+    timer1s = timerController.register_timer(
+        TimerType::callback_type::create<tick1s>(),
+        1000, true);
 
     timerController.enable(true);
     timerController.start(timer20ms);
-    //timerController.start(timer1s);
+    timerController.start(timer1s);
 
     #if USE_DISPLAY==1
     statusScreen.wtServer = &withrottleServer;
