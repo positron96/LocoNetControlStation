@@ -121,7 +121,7 @@ Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 
 * link:lib/DCC[DCC library]: DCC packet generation and track output backend.
 ** Public include is `lib/DCC/include/DCC.h`; most internals live under `lib/DCC/include/dcc/` and `lib/DCC/src/`.
-** `dcc::PacketList` (in `PacketList.hpp`) stores outgoing DCC packets and decouples packet preparation and scheduling from low-level transmission.
+** `dcc::PacketList` (in `packet_list.hpp`) stores outgoing DCC packets and decouples packet preparation and scheduling from low-level transmission.
     Used internally by `BaseChannel`
 ** `dcc::BaseChannel` (in `base_channel.hpp`) is the abstract track interface (both main and program).
 ** `dcc::ESP32RMTChannel` (in `esp32_rmtcont_channel.hpp`) is the current ESP32 output implementation used by this project.
@@ -136,21 +136,21 @@ Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
 * link:lib/esp32-rmt-cont[ESP32 RMT continuous library]:
     An extract of legacy ESP32 RMT driver from ESP-IDF v5. Has its own link:lib/esp32-rmt-cont/README.md[README].
 
-* `src/CommandStation.h/.cpp`: high-level command station API.
+* `src/command_station.hpp/.cpp`: high-level command station API.
 Handles locomotive slot allocation/ownership, speed/direction/functions,
   CV programming, turnout roster/state. Sends commands to DCC channel objects.
 
-* `src/LocoNetManagers.h/.cpp`: LocoNet-related functionality.
+* `src/loconet_managers.hpp/.cpp`: LocoNet-related functionality.
 ** `LocoNetSlotManager` handles slot/programming/clock related LocoNet traffic.
 ** `LocoNetTurnoutManager` handles switch/accessory requests.
 
-* `src/LocoNetTCPServer.h`: `LbServer` implementation of http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html[LocoNet over TCP].
+* `src/loconet_tcp_server.hpp`: `LbServer` implementation of http://loconetovertcp.sourceforge.net/Protocol/LoconetOverTcp.html[LocoNet over TCP].
 It parses TCP frames, injects messages into LocoNet bus, and forwards bus traffic back to TCP clients.
 
-* `src/LocoNetSerial.h`: LocoNet over UART transport.
+* `src/loconet_serial.hpp`: LocoNet over UART transport.
 Can be used for a serial PC-LocoNet link, but for now WiFi is used instead.
 
-* `src/WiThrottleServer.h/.cpp`: server-side link:https://www.jmri.org/help/en/package/jmri/jmrit/withrottle/Protocol.shtml[WiThrottle protocol] implementation.
+* `src/withrottle_server.hpp/.cpp`: server-side link:https://www.jmri.org/help/en/package/jmri/jmrit/withrottle/Protocol.shtml[WiThrottle protocol] implementation.
   Connects WiThrottle clients to command station data.
 
 * `src/ui/`: UI components for OLED status display (`display.hpp/.cpp`, `status_screen.hpp`).

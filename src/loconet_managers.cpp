@@ -1,8 +1,8 @@
-#include "LocoNetManagers.h"
+#include "loconet_managers.hpp"
 
 #include <dcc/accessory_address.hpp>
 
-#include "FastClock.hpp"
+#include "fast_clock.hpp"
 
 #define LOG_LEVEL  LEVEL_INFO
 #include "log.h"

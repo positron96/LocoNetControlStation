@@ -1,8 +1,8 @@
 #pragma once
 
 #include "packet.hpp"
-#include "LocoAddress.h"
-#include "LocoSpeed.h"
+#include "loco_address.hpp"
+#include "loco_speed.hpp"
 #include "log.hpp"
 
 #include <etl/map.h>

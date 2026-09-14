@@ -4,9 +4,9 @@
 
 #include "display.hpp"
 
-#include "../CommandStation.h"
-#include "../WiThrottleServer.h"
-#include "../LocoNetTCPServer.h"
+#include "../command_station.hpp"
+#include "../withrottle_server.hpp"
+#include "../loconet_tcp_server.hpp"
 
 #include <etl/enum_type.h>
 #include <etl/string_view.h>

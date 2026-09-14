@@ -1,10 +1,10 @@
 #pragma once
 
-#include "LocoAddress.h"
-#include "LocoSpeed.h"
+#include "loco_address.hpp"
+#include "loco_speed.hpp"
 #include "accessory_address.hpp"
 #include "packet.hpp"
-#include "PacketList.hpp"
+#include "packet_list.hpp"
 #include "power_event.hpp"
 #include "log.hpp"
 

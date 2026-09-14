@@ -1,5 +1,5 @@
 
-#include "LocoSpeed.h"
+#include "dcc/loco_speed.hpp"
 
 #include <stdio.h>
 #include <unity.h>
@@ -7,7 +7,7 @@
 void testLocoSpeed() {
 
     TEST_ASSERT_EQUAL_MESSAGE(0, SPEED_IDLE.get128(), "IDLE");
-    TEST_ASSERT_EQUAL_MESSAGE(1, SPEED_EMGR.get128(), "EMGR");    
+    TEST_ASSERT_EQUAL_MESSAGE(1, SPEED_EMGR.get128(), "EMGR");
 
     // test 14 speed steps
     for(uint8_t a = 0; a<16; a++) {
@@ -16,7 +16,7 @@ void testLocoSpeed() {
         //printf("in %d (%d) out %d\n", a, s.get128(), ret);
         TEST_ASSERT_EQUAL_MESSAGE(a, ret, "S14" );
     }
-    
+
     // test 28 speed steps
     for(uint8_t a = 0; a<32; a++) {
         LocoSpeed s = LocoSpeed{a, SpeedMode::S28};

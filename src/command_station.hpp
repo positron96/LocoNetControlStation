@@ -8,11 +8,11 @@
 
 #include <dcc/base_channel.hpp>
 #include <dcc/packet.hpp>
-#include <dcc/LocoAddress.h>
+#include <dcc/loco_address.hpp>
 #include <dcc/accessory_address.hpp>
 #include <LocoNet2.h>
 
-#include "Watchdog.h"
+#include "watchdog.hpp"
 
 #include <etl/map.h>
 #include <etl/bitset.h>

@@ -3,8 +3,8 @@
 #include <Arduino.h>
 #include <LocoNet2.h>
 #include <etl/map.h>
-#include "CommandStation.h"
-#include "FastClock.hpp"
+#include "command_station.hpp"
+#include "fast_clock.hpp"
 
 class LocoNetSlotManager : public LocoNetConsumer, public fast_clock::clock_observer  {
 

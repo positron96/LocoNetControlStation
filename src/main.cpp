@@ -6,14 +6,14 @@
 #include <dcc/esp32_rmtcont_channel.hpp>
 #include <dcc/esp32_current_meter.hpp>
 
-#include "CommandStation.h"
+#include "command_station.hpp"
 
-#include "LocoNetManagers.h"
+#include "loconet_managers.hpp"
 
-#include "LocoNetSerial.h"
-#include "LocoNetTCPServer.h"
+#include "loconet_serial.hpp"
+#include "loconet_tcp_server.hpp"
 
-#include "WiThrottleServer.h"
+#include "withrottle_server.hpp"
 #include "led.hpp"
 
 #include <LocoNetStream.h>

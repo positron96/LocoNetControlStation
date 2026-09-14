@@ -11,10 +11,10 @@
 
 #pragma once
 
-#include "CommandStation.h"
-#include "Watchdog.h"
+#include "command_station.hpp"
+#include "watchdog.hpp"
 #include "dcc/power_event.hpp"
-#include "FastClock.hpp"
+#include "fast_clock.hpp"
 
 #include <WiFi.h>
 #include <WiFiServer.h>

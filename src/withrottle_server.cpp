@@ -1,8 +1,8 @@
-#include "WiThrottleServer.h"
+#include "withrottle_server.hpp"
 
 #include "config.hpp"
 
-#include "dcc/LocoAddress.h"
+#include "dcc/loco_address.hpp"
 #include "dcc/accessory_address.hpp"
 
 #define FILE_LOG_LEVEL  LEVEL_DEBUG

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "LocoAddress.h"
-#include "LocoSpeed.h"
+#include "loco_address.hpp"
+#include "loco_speed.hpp"
 #include "accessory_address.hpp"
 
 #include <etl/vector.h>

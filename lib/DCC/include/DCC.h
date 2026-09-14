@@ -5,6 +5,6 @@
 
 #include "dcc/base_channel.hpp"
 #include "dcc/packet.hpp"
-#include "dcc/PacketList.hpp"
-#include "dcc/LocoAddress.h"
+#include "dcc/packet_list.hpp"
+#include "dcc/loco_address.hpp"
 #include "dcc/accessory_address.hpp"

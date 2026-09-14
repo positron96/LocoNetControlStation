@@ -1,7 +1,7 @@
 #include "display.hpp"
 
 #include "../config.hpp"
-#include "../CommandStation.h" // for statusbar stuff
+#include "../command_station.hpp" // for statusbar stuff
 
 #include "WiFi.h"
 
