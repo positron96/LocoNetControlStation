@@ -12,11 +12,13 @@
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
 #define DCC_MAIN_PIN_SENSE 36
-#define DCC_MAIN_MV_TO_MA_COEF  1.0F // 3V -> 3A
+// per 1000mA: mV = 1.575mA * 680 Ohm
+#define DCC_MAIN_MV_TO_MA_COEF  (1000f / 680f / 1.575f)  // 3V ADC is ~3A
 #define DCC_PROG_PIN 26
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
-#define DCC_PROG_MV_TO_MA_COEF  (100.0f / 3000.0f)  // 3V is 100mA
+// per 1000mA: mV = 1.575mA * 18000 Ohm
+#define DCC_PROG_MV_TO_MA_COEF  (1000.0f / 18000f / 1.575f)  // 3V ADC is ~100mA
 
 #define PIN_DISP_SDA 21
 #define PIN_DISP_SCL 22
@@ -48,11 +50,12 @@
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
 #define DCC_MAIN_PIN_SENSE 36
-#define DCC_MAIN_MV_TO_MA_COEF  2.0F  // 0.5 ohm sense resistor, 1000mA -> 500mV
+// 0.5 ohm sense resistor, 1000mA -> 500mV
+#define DCC_MAIN_MV_TO_MA_COEF  (1000f / 500f)
 #define DCC_PROG_PIN 26
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
-#define DCC_PROG_MV_TO_MA_COEF  2.0F  // 0.5 ohm sense resistor
+#define DCC_PROG_MV_TO_MA_COEF  2.0F  // same 0.5 ohm resistor
 
 #define PIN_LED  22
 #define PIN_BT 13

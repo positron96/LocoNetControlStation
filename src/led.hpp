@@ -69,6 +69,7 @@ namespace led {
         static constexpr uint32_t blink_intervals[state_count] = {400, 300, 250};
         // Pause between blink groups, per priority - shorter for urgent states so they repeat sooner.
         static constexpr uint32_t pause_intervals[state_count] = {800, 600, 500};
+        static constexpr uint32_t off_time_ms = 150;
 
         uint8_t pin;
         uint8_t value{LOW};
@@ -86,13 +87,13 @@ namespace led {
 
         void apply_priority_state() {
             for(unsigned priority = state_count; priority > 0; --priority) {
-                if(priority_state.test(priority - 1)) {
+                if(priority_state[priority - 1]) {
                     start_pattern(priority - 1);
                     return;
                 }
             }
 
-            stop_blinking(); // fallback
+            stop_blinking(); // nothing is on, turn off.
         }
 
         void start_pattern(unsigned priority) {
@@ -120,17 +121,17 @@ namespace led {
 
         // Steps through on -> off -> ... -> pause -> on, counting blinks per priority's code.
         void advance_pattern() {
-            const uint32_t on_off_ms = blink_intervals[active_priority];
+            const uint32_t on_time_ms = blink_intervals[active_priority];
             const uint8_t total_blinks = blink_count[active_priority];
 
-            switch(phase) {
+            switch(phase) {  // transitioning from this phase
                 case Phase::on:
                     value = LOW;
                     digitalWrite(pin, value);
                     ++blinks_done;
                     if(blinks_done < total_blinks) {
                         phase = Phase::off;
-                        schedule(on_off_ms);
+                        schedule(off_time_ms);
                     } else {
                         phase = Phase::pause;
                         schedule(pause_intervals[active_priority]);
@@ -141,7 +142,7 @@ namespace led {
                     value = HIGH;
                     digitalWrite(pin, value);
                     phase = Phase::on;
-                    schedule(on_off_ms);
+                    schedule(on_time_ms);
                     break;
 
                 case Phase::pause:
@@ -149,7 +150,7 @@ namespace led {
                     value = HIGH;
                     digitalWrite(pin, value);
                     phase = Phase::on;
-                    schedule(on_off_ms);
+                    schedule(on_time_ms);
                     break;
             }
         }
