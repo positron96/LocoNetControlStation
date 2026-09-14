@@ -17,8 +17,12 @@
 
 #include <LocoNetStream.h>
 
+#if USE_DISPLAY==1
 #include "ui/display.hpp"
 #include "ui/status_screen.hpp"
+#include <U8g2lib.h>
+#include <Wire.h>  // move out from this ifdef if I2C is used elsewhere
+#endif
 
 #include <WiFi.h>
 #include <ESPmDNS.h>
@@ -26,17 +30,12 @@
 
 #include <Arduino.h>
 
-#include <Wire.h>
-#include <U8g2lib.h>
-
 #include <etl/callback_timer_atomic.h>
 #include <stdio.h>
 #include <atomic>
 
 LocoNetBus bus;
 
-#define LOCONET_PIN_RX 16
-#define LOCONET_PIN_TX 17
 #include <LocoNetStreamESP32.h>
 //LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
@@ -44,13 +43,6 @@ LocoNetDispatcher parser(&bus);
 LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
 
 //LocoNetSerial lSerial(&Serial, &bus);
-
-#define DCC_MAIN_PIN 25
-#define DCC_MAIN_PIN_EN 32
-#define DCC_MAIN_PIN_SENSE 36
-#define DCC_PROG_PIN 26
-#define DCC_PROG_PIN_EN 33
-#define DCC_PROG_PIN_SENSE 39
 
 dcc::PacketList<10> dcc_packets_main;
 dcc::PacketList<2> dcc_packets_prog;
@@ -67,17 +59,11 @@ LocoNetTurnoutManager lnTurnoutMan(&bus);
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 
 #if USE_DISPLAY==1
-constexpr int PIN_DISP_SDA = 18;
-constexpr int PIN_DISP_SCL = 19;
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
 U8G2 &ui::Display::u8g2 = u8g2_;
 ui::Display disp;
 ui::StatusScreen statusScreen;
 #endif
-
-#define PIN_LED  22
-#define PIN_BT 13
-#define PIN_BT2 15
 
 // constexpr int _debug_pin = 14;
 // constexpr int _debug_pin2 = 12;
@@ -121,6 +107,10 @@ void setup() {
 
     Serial.begin(115200);
     Serial.println(CS_FULL_NAME);
+    Serial.print("Config: ");
+    Serial.printf(" PCB_VER=%d", PCB_VER);
+    Serial.printf(" USE_DISPLAY=%d\n", USE_DISPLAY);
+    Serial.printf(" USE_WIFI=%d\n", USE_WIFI);
 
     pinMode(PIN_BT, INPUT_PULLUP);
     pinMode(PIN_BT2, INPUT_PULLUP);
@@ -141,11 +131,11 @@ void setup() {
     });
 
 
-    dccMain.setVoltageToCurrentCoef(1.0f); // depends on schematic
+    dccMain.setVoltageToCurrentCoef(DCC_MAIN_MV_TO_MA_COEF);
     dccMain.setOvercurrentThreshold(2000);
     currentMeter.addChannel(dccMain);
 
-    dccProg.setVoltageToCurrentCoef(1.0f);
+    dccProg.setVoltageToCurrentCoef(DCC_PROG_MV_TO_MA_COEF);
     dccProg.setOvercurrentThreshold(500);
     currentMeter.addChannel(dccProg);
 

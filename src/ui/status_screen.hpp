@@ -213,7 +213,7 @@ namespace ui {
             x = 5;
             y += 10;
 
-            int voltage = 12345; // mV
+            int voltage = analogReadMilliVolts(PIN_VSENSE);
             int tx = x;
             tx += u8g2.drawStr(x, y, "Input:");
             y = drawValue(u8g2, tx + 10, y, voltage, "V");

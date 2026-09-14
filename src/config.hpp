@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config_hw.hpp"
+
 #define CS_SHORT_NAME "ESP32CS"
 #define CS_FULL_NAME "ESP32CommandStation"  // human-readable Project name
 
