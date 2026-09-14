@@ -14,6 +14,7 @@
 #include "LocoNetTCPServer.h"
 
 #include "WiThrottleServer.h"
+#include "led.hpp"
 
 #include <LocoNetStream.h>
 
@@ -68,37 +69,30 @@ ui::StatusScreen statusScreen;
 // constexpr int _debug_pin = 14;
 // constexpr int _debug_pin2 = 12;
 
-constexpr int LED_INTL_NORMAL = 1000;
-constexpr int LED_INTL_CONFIG1 = 500;
-constexpr int LED_INTL_CONFIG2 = 250;
-
-uint8_t ledVal;
-
-void ledStartBlinking(uint32_t ms=0, uint8_t val=1);
-void ledStop();
-void ledUpdate();
-
+led::Led statusLed(PIN_LED);
 
 void tick1s();
 void tick20ms();
 
 using TimerType = etl::callback_timer_atomic<3, std::atomic_uint>;
 TimerType timerController;
-etl::timer::id::type ledTimer;
 etl::timer::id::type timer20ms;
 etl::timer::id::type timer1s;
 
 class PowerStatusObserver: public dcc::PowerObserver {
     void notification(const dcc::PowerEvent &event) override {
-        if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
-            if(event.channel == &dccMain) {
-                ledStartBlinking(LED_INTL_CONFIG2, 1);
-            Serial.println("Overcurrent on main");
-            } else if(event.channel == &dccProg) {
-
+        if(event.channel == &dccMain) {
+            if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
+                statusLed.enable_state(led::State::error);
+                Serial.println("Overcurrent on main");
+            } else if (event.state) {
+                statusLed.disable_state(led::State::error);
+            }
+        } else {
+            // prog
+            if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
                 Serial.println("Overcurrent on prog");
             }
-
         }
     }
 } powerStatusObserver;
@@ -114,12 +108,11 @@ void setup() {
 
     pinMode(PIN_BT, INPUT_PULLUP);
     pinMode(PIN_BT2, INPUT_PULLUP);
-    pinMode(PIN_LED, OUTPUT);
 
     // pinMode(_debug_pin, OUTPUT);
     // pinMode(_debug_pin2, OUTPUT);
 
-    digitalWrite(PIN_LED, LOW);
+    statusLed.begin();
 
     //locoNetPhy.start();
     //lSerial.begin();
@@ -156,9 +149,6 @@ void setup() {
     dccProg.setPower(true);
     currentMeter.begin();
 
-    ledTimer = timerController.register_timer(
-        TimerType::callback_type::create<ledUpdate>(),
-        LED_INTL_NORMAL, true);
     timer20ms = timerController.register_timer(
         TimerType::callback_type::create<tick20ms>(),
         20, true);
@@ -182,7 +172,7 @@ void setup() {
     #endif
 
 #if USE_WIFI != 0
-    WiFi.setSleep(WIFI_PS_NONE);
+    WiFi.setSleep(WIFI_PS_NONE);  // ! makes WiFi MUCH more reliable.
     bool bt = digitalRead(PIN_BT)==0;
     if(bt) {
         // start AP
@@ -193,23 +183,26 @@ void setup() {
         Serial.println("WiFi AP started.");
         Serial.println("IP address: ");
         Serial.println(WiFi.softAPIP());
-        ledStartBlinking(LED_INTL_NORMAL/2);
+        statusLed.enable_state(led::State::attention);
     } else {
         WiFiManager wifiManager;
         wifiManager.setConfigPortalTimeout(300); // 5 min
+        statusLed.enable_state(led::State::attention);
         if ( !wifiManager.autoConnect(CS_FULL_NAME " AP") ) { // sometimes wifi connects during captive portal
             if(WiFi.status() != WL_CONNECTED) {
                 Serial.print("Failed connection");
+                statusLed.enable_state(led::State::error);
                 delay(1000);
                 ESP.restart();
             }
         }
         WiFi.setAutoReconnect(true);
+        statusLed.disable_state(led::State::attention);
         Serial.println("");
         Serial.println("WiFi connected.");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-        ledStartBlinking();
+        statusLed.enable_state(led::State::normal);
     }
 
     MDNS.begin(CS_SHORT_NAME);
@@ -304,34 +297,4 @@ void tick1s() {
 #if USE_DISPLAY==0 && USE_WIFI==1
     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
 #endif
-}
-
-
-void ledStartBlinking(uint32_t ms, uint8_t val) {
-    if(ms==0) ms = LED_INTL_NORMAL;
-    ledVal = val;
-    digitalWrite(PIN_LED, ledVal);
-    //ledNextUpdate = millis()+ms;
-
-    timerController.set_period(ledTimer, ms);
-    timerController.start(ledTimer);
-}
-
-void ledStop() {
-    //ledNextUpdate = 0; // turn off blink
-    timerController.stop(ledTimer);
-    digitalWrite(PIN_LED, LOW);
-}
-void ledUpdate() {
-    //if(ledNextUpdate!=0 && millis()>ledNextUpdate) {
-        ledVal = 1-ledVal;
-        digitalWrite(PIN_LED, ledVal);
-
-        //if(!configMode) {
-        //ledNextUpdate = LED_INTL_NORMAL;
-        /*} else {
-        ledNextUpdate = configVar==0 ? LED_INTL_CONFIG1 : LED_INTL_CONFIG2;
-        }*/
-        //ledNextUpdate += millis();
-    //}
 }
