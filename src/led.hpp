@@ -42,7 +42,8 @@ namespace led {
             digitalWrite(pin, value);
         }
 
-        void enable_state(State state) {
+        void enable_state(State state, uint8_t blinks = 1) {
+            blink_count[state.get_value()] = blinks == 0 ? 1 : blinks;
             set_state(state, true);
         }
 
@@ -55,22 +56,6 @@ namespace led {
             apply_priority_state();
         }
 
-        void start_blinking(uint32_t ms = 1000, uint8_t initial_value = HIGH) {
-            if(ms == 0) ms = 1000;
-            value = initial_value;
-            digitalWrite(pin, value);
-
-            if(timer == nullptr) {
-                timer = xTimerCreate("LedBlink", pdMS_TO_TICKS(ms), pdTRUE,
-                    static_cast<void*>(this), &Led::timer_func);
-            }
-
-            if(timer == nullptr) return;
-
-            xTimerChangePeriod(timer, pdMS_TO_TICKS(ms), 0);
-            xTimerStart(timer, 0);
-        }
-
         void stop_blinking() {
             if(timer != nullptr) xTimerStop(timer, 0);
             value = LOW;
@@ -79,22 +64,30 @@ namespace led {
 
     private:
         static constexpr unsigned state_count = 3;
-        static constexpr uint32_t state_intervals[state_count] = {1000, 500, 250};
+        // On/off duration of a single blink, per priority - faster blink = more urgent,
+        // but kept slow enough (>=250ms) that blink counts stay easy to count visually.
+        static constexpr uint32_t blink_intervals[state_count] = {400, 300, 250};
+        // Pause between blink groups, per priority - shorter for urgent states so they repeat sooner.
+        static constexpr uint32_t pause_intervals[state_count] = {800, 600, 500};
 
         uint8_t pin;
         uint8_t value{LOW};
         etl::bitset<state_count> priority_state;
+        uint8_t blink_count[state_count] = {1, 1, 1};
         TimerHandle_t timer{nullptr};
+        unsigned active_priority{0};
+        uint8_t blinks_done{0};
+        enum class Phase { on, off, pause } phase{Phase::pause};
 
         static void timer_func(TimerHandle_t timer) {
             auto* inst = static_cast<Led*>(pvTimerGetTimerID(timer));
-            inst->toggle();
+            inst->advance_pattern();
         }
 
         void apply_priority_state() {
             for(unsigned priority = state_count; priority > 0; --priority) {
                 if(priority_state.test(priority - 1)) {
-                    start_blinking(state_intervals[priority - 1]);
+                    start_pattern(priority - 1);
                     return;
                 }
             }
@@ -102,9 +95,63 @@ namespace led {
             stop_blinking(); // fallback
         }
 
-        void toggle() {
-            value = value == LOW ? HIGH : LOW;
+        void start_pattern(unsigned priority) {
+            active_priority = priority;
+            blinks_done = 0;
+            phase = Phase::on;
+            value = HIGH;
             digitalWrite(pin, value);
+            schedule(blink_intervals[active_priority]);
+        }
+
+        void schedule(uint32_t ms) {
+            if(ms == 0) ms = 1;
+
+            if(timer == nullptr) {
+                timer = xTimerCreate("LedBlink", pdMS_TO_TICKS(ms), pdFALSE,
+                    static_cast<void*>(this), &Led::timer_func);
+                if(timer == nullptr) return;
+                xTimerStart(timer, 0);
+                return;
+            }
+
+            xTimerChangePeriod(timer, pdMS_TO_TICKS(ms), 0);
+        }
+
+        // Steps through on -> off -> ... -> pause -> on, counting blinks per priority's code.
+        void advance_pattern() {
+            const uint32_t on_off_ms = blink_intervals[active_priority];
+            const uint8_t total_blinks = blink_count[active_priority];
+
+            switch(phase) {
+                case Phase::on:
+                    value = LOW;
+                    digitalWrite(pin, value);
+                    ++blinks_done;
+                    if(blinks_done < total_blinks) {
+                        phase = Phase::off;
+                        schedule(on_off_ms);
+                    } else {
+                        phase = Phase::pause;
+                        schedule(pause_intervals[active_priority]);
+                    }
+                    break;
+
+                case Phase::off:
+                    value = HIGH;
+                    digitalWrite(pin, value);
+                    phase = Phase::on;
+                    schedule(on_off_ms);
+                    break;
+
+                case Phase::pause:
+                    blinks_done = 0;
+                    value = HIGH;
+                    digitalWrite(pin, value);
+                    phase = Phase::on;
+                    schedule(on_off_ms);
+                    break;
+            }
         }
     };
 

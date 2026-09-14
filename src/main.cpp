@@ -183,7 +183,7 @@ void setup() {
         Serial.println("WiFi AP started.");
         Serial.println("IP address: ");
         Serial.println(WiFi.softAPIP());
-        statusLed.enable_state(led::State::attention);
+        statusLed.enable_state(led::State::normal, 2); // 2 blinks: running as AP
     } else {
         WiFiManager wifiManager;
         wifiManager.setConfigPortalTimeout(300); // 5 min
@@ -202,7 +202,7 @@ void setup() {
         Serial.println("WiFi connected.");
         Serial.println("IP address: ");
         Serial.println(WiFi.localIP());
-        statusLed.enable_state(led::State::normal);
+        statusLed.enable_state(led::State::normal, 1);
     }
 
     MDNS.begin(CS_SHORT_NAME);
@@ -210,7 +210,8 @@ void setup() {
     lbServer.begin();
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
-
+#else
+    statusLed.enable_state(led::State::normal);
 #endif
 
 }
