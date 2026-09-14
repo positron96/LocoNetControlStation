@@ -18,25 +18,27 @@ Feature list:
 * [x] Running locos on main track via DCC
 ** [x] Constant refreshing of loco speed and first 12 functions
 ** [x] Priority-based DCC packet queue (more important packets are sent out first)
-* [x] Ops mode programming via DCC (reading CVs works)
-* [x] Fast clock (full master mode needs a compilation flag)
+* [x] Ops mode programming on a dedicated DCC track (reading CVs works)
+* [x] Fast clock
 * Loconet interface
 ** Routing LocoNet messages to/from several sources:
 *** [x] Physical LocoNet bus
 *** [x] LbServer (LocoNet over TCP) over WiFi
 *** [x] USB-Serial interface (present, but not used)
 ** [x] "Dispatch" of LocoNet slots
-** [x] Fast clock
+** [x] Fast clock (full clock master mode needs a code change, it's disabled now)
 * [x] WiFi control via WiThrottle protocol (EngineDriver or WiThrottle)
-* [x] OLED Display for informational display
+* [x] OLED Display for information and diagnostic output
 * [ ] Stored turnout roster (partially done)
 * [ ] +++<del>DCC++ interface via USB-Serial or WiFi</del>+++ (No need at the moment)
 * [ ] RailCom gap generation and reading (low priority)
 * [ ] LCC interface (low priority)
 
 The intended primary interface of the command station is LocoNet.
-LocoNet messages are received and transmitted from physical LocoNet bus, WiFi, USB.
-However, if needed, LocoNet can be cut from project and DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
+LocoNet messages are received and transmitted from physical LocoNet bus and WiFi.
+However, LocoNet is not an essential part of the firmware and can be removed from project;
+DCC packet generation with corresponding API can be used to implement other interfaces, like DCC++.
+
 WiThrottle protocol is used to connect WiFi throttle to Command station and does not depend on LocoNet routing.
 
 ## Hardware
