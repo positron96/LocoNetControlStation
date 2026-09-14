@@ -28,6 +28,8 @@
 #define PIN_BT2 15
 
 #define PIN_VSENSE 35
+// 33K / 6.8K voltage divider  (20V->!3.3V)
+#define VSENSE_COEF  ((6.8f + 33.0f) / 6.8f)
 
 #define PIN_CAN_RX 27
 #define PIN_CAN_TX 14
