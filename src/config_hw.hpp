@@ -28,7 +28,7 @@
 #define PIN_BT2 15
 
 #define PIN_VSENSE 35
-// 33K / 6.8K voltage divider  (20V->!3.3V)
+// 33K / 6.8K voltage divider  (20V->~3.3V)
 #define VSENSE_COEF  ((6.8f + 33.0f) / 6.8f)
 
 #define PIN_CAN_RX 27
@@ -52,12 +52,12 @@
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
 #define DCC_MAIN_PIN_SENSE 36
-// 0.5 ohm sense resistor, 1000mA -> 500mV
-#define DCC_MAIN_MV_TO_MA_COEF  (1000.0f / 500.0f)
+// 0.1 ohm sense resistor, 1000mA -> 100mV
+#define DCC_MAIN_MV_TO_MA_COEF  (1000.0f / 100.0f)
 #define DCC_PROG_PIN 26
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
-#define DCC_PROG_MV_TO_MA_COEF  2.0F  // same 0.5 ohm resistor
+#define DCC_PROG_MV_TO_MA_COEF  DCC_MAIN_MV_TO_MA_COEF  // same resistor, makes it unusable for reading CVs
 
 #define PIN_LED  22
 #define PIN_BT 13
