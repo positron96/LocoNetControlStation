@@ -108,7 +108,7 @@ protected:
     /** Tries to schedule a packet for a specified duration and waits until it's sent to tracks. */
     bool sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000);
 
-    uint getBaselineCurrent() const;
+    uint getBaselineCurrent();
     bool checkCurrentResponse(uint baseline) const;
 
 };

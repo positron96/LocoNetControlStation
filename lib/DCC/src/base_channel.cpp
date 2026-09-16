@@ -13,10 +13,11 @@ Packet resetPacket{0x00, 0x00};
 PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 
 #define  ACK_BASE_COUNT            100      /**< Number of analogRead samples to take before each CV verify to establish a baseline current.*/
-#define  ACK_SAMPLE_MILLIS         50       ///< analogReads are taken for this number of milliseconds
-#define  ACK_SAMPLE_SMOOTHING      0.3      /**< Exponential smoothing to use in processing the analogRead samples after a CV verify (bit or byte) has been sent.*/
-#define  ACK_SAMPLE_THRESHOLD      2       /**< The threshold that the exponentially-smoothed analogRead samples (after subtracting the baseline current) must cross to establish ACKNOWLEDGEMENT.*/
-
+#define  ACK_SAMPLE_MILLIS         10       ///< analogReads are taken for this number of milliseconds
+/** The mA difference for CV acknowledgement.
+ *  NMRA 9.2.3 mandates +60mA for 6ms (+-1ms), but provide some legroom.
+ */
+#define  ACK_SAMPLE_THRESHOLD      40
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
@@ -37,11 +38,12 @@ void BaseChannel::sendAccessory(const AccessoryAddress &addr, bool thr) {
     packets.put_accessory_packet(addr, thr);
 }
 
-uint BaseChannel::getBaselineCurrent() const {
+uint BaseChannel::getBaselineCurrent() {
     uint baseline = 0;
 
     // collect baseline current
     for (int j = 0; j < ACK_BASE_COUNT; j++) {
+        updateCurrent();
         uint16_t v = getCurrent();
         baseline += v;
         delayMicroseconds(500);
@@ -53,11 +55,9 @@ uint BaseChannel::getBaselineCurrent() const {
 
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
 bool BaseChannel::checkCurrentResponse(uint baseline) const {
-    bool ret = false;
-    int max = 0;
     delay(ACK_SAMPLE_MILLIS);
-    max = getMaxCurrent();
-    ret = max - baseline > ACK_SAMPLE_THRESHOLD;
+    int max = getMaxCurrent();
+    bool ret = max - baseline > ACK_SAMPLE_THRESHOLD;
     DCC_LOGD("result is %d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }

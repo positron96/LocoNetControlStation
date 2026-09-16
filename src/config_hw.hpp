@@ -52,12 +52,13 @@
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
 #define DCC_MAIN_PIN_SENSE 36
-// 0.1 ohm sense resistor, 1000mA -> 100mV
-#define DCC_MAIN_MV_TO_MA_COEF  (1000.0f / 100.0f)
+// 0.1 ohm sense resistor, 1A -> 0.1V
+#define DCC_MAIN_MV_TO_MA_COEF  (1.0f / 0.1f)
 #define DCC_PROG_PIN 26
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
-#define DCC_PROG_MV_TO_MA_COEF  DCC_MAIN_MV_TO_MA_COEF  // same resistor, makes it unusable for reading CVs
+// 10 ohm resistor (100mA -> 1000mV)
+#define DCC_PROG_MV_TO_MA_COEF  (1.0f / 10.0f)
 
 #define PIN_LED  22
 #define PIN_BT 13
