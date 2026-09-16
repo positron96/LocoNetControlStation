@@ -4,7 +4,7 @@
 // PlatformIO environment in platformio.ini.
 
 #if defined(PCB_MK2)
-#define PCB_VER 200
+#define PCB_NAME "MK2(2026)"
 
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17
@@ -44,7 +44,7 @@
 
 #elif defined(PCB_MK1)
 
-#define PCB_VER 100
+#define PCB_NAME "MK1(2021)"
 
 #define LOCONET_PIN_RX 16
 #define LOCONET_PIN_TX 17

@@ -102,7 +102,7 @@ void setup() {
     Serial.begin(115200);
     Serial.println(CS_FULL_NAME);
     Serial.println("Config: ");
-    Serial.printf(" PCB_VER=%d\n", PCB_VER);
+    Serial.printf(" PCB_NAME=%s\n", PCB_NAME);
     Serial.printf(" USE_DISPLAY=%d\n", USE_DISPLAY);
     Serial.printf(" USE_WIFI=%d\n", USE_WIFI);
 
