@@ -66,9 +66,6 @@ ui::Display disp;
 ui::StatusScreen statusScreen;
 #endif
 
-// constexpr int _debug_pin = 14;
-// constexpr int _debug_pin2 = 12;
-
 led::Led statusLed(PIN_LED);
 
 void tick1s();

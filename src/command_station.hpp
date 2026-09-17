@@ -182,14 +182,14 @@ public:
 
 
 
-    int16_t readCVProg(uint16_t cv) {
+    etl::expected<uint8_t, dcc::CvCommError> readCVProg(uint16_t cv) {
         //IDCCChannel *dccProg = dccMain;
-        if(dccProg==nullptr) return -2;
+        if(dccProg==nullptr) return etl::unexpected(dcc::CvCommError::InvalidState);
         return dccProg->readCVProg(cv);
     }
-    bool verifyCVProg(uint16_t cv, uint8_t val) {
+    etl::expected<bool, dcc::CvCommError> verifyCVProg(uint16_t cv, uint8_t val) {
         //IDCCChannel *dccProg = dccMain;
-        if(dccProg==nullptr) return false;
+        if(dccProg==nullptr) return etl::unexpected(dcc::CvCommError::InvalidState);
         return dccProg->verifyCVByteProg(cv, val);
     }
     bool writeCvProg(uint16_t cv, uint8_t val) {

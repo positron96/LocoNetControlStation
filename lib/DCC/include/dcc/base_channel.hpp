@@ -11,6 +11,8 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 #include <etl/observer.h>
+#include <etl/enum_type.h>
+#include <etl/expected.h>
 
 #include <Arduino.h>
 
@@ -22,6 +24,20 @@ namespace dcc {
 extern Packet idlePacket;
 extern Packet resetPacket;
 extern PacketBits idle_packet_bits;
+
+struct CvCommError {
+    enum enum_type {
+        Timeout,
+        NoResponse,
+        InvalidState,
+   };
+
+   ETL_DECLARE_ENUM_TYPE(CvCommError, unsigned)
+   ETL_ENUM_TYPE(Timeout, "Timeout")
+   ETL_ENUM_TYPE(NoResponse, "No Response")
+   ETL_ENUM_TYPE(InvalidState, "Invalid State")
+   ETL_END_ENUM_TYPE
+};
 
 /**
  * A (abstract) class that manages one DCC track.
@@ -63,8 +79,8 @@ public:
      */
     void sendAccessory(const AccessoryAddress &addr, bool thr);
 
-    int16_t readCVProg(int cv);
-    bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
+    etl::expected<uint8_t, CvCommError> readCVProg(int cv);
+    etl::expected<bool, CvCommError> verifyCVByteProg(uint16_t cv, uint8_t bValue);
     bool writeCVByteProg(int cv, uint8_t bValue);
     bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
     void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);

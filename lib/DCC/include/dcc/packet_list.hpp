@@ -48,6 +48,8 @@ namespace dcc {
 
         size_t free_loco_slots() const { return loco_slots.available(); }
 
+        size_t used_loco_slots() const { return loco_slots.size(); }
+
         bool has_loco(const LocoAddress addr) const {
             return loco_slots.find(addr) != loco_slots.end();
         }

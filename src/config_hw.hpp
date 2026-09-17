@@ -42,6 +42,9 @@
 #define PIN_SPI_CLK 18
 #define PIN_SPI_SS 5
 
+#define PIN_DBG1 14
+#define PIN_DBG2 12
+
 #elif defined(PCB_MK1)
 
 #define PCB_NAME "MK1(2021)"

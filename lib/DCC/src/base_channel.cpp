@@ -63,6 +63,11 @@ bool BaseChannel::checkCurrentResponse(uint baseline) const {
 }
 
 
+/**
+ * Enqueues a DCC packet and waits until pending queue is empty.
+ *
+ * In other words, it returns when packet starts transmitting.
+ */
 bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms) {
     size_t remaining_ms = timeout_ms;
 
@@ -83,54 +88,75 @@ bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepea
     return true;
 }
 
-int16_t BaseChannel::readCVProg(int cv) {
-	uint8_t packet[4];
-	int ret;
+// #define PIN_DBG1 14
+// #define PIN_DBG2 12
 
-	cv--;                              // actual CV addresses are cv-1 (0-1023)
+constexpr uint8_t CV_LONGFORM = 0b1110'0000;
+constexpr uint8_t CV_VERIFY = 0b0100;
 
-	packet[0] = 0x78 | (highByte(cv) & 0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-	packet[1] = lowByte(cv);
+etl::expected<uint8_t, CvCommError> BaseChannel::readCVProg(int cv) {
 
-	ret = 0;
+    uint8_t packet[3];
+    int ret;
+
+    cv--;     // actual CV addresses are cv-1 (0-1023)
+
+    packet[0] = 0x78 | (highByte(cv) & 0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
+    packet[1] = lowByte(cv);
+
+    ret = 0;
+
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError::InvalidState);
+    }
 
     int baseline = getBaselineCurrent();
 
     //TODO: verify that channel does not starve with this waiting implementation
-	for (uint8_t i = 0; i<8; i++) {
-		packet[2] = 0xE8 | i;
+    for (uint8_t i = 0; i<8; i++) {
+        packet[2] = 0xE8 | i;
 
-		sendPacketFully(resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
-        resetMaxCurrent();
-		sendPacketFully(packet, 3, 5);               // NMRA recommends 5 verify packets
-		sendPacketFully(resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+        if(!sendPacketFully(resetPacket, 3)) return etl::unexpected(CvCommError::Timeout);          // NMRA recommends starting with 3 reset packets
+        resetMaxCurrent(); // start reading current here
+        //digitalWrite(PIN_DBG1, HIGH);
+        if(!sendPacketFully(packet, 5)) return etl::unexpected(CvCommError::Timeout);               // NMRA recommends 5 verify packets
+        //digitalWrite(PIN_DBG1, LOW);
+        if(!sendPacketFully(resetPacket, 1)) return etl::unexpected(CvCommError::Timeout);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
 
         bool bitVal = checkCurrentResponse(baseline);
         if(bitVal) bitSet(ret, i);
 
         DCC_LOGD("Reading bit %d, value is %d", i, bitVal?1:0);
-	}
+    }
 
-    return verifyCVByteProg(cv+1, ret) ? ret : -1;
-
+    auto verified = verifyCVByteProg(cv+1, ret);
+    if(!verified) return etl::unexpected(verified.error());
+    if(!verified.value()) return etl::unexpected(CvCommError::NoResponse);
+    return ret;
 }
 
-bool BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
+etl::expected<bool, CvCommError> BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue){
+
     DCC_LOGI("Verifying cv%d==%d", cv, bValue);
-    uint8_t packet[4];
+    uint8_t packet[3];
 
     cv--;
 
-    packet[0] = 0x74 | (highByte(cv) & 0x03);
+    packet[0] = CV_LONGFORM | CV_VERIFY | (highByte(cv) & 0x03);
     packet[1] = lowByte(cv);
-	packet[2] = bValue;
+    packet[2] = bValue;
 
-    sendPacketFully(resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
-    sendPacketFully(resetPacket, 2, 3);
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError::InvalidState);
+    }
+
+    if(!sendPacketFully(resetPacket, 3)) return etl::unexpected(CvCommError::Timeout);    // NMRA recommends starting with 3 reset packets
     uint baseline = getBaselineCurrent();
     resetMaxCurrent();
-	sendPacketFully(packet, 3, 5);         // NMRA recommends 5 verify packets
-	sendPacketFully(resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+    if(!sendPacketFully(packet, 5)) return etl::unexpected(CvCommError::Timeout);         // NMRA recommends 5 verify packets
+    if(!sendPacketFully(resetPacket, 1)) return etl::unexpected(CvCommError::Timeout);    // decide if it's needed or mandated
 
     return checkCurrentResponse(baseline);
 
