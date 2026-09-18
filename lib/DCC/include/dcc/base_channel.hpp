@@ -79,12 +79,12 @@ public:
      */
     void sendAccessory(const AccessoryAddress &addr, bool thr);
 
-    etl::expected<uint8_t, CvCommError> readCVProg(int cv);
-    etl::expected<bool, CvCommError> verifyCVByteProg(uint16_t cv, uint8_t bValue);
-    bool writeCVByteProg(int cv, uint8_t bValue);
-    bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
-    void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);
-    void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
+    etl::expected<uint8_t, CvCommError> readCVProg(uint16_t cv);
+    etl::expected<bool, CvCommError> verifyCVByteProg(uint16_t cv, uint8_t value);
+    bool writeCVByteProg(uint16_t cv, uint8_t value);
+    bool writeCVBitProg(uint16_t cv, uint8_t bit_num, uint8_t value);
+    void writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value);
+    void writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num, uint8_t value);
 
     void unloadSlot(const LocoAddress addr) { packets.clear_loco(addr); }
 

@@ -48,16 +48,17 @@ public:
 
     void updateCurrent() override {
         const uint16_t mv = analogReadMilliVolts(_sensePin);
-
-        current = static_cast<uint16_t>(mv * _mvTomA);
+        uint16_t cur = static_cast<uint16_t>(mv * _mvTomA);
+        current = cur;
         if (current > maxCurrent) {
-            maxCurrent = current.load();
+            maxCurrent = cur;
         }
 
-        if(current > overCurrentThreshold) {
+        if(cur > overCurrentThreshold) {
+            Serial.printf("Overcurrent: %dmV, %d mA > %d mA\n", mv, cur, overCurrentThreshold);
             overCurrentFlag = true;
             overCurrentEventPending = true;
-            digitalWrite(_enPin, LOW); // act immediately and without notifications
+            //digitalWrite(_enPin, LOW); // act immediately before any notifications
         }
     }
 

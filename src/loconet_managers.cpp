@@ -394,15 +394,15 @@ void LocoNetSlotManager::processProgMsg(const progTaskMsg &msg) {
             case DIR_BYTE_ON_SRVC_TRK: {
                 LOGI("Read byte on prog CV%d", cv);
                 sendLack(PROG_LACK, 1); // ack ok
-                int16_t ret = CS.readCVProg(cv);
-                sendProgData(msg, (ret>=0) ? 0 : PSTAT_READ_FAIL, ret>=0?ret:0);
+                auto ret = CS.readCVProg(cv);
+                sendProgData(msg, ret.has_value() ? 0 : PSTAT_READ_FAIL, ret.value_or(0));
                 break;
             }
             case SRVC_TRK_RESERVED: {// make it a verify command.
                 LOGI("Verify byte on prog CV%d==%d", cv, val);
                 sendLack(PROG_LACK, 1); // ack ok
-                bool ret = CS.verifyCVProg(cv, val);
-                sendProgData(msg, ret?0:PSTAT_READ_FAIL, val);
+                auto ret = CS.verifyCVProg(cv, val);
+                sendProgData(msg, ret.has_value() ? 0 : PSTAT_READ_FAIL, ret.value_or(0));
                 break;
             }
             default:
