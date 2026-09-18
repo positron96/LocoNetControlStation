@@ -5,7 +5,7 @@
 #include "dcc/loco_address.hpp"
 #include "dcc/accessory_address.hpp"
 
-#define FILE_LOG_LEVEL  LEVEL_DEBUG
+#define FILE_LOG_LEVEL  LEVEL_INFO
 #include "log.h"
 
 #include <etl/vector.h>

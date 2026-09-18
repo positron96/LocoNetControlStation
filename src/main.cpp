@@ -211,7 +211,7 @@ void setup() {
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 #else
-    statusLed.enable_state(led::State::normal);
+    statusLed.enable_state(led::State::normal, 3);
 #endif
 
 }
