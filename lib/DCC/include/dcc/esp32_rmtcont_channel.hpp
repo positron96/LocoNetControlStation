@@ -219,6 +219,7 @@ private:
                 packet.packet.size_bits,
                 packet.packet.buf[0], packet.packet.buf[1],
                 packet.nRepeats);
+            repeatsLeft = packet.nRepeats - 1; // nRepeats=1 means stop at next tx done event.
             // this is data without preamble, put with offset.
             rmt_fill_tx_items(_rmtChannel, rmt_items.data(), itemCount, PREAMBLE_BITS);
         }
