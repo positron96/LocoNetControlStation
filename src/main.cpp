@@ -18,6 +18,8 @@
 
 #include <LocoNetStream.h>
 
+#include "dccpp_proto_decoder.hpp"
+
 #if USE_DISPLAY==1
 #include "ui/display.hpp"
 #include "ui/status_screen.hpp"
@@ -58,6 +60,8 @@ LocoNetSlotManager lnSlotMan(&bus);
 LocoNetTurnoutManager lnTurnoutMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
+
+dccpp::DccppStreamHandler dccpp{&Serial};
 
 #if USE_DISPLAY==1
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
@@ -222,6 +226,7 @@ void loop() {
 #endif
     CS.loop();
     //lSerial.loop();
+    dccpp.loop();
 
     uint32_t ms = millis();
     static uint32_t lastMs = millis(); // don't start from 0 as connecting to wifi can take a lot
