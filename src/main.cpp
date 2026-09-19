@@ -238,7 +238,6 @@ void loop() {
     static int inState = 0;
     static int inState2 = 0;
     if(millis()>nextInRead) {
-        // Serial.println("CHECK");
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
             //CS.turnoutAction(6, false, v ? TurnoutAction::THROW : TurnoutAction::CLOSE);

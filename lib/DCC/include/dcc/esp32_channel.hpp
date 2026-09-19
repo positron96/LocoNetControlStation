@@ -47,7 +47,11 @@ public:
     }
 
     void updateCurrent() override {
-        const uint16_t mv = analogReadMilliVolts(_sensePin);
+
+        history[writeIdx] = (int)analogReadMilliVolts(_sensePin);
+        writeIdx = (writeIdx + 1) % WINDOW_SIZE;
+
+        const uint16_t mv = getTrimmedValue();
         uint16_t cur = static_cast<uint16_t>(mv * _mvTomA);
         current = cur;
         if (current > maxCurrent) {
@@ -78,6 +82,25 @@ protected:
 
 private:
     float _mvTomA;
+
+    constexpr static int WINDOW_SIZE = 4;
+    int history[WINDOW_SIZE] = {0};
+    int writeIdx = 0;
+
+    int getTrimmedValue() {
+        int minVal = std::numeric_limits<int>::max();
+        int maxVal = std::numeric_limits<int>::min();
+        int sum = 0;
+
+        for (int i = 0; i < WINDOW_SIZE; i++) {
+            int v = history[i];
+            sum += v;
+            if (v < minVal) minVal = v;
+            if (v > maxVal) maxVal = v;
+        }
+        // Remove the single highest and lowest outliers
+        return (sum - minVal - maxVal) / (WINDOW_SIZE - 2);
+    }
 };
 
 }

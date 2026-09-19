@@ -17,7 +17,7 @@ PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 /** The mA difference for CV acknowledgement.
  *  NMRA 9.2.3 mandates +60mA for 6ms (+-1ms), but provide some legroom.
  */
-#define  ACK_SAMPLE_THRESHOLD      40
+#define  ACK_SAMPLE_THRESHOLD      35
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
@@ -57,7 +57,7 @@ uint BaseChannel::getBaselineCurrent() {
 bool BaseChannel::checkCurrentResponse(uint baseline) const {
     delay(ACK_SAMPLE_MILLIS);
     int max = getMaxCurrent();
-    bool ret = max - baseline > ACK_SAMPLE_THRESHOLD;
+    bool ret = max - (int)baseline > ACK_SAMPLE_THRESHOLD;
     DCC_LOGI("result is %d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }
@@ -117,7 +117,7 @@ etl::expected<uint8_t, CvCommError> BaseChannel::readCVProg(uint16_t cv) {
         return etl::unexpected(CvCommError::InvalidState);
     }
 
-    int baseline = getBaselineCurrent();
+    uint baseline = getBaselineCurrent();
 
     // TODO: implement logic: verify bit==1; if no ack received, verify bit==0; if no ack received, abort as NO_RESP
 

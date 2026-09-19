@@ -145,11 +145,11 @@ public:
         channels.push_back(&ch);
     }
 
-    void update() {
-        for(auto ch: channels) {
-            ch->updateCurrent();
-        }
-    }
+    // void update() {
+    //     for(auto ch: channels) {
+    //         ch->updateCurrent();
+    //     }
+    // }
 
     void checkOvercurrent() {
         for(auto ch: channels) {
