@@ -59,10 +59,10 @@ public:
         }
 
         if(cur > overCurrentThreshold) {
-            Serial.printf("Overcurrent: %dmV, %d mA > %d mA\n", mv, cur, overCurrentThreshold);
+            digitalWrite(_enPin, LOW); // act immediately before any notifications
+            DCC_LOGW("Overcurrent: %dmV, %d mA > %d mA\n", mv, cur, overCurrentThreshold);
             overCurrentFlag = true;
             overCurrentEventPending = true;
-            //digitalWrite(_enPin, LOW); // act immediately before any notifications
         }
     }
 

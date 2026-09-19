@@ -75,8 +75,8 @@ public:
              : false;
     }
 
-    const dcc::BaseChannel *getMainTrack() const { return dccMain; }
-    const dcc::BaseChannel *getProgTrack() const { return dccProg; }
+    dcc::BaseChannel *getMainTrack() const { return dccMain; }
+    dcc::BaseChannel *getProgTrack() const { return dccProg; }
 
 
     struct LocoData {

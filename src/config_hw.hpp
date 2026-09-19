@@ -42,8 +42,8 @@
 #define PIN_SPI_CLK 18
 #define PIN_SPI_SS 5
 
-#define PIN_DBG1 12
-#define PIN_DBG2 14
+// #define PIN_DBG1 12
+// #define PIN_DBG2 14
 
 #elif defined(PCB_MK1)
 
@@ -68,8 +68,8 @@
 #define PIN_BT 13
 #define PIN_BT2 15
 
-#define PIN_DBG1 12
-#define PIN_DBG2 14
+// #define PIN_DBG1 12
+// #define PIN_DBG2 14
 
 #if defined(USE_DISPLAY) && USE_DISPLAY==1
     #warning "LOLIN32 board does not support display, forcing USE_DISPLAY to 0"

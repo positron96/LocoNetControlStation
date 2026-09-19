@@ -17,7 +17,7 @@ namespace dccpp {
 
     class DccppStreamHandler {
     public:
-        explicit DccppStreamHandler(Stream *stream);
+        explicit DccppStreamHandler(Stream *stream): stream{stream} {}
 
         void loop();
 

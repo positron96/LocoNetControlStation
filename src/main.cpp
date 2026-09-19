@@ -10,7 +10,7 @@
 
 #include "loconet_managers.hpp"
 
-#include "loconet_serial.hpp"
+//#include "loconet_serial.hpp"
 #include "loconet_tcp_server.hpp"
 
 #include "withrottle_server.hpp"
@@ -61,7 +61,7 @@ LocoNetTurnoutManager lnTurnoutMan(&bus);
 
 WiThrottleServer withrottleServer(WiThrottleServer::DEF_PORT, CS_FULL_NAME);
 
-dccpp::DccppStreamHandler dccpp{&Serial};
+dccpp::DccppStreamHandler dccppHandler{&Serial};
 
 #if USE_DISPLAY==1
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, PIN_DISP_SCL, PIN_DISP_SDA);
@@ -85,14 +85,14 @@ class PowerStatusObserver: public dcc::PowerObserver {
         if(event.channel == &dccMain) {
             if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
                 statusLed.enable_state(led::State::error);
-                Serial.println("Overcurrent on main");
+                Serial.printf("Overcurrent on main: %d mA\n", dccMain.getCurrent());
             } else if (event.state) {
                 statusLed.disable_state(led::State::error);
             }
         } else {
             // prog
             if(!event.state && event.reason == dcc::PowerEvent::Reason::Overcurrent) {
-                Serial.println("Overcurrent on prog");
+                Serial.printf("Overcurrent on prog: %d mA\n", dccProg.getCurrent());
             }
         }
     }
@@ -107,11 +107,11 @@ void setup() {
     Serial.printf(" USE_DISPLAY=%d\n", USE_DISPLAY);
     Serial.printf(" USE_WIFI=%d\n", USE_WIFI);
 
-    pinMode(PIN_BT, INPUT_PULLUP);
-    pinMode(PIN_BT2, INPUT_PULLUP);
+    pinMode(PIN_BT, INPUT);
+    pinMode(PIN_BT2, INPUT);
 
-    // pinMode(_debug_pin, OUTPUT);
-    // pinMode(_debug_pin2, OUTPUT);
+    // pinMode(PIN_DBG1, OUTPUT);
+    // pinMode(PIN_DBG2, OUTPUT);
 
     statusLed.begin();
 
@@ -226,7 +226,7 @@ void loop() {
 #endif
     CS.loop();
     //lSerial.loop();
-    dccpp.loop();
+    dccppHandler.loop();
 
     uint32_t ms = millis();
     static uint32_t lastMs = millis(); // don't start from 0 as connecting to wifi can take a lot

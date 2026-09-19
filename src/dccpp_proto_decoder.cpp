@@ -1,12 +1,14 @@
 #include "dccpp_proto_decoder.hpp"
 
-#define FILE_LOG_LEVEL LEVEL_WARN
-#include "log.h"
+#include "command_station.hpp"
 
 #include <etl/string_utilities.h>
 #include <etl/string_view.h>
 #include <etl/to_arithmetic.h>
 #include <etl/array.h>
+
+#define FILE_LOG_LEVEL LEVEL_WARN
+#include "log.h"
 
 #define FMT_SV(sv)  (int)((sv).length()), (sv).data()
 
@@ -38,13 +40,26 @@ namespace dccpp {
         return count;
     }
 
+    void DccppStreamHandler::loop() {
+        while(stream->available() > 0) {
+            char c = stream->read();
+            Serial.print(c);
+            if(c=='\n' || c=='\r') {
+                process_line(buf);
+                buf.clear();
+            } else {
+                buf.push_back(c);
+            }
+        }
+    }
+
     void DccppStreamHandler::process_line(const etl::string_view line) {
         if(line.empty()) return;
 
         auto trimmed = etl::trim_view_whitespace(line);
 
         if(trimmed.size() < 3 || trimmed.front() != '<' || trimmed.back() != '>') {
-            LOGE("DCC++ parse error: malformed bracketed command: '%.*s'", FMT_SV(trimmed));
+            LOGE("DCC++ parse error: malformed brackets: '%.*s'", FMT_SV(trimmed));
             return;
         }
 
@@ -96,10 +111,19 @@ namespace dccpp {
             case '0':
             case '1': {
                 // power control: <0> or <1>
+                bool v = cmd[0] == '1';
+                if(parts.size()==1) {
+                    CS.setPowerState(v);
+                } else {
+                    if(parts[1] == "MAIN") {
+                        CS.getMainTrack()->setPower(v);
+                    } else if(parts[1] == "PROG") {
+                        CS.getProgTrack()->setPower(v);
+                    }
+                }
                 break;
             }
-            case 'R':
-            case 'r': {
+            case 'R': {
                 if(count < 4) {
                     LOGE("DCC++ parse error: invalid CV read command '%.*s'", FMT_SV(trimmed));
                     return;
@@ -109,13 +133,14 @@ namespace dccpp {
                     LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
                     return;
                 }
-                (void)cv;
-                (void)callback_num;
-                (void)callback_sub;
+                auto ret = CS.readCVProg(cv);
+                String t = String("<r ") + callback_num + " " + callback_sub + " " + (ret?(int)ret.value():-1) +">";
+                stream->println(t);
                 break;
             }
-            case 'W':
-            case 'w': {
+            case 'r':
+                break;
+            case 'W': {
                 if(count < 5) {
                     LOGE("DCC++ parse error: invalid CV write command '%.*s'", FMT_SV(trimmed));
                     return;
@@ -125,12 +150,14 @@ namespace dccpp {
                     LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
                     return;
                 }
-                (void)cv;
-                (void)value;
-                (void)callback_num;
-                (void)callback_sub;
+                auto ret = CS.writeCvProg(cv, value);
+                String t = String("<r ") + callback_num + " " + callback_sub + " " + (ret?(int)value:-1) + ">";
+                stream->println(t);
                 break;
             }
+            case 'w':
+                // not implemented
+                break;
             case 'B':
             case 'b': {
                 if(count < 6) {
