@@ -63,7 +63,7 @@ namespace dcc {
     inline size_t encode_dcc(const etl::span<const uint8_t> src, etl::span<uint8_t> dst, size_t preamble_bits) {
         uint8_t crc = src[0];
         size_t len = src.size();
-        for(int i=1; i<len; i++)
+        for(size_t i=1; i<len; i++)
             crc ^= src[i];
 
         etl::bit_stream_writer s(dst, etl::endian::big);

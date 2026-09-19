@@ -32,7 +32,7 @@
 //!!! NOT REENTRANT!
 inline char* fmt_span(const etl::span<const uint8_t> bytes) {
     static char buf[100];
-    size_t n = 0;
+    int n = 0;
     n += snprintf(buf, sizeof(buf), "[len=%d:", bytes.size());
     for(size_t i=0; i<bytes.size() && n < sizeof(buf); i++) {
         n += snprintf(buf+n, sizeof(buf)-n, "%02X ", bytes[i]);
