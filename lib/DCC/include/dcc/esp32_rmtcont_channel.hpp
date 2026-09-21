@@ -19,14 +19,14 @@ namespace dcc {
  *   . put preamble at the beginning of the TX block and don't touch it,
  *   . start outputting in loop mode,
  *   . in TX DONE interrupt rewrite only payload area.
- *     RMT is outputting preamble while core is filling payload,
- *     so there are no gaps.
+ *     RMT is outputting preamble while CPU is filling payload area,
+ *       so there are no gaps.
  *
  * DCC packet always starts at the beginning of the RMT block,
  *   as a consequence it must fully fit into RMT memory.
  * Not a problem for OG ESP32 (it has 8 channels 64 bits each, which can be combined),
  *   somewhat a problem for ESP32-S2/S3 (4 TX blocks 48 bits each),
- *   but definitely a problem for ESP32-C3/C5/C6 where there are only 2 TX blocks 48 bits each.
+ *   definitely a problem for ESP32-C3/C5/C6 where there are only 2 TX blocks 48 bits each.
  *
  * On memory blocks:
  *   https://docs.espressif.com/projects/arduino-esp32/en/latest/api/rmt.html#rmt-memory-blocks
@@ -49,7 +49,7 @@ public:
         cfg.rmt_mode = RMT_MODE_TX;
         cfg.channel = _rmtChannel;
         cfg.clk_div = APB_CLK_FREQ  / 1'000'000;
-        cfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
+        cfg.gpio_num = static_cast<gpio_num_t>(pinData);
         cfg.mem_block_num = MEM_BLOCKS;
         ESP_ERROR_CHECK(rmt_config(&cfg));
 
@@ -110,6 +110,10 @@ private:
         return t;
     }
     rmt_channel_t _rmtChannel{static_cast<rmt_channel_t>(incChannel())}; // auto-increment for now.
+
+    uint8_t repeatsLeft{0};
+    size_t packetsSent{0};
+
 
     // volatile bool _running{false};
     // TaskHandle_t _txTask{nullptr};
@@ -189,8 +193,6 @@ private:
         }
     }
 
-    uint8_t repeatsLeft{0};
-
     IRAM_ATTR void rmtTxDoneCallback() {
         // ets_printf("RMT channel %d, len %d\n", _rmtChannel, rmt_items.size());
         // if(_running && _txTask != nullptr) {
@@ -198,6 +200,9 @@ private:
         //     vTaskNotifyGiveFromISR(_txTask, &xHigherPriorityTaskWoken);
         //     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
         // }
+
+        if (powerState) packetsSent++;
+
         if (repeatsLeft>0) {
             repeatsLeft--;
             DCC_LOGD_ISR("repeat packet = %d", repeatsLeft);
@@ -224,6 +229,10 @@ private:
             rmt_fill_tx_items(_rmtChannel, rmt_items.data(), itemCount, PREAMBLE_BITS);
         }
 
+    }
+
+    size_t diagGetPacketsSent() const override {
+        return packetsSent;
     }
 };
 

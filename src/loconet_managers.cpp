@@ -327,7 +327,7 @@ uint8_t getSlotStat(const LocoData &dd) {
         ::sendLack(cmd, arg, _ln, this);
     }
 
-    void LocoNetSlotManager::processDirf(uint8_t slot, uint v) {
+    void LocoNetSlotManager::processDirf(uint8_t slot, unsigned v) {
         LOGI("OPC_LOCO_DIRF slot %d dirf %02x", slot, v);
         uint8_t dir = ((v & DIRF_DIR) == DIRF_DIR) ? 0 : 1;
         CS.setLocoDir(slot, dir);

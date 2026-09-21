@@ -163,9 +163,9 @@ private:
         if(clients.empty()) return; // don't waste time processing
 
         char buf[LB_BUF_SIZE] = "RECEIVE";
-        uint len = strlen(buf);
+        size_t len = strlen(buf);
         uint8_t nBytes = msg.length();
-        for(int j=0; j<nBytes; j++) {
+        for(size_t j=0; j<nBytes; j++) {
             len += snprintf(buf+len, LB_BUF_SIZE-len, " %02X", msg.data[j]);
         }
         LB_LOGD("Transmitting '%s'", buf );

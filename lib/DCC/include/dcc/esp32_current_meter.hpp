@@ -8,6 +8,11 @@
 
 namespace dcc {
 
+    /**
+     * Class for background current measurement that uses ESP32 timer.
+     *
+     * Actual current measuring is not part of this class, see esp32_channel.hpp.
+     */
     class ESP32CurrentMeter: public CurrentMeter {
     public:
         void begin() override {

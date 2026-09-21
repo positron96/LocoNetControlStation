@@ -35,7 +35,7 @@ public:
         ESP32Channel::begin();
 
         rmt_tx_channel_config_t txCfg{};
-        txCfg.gpio_num = static_cast<gpio_num_t>(_outputPin);
+        txCfg.gpio_num = static_cast<gpio_num_t>(pinData);
         txCfg.clk_src = RMT_CLK_SRC_DEFAULT;
         txCfg.resolution_hz = 1000'000;  // 1 tick = 1us
         txCfg.mem_block_symbols = 64;
@@ -43,7 +43,7 @@ public:
         txCfg.intr_priority = 0;
 
         if (rmt_new_tx_channel(&txCfg, &_rmtChannel) != ESP_OK) {
-            DCC_LOGW("RMT new TX channel failed for GPIO %d", _outputPin);
+            DCC_LOGW("RMT new TX channel failed for GPIO %d", pinData);
             return;
         }
 

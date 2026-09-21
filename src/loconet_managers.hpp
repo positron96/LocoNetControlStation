@@ -66,7 +66,7 @@ private:
 
     void sendProgData(progTaskMsg, uint8_t pstat, uint8_t value );
 
-    void processDirf(uint8_t slot, uint v) ;
+    void processDirf(uint8_t slot, unsigned v) ;
 
     void processSnd(uint8_t slot, uint8_t snd);
 

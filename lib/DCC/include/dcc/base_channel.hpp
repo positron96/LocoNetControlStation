@@ -112,6 +112,8 @@ public:
 
     virtual ~BaseChannel() = default;
 
+    virtual size_t diagGetPacketsSent() const { return 0; }
+
 protected:
     uint16_t overCurrentThreshold{std::numeric_limits<uint16_t>::max()}; ///< disabled until explicitly set
     std::atomic<uint16_t> current{0};
@@ -124,8 +126,8 @@ protected:
     /** Tries to schedule a packet for a specified duration and waits until it's sent to tracks. */
     bool sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000);
 
-    uint getBaselineCurrent();
-    bool checkCurrentResponse(uint baseline) const;
+    unsigned getBaselineCurrent();
+    bool checkCurrentResponse(unsigned baseline) const;
 
 };
 
