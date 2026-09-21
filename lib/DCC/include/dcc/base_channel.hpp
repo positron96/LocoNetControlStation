@@ -11,6 +11,8 @@
 #include <etl/map.h>
 #include <etl/bitset.h>
 #include <etl/observer.h>
+#include <etl/enum_type.h>
+#include <etl/expected.h>
 
 #include <Arduino.h>
 
@@ -22,6 +24,20 @@ namespace dcc {
 extern Packet idlePacket;
 extern Packet resetPacket;
 extern PacketBits idle_packet_bits;
+
+struct CvCommError {
+    enum enum_type {
+        Timeout,
+        NoResponse,
+        InvalidState,
+   };
+
+   ETL_DECLARE_ENUM_TYPE(CvCommError, unsigned)
+   ETL_ENUM_TYPE(Timeout, "Timeout")
+   ETL_ENUM_TYPE(NoResponse, "No Response")
+   ETL_ENUM_TYPE(InvalidState, "Invalid State")
+   ETL_END_ENUM_TYPE
+};
 
 /**
  * A (abstract) class that manages one DCC track.
@@ -67,12 +83,12 @@ public:
      */
     void sendAccessory(const AccessoryAddress &addr, bool thr);
 
-    int16_t readCVProg(int cv);
-    bool verifyCVByteProg(uint16_t cv, uint8_t bValue);
-    bool writeCVByteProg(int cv, uint8_t bValue);
-    bool writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue);
-    void writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue);
-    void writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue);
+    etl::expected<uint8_t, CvCommError> readCVProg(uint16_t cv);
+    etl::expected<bool, CvCommError> verifyCVByteProg(uint16_t cv, uint8_t value);
+    etl::expected<void, CvCommError> writeCVByteProg(uint16_t cv, uint8_t value);
+    etl::expected<void, CvCommError> writeCVBitProg(uint16_t cv, uint8_t bit_num, uint8_t value);
+    void writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value);
+    void writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num, uint8_t value);
 
     void unloadSlot(const LocoAddress addr) { packets.clear_loco(addr); }
 
@@ -100,6 +116,8 @@ public:
 
     virtual ~BaseChannel() = default;
 
+    virtual size_t diagGetPacketsSent() const { return 0; }
+
 protected:
     uint16_t overCurrentThreshold{std::numeric_limits<uint16_t>::max()}; ///< disabled until explicitly set
     std::atomic<uint16_t> current{0};
@@ -112,8 +130,8 @@ protected:
     /** Tries to schedule a packet for a specified duration and waits until it's sent to tracks. */
     bool sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms=1000);
 
-    uint getBaselineCurrent();
-    bool checkCurrentResponse(uint baseline) const;
+    unsigned getBaselineCurrent();
+    bool checkCurrentResponse(unsigned baseline) const;
 
 };
 
@@ -133,11 +151,11 @@ public:
         channels.push_back(&ch);
     }
 
-    void update() {
-        for(auto ch: channels) {
-            ch->updateCurrent();
-        }
-    }
+    // void update() {
+    //     for(auto ch: channels) {
+    //         ch->updateCurrent();
+    //     }
+    // }
 
     void checkOvercurrent() {
         for(auto ch: channels) {

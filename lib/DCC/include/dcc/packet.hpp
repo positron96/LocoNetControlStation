@@ -63,7 +63,7 @@ namespace dcc {
     inline size_t encode_dcc(const etl::span<const uint8_t> src, etl::span<uint8_t> dst, size_t preamble_bits) {
         uint8_t crc = src[0];
         size_t len = src.size();
-        for(int i=1; i<len; i++)
+        for(size_t i=1; i<len; i++)
             crc ^= src[i];
 
         etl::bit_stream_writer s(dst, etl::endian::big);
@@ -138,7 +138,7 @@ namespace dcc {
     constexpr inline It encode_address(const LocoAddress addr, It out) {
         uint16_t iAddr = addr.addr();
         if ( addr.isLong() ) {
-            *out++ = highByte(iAddr) | 0xC0;  // convert train number into a two-byte address
+            *out++ = highByte(iAddr) | 0xC0;
         }
 
         *out++ = lowByte(iAddr);
@@ -190,7 +190,7 @@ namespace dcc {
     inline auto make_f0_f4_packet(LocoAddress addr, uint32_t fns) {
         etl::vector<uint8_t, 4> data;
         auto it = encode_address(addr, data.begin());
-        *it++ = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Fu) >> 1u;
+        *it++ = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Eu) >> 1u;
         data.uninitialized_resize(std::distance(data.begin(), it));
         return data;
     }

@@ -67,8 +67,8 @@ public:
              : false;
     }
 
-    const dcc::BaseChannel *getMainTrack() const { return dccMain; }
-    const dcc::BaseChannel *getProgTrack() const { return dccProg; }
+    dcc::BaseChannel *getMainTrack() const { return dccMain; }
+    dcc::BaseChannel *getProgTrack() const { return dccProg; }
 
 
     struct LocoData {
@@ -170,25 +170,25 @@ public:
 
 
 
-    int16_t readCVProg(uint16_t cv) {
+    etl::expected<uint8_t, dcc::CvCommError> readCVProg(uint16_t cv) {
         //IDCCChannel *dccProg = dccMain;
-        if(dccProg==nullptr) return -2;
+        if(dccProg==nullptr) return etl::unexpected(dcc::CvCommError::InvalidState);
         return dccProg->readCVProg(cv);
     }
-    bool verifyCVProg(uint16_t cv, uint8_t val) {
+    etl::expected<bool, dcc::CvCommError> verifyCVProg(uint16_t cv, uint8_t val) {
         //IDCCChannel *dccProg = dccMain;
-        if(dccProg==nullptr) return false;
+        if(dccProg==nullptr) return etl::unexpected(dcc::CvCommError::InvalidState);
         return dccProg->verifyCVByteProg(cv, val);
     }
     bool writeCvProg(uint16_t cv, uint8_t val) {
         //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
-        return dccProg->writeCVByteProg(cv, val);
+        return dccProg->writeCVByteProg(cv, val).has_value();
     }
     bool writeCvProgBit(uint16_t cv, uint8_t bit, bool val) {
         //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
-        return dccProg->writeCVBitProg(cv, bit, val);
+        return dccProg->writeCVBitProg(cv, bit, val).has_value();
     }
     void writeCvMain(LocoAddress addr, uint16_t cv, uint8_t val) {
         if(dccMain==nullptr) return;

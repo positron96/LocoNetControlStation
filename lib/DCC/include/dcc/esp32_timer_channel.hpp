@@ -31,10 +31,10 @@ public:
         timerPeriodsLeft = timerPeriodsLeft - 1;
         //DCC_DEBUGF_ISR("ESP32TimerChannel::timerFunc, periods left: %d, total: %d\n", R.timerPeriodsLeft, R.timerPeriodsHalf*2);
         if(timerPeriodsLeft == timerPeriodsHalf) {
-            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 1);
+            gpio_set_level(static_cast<gpio_num_t>(pinData), 1);
         }
         if(timerPeriodsLeft == 0) {
-            gpio_set_level(static_cast<gpio_num_t>(_outputPin), 0);
+            gpio_set_level(static_cast<gpio_num_t>(pinData), 0);
             nextBit();
         }
     }

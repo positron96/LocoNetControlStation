@@ -17,7 +17,7 @@ PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 /** The mA difference for CV acknowledgement.
  *  NMRA 9.2.3 mandates +60mA for 6ms (+-1ms), but provide some legroom.
  */
-#define  ACK_SAMPLE_THRESHOLD      40
+#define  ACK_SAMPLE_THRESHOLD      35
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
@@ -37,7 +37,7 @@ void BaseChannel::sendThrottleOnce(LocoAddress addr, LocoSpeed sp, SpeedMode sm,
 }
 
 void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {
-    DCC_LOGI("addr %d, group=%d fn=%08x", addr.addr(), (uint8_t)group, fn);
+    DCC_LOGI("addr %d, group=%d fn=0x%08x", addr.addr(), (uint8_t)group, fn);
 
     packets.put_loco_fn_packet(addr, group, fn);
 
@@ -49,12 +49,12 @@ void BaseChannel::sendAccessory(const AccessoryAddress &addr, bool thr) {
     packets.put_accessory_packet(addr, thr);
 }
 
-uint BaseChannel::getBaselineCurrent() {
-    uint baseline = 0;
+unsigned BaseChannel::getBaselineCurrent() {
+    unsigned baseline = 0;
 
     // collect baseline current
     for (int j = 0; j < ACK_BASE_COUNT; j++) {
-        updateCurrent();
+        //updateCurrent(); // seems it's not reentrant
         uint16_t v = getCurrent();
         baseline += v;
         delayMicroseconds(500);
@@ -65,15 +65,20 @@ uint BaseChannel::getBaselineCurrent() {
 }
 
 // https://www.nmra.org/sites/default/files/s-9.2.3_2012_07.pdf
-bool BaseChannel::checkCurrentResponse(uint baseline) const {
+bool BaseChannel::checkCurrentResponse(unsigned baseline) const {
     delay(ACK_SAMPLE_MILLIS);
     int max = getMaxCurrent();
-    bool ret = max - baseline > ACK_SAMPLE_THRESHOLD;
-    DCC_LOGD("result is %d, max: %d, baseline: %d", ret?1:0, max, baseline);
+    bool ret = max - (int)baseline > ACK_SAMPLE_THRESHOLD;
+    DCC_LOGI("result is %d, max: %d, baseline: %d", ret?1:0, max, baseline);
     return ret;
 }
 
 
+/**
+ * Enqueues a DCC packet and waits until pending queue is empty.
+ *
+ * In other words, it returns when packet starts transmitting.
+ */
 bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepeat, size_t timeout_ms) {
     size_t remaining_ms = timeout_ms;
 
@@ -94,157 +99,209 @@ bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepea
     return true;
 }
 
-int16_t BaseChannel::readCVProg(int cv) {
-	uint8_t packet[4];
-	int ret;
+// #define PIN_DBG1 12
+// #define PIN_DBG2 14
 
-	cv--;                              // actual CV addresses are cv-1 (0-1023)
+constexpr uint8_t B1_OPS_PREFIX     = 0b0111'0000;
+constexpr uint8_t B1_MAIN_LONGFORM  = 0b1110'0000;
+constexpr uint8_t B1_MAIN_SHORTFORM = 0b0110'0000;
+constexpr uint8_t B1_BIT_MANIP = 0b1000;
+constexpr uint8_t B1_VERIFY_BYTE = 0b0100;
+constexpr uint8_t B1_WRITE_BYTE = 0b1100;
 
-	packet[0] = 0x78 | (highByte(cv) & 0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-	packet[1] = lowByte(cv);
+constexpr uint8_t B2_BIT_WRITE = 0b1'0000;
+constexpr uint8_t B2_BIT_VERIFY = 0;
 
-	ret = 0;
+constexpr uint8_t B2_BIT_MANIP = 0b1110'0000;
 
-    int baseline = getBaselineCurrent();
+constexpr size_t PRE_PACKET_REPEATS = 3; // NMRA recommends starting with min 3 reset packets
+constexpr size_t READ_REPEATS = 5;  // NMRA recommends min 5 verify packets
+constexpr size_t WRITE_REPEATS = 5; // NMRA recommends min 5 verify packets
+constexpr size_t POST_READ_REPEATS = 1; // "followed by 1 or more Reset Packets, if an acknowledgement is detected"
+constexpr size_t POST_WRITE_REPEATS = 6; // "6 or more Identical Write or Reset packets (DecoderRecovery-Time)"
 
-    //TODO: verify that channel does not starve with this waiting implementation
-	for (uint8_t i = 0; i<8; i++) {
-		packet[2] = 0xE8 | i;
+constexpr uint8_t cvHighBits(uint16_t cv) {
+    return highByte(cv) & 0b11;
+}
 
-		sendPacketFully(resetPacket, 2, 3);          // NMRA recommends starting with 3 reset packets
-        resetMaxCurrent();
-		sendPacketFully(packet, 3, 5);               // NMRA recommends 5 verify packets
-		sendPacketFully(resetPacket, 2, 1);          // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+constexpr uint8_t cvLowBits(uint16_t cv) {
+    return lowByte(cv);
+}
+
+etl::expected<uint8_t, CvCommError> BaseChannel::readCVProg(uint16_t cv) {
+
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError::InvalidState);
+    }
+
+    uint8_t packet[3];
+    int ret;
+
+    cv--;     // actual CV addresses are cv-1 (0-1023)
+    packet[0] = B1_OPS_PREFIX | B1_BIT_MANIP | cvHighBits(cv);
+    packet[1] = cvLowBits(cv);
+
+    ret = 0;
+
+    unsigned baseline = getBaselineCurrent();
+
+    // TODO: implement logic: verify bit==1; if no ack received, verify bit==0; if no ack received, abort as NO_RESP
+
+    constexpr uint8_t B2_BIT_ONE = 0b1000;
+    for (uint8_t pos=0; pos<8; pos++) {
+        packet[2] = B2_BIT_MANIP | B2_BIT_VERIFY | B2_BIT_ONE | pos;
+
+        if(!sendPacketFully(resetPacket, PRE_PACKET_REPEATS)) return etl::unexpected(CvCommError::Timeout);
+        resetMaxCurrent(); // start reading current here
+        if(!sendPacketFully(packet, READ_REPEATS)) return etl::unexpected(CvCommError::Timeout);
+        if(!sendPacketFully(resetPacket, POST_READ_REPEATS)) return etl::unexpected(CvCommError::Timeout);
 
         bool bitVal = checkCurrentResponse(baseline);
-        if(bitVal) bitSet(ret, i);
+        if(bitVal) bitSet(ret, pos);
 
-        DCC_LOGD("Reading bit %d, value is %d", i, bitVal?1:0);
-	}
+        DCC_LOGI("Reading bit %d, value is %d", pos, bitVal?1:0);
+    }
 
-    return verifyCVByteProg(cv+1, ret) ? ret : -1;
-
+    auto verified = verifyCVByteProg(cv+1, ret);
+    if(!verified) return etl::unexpected(verified.error());
+    if(!verified.value()) return etl::unexpected(CvCommError::NoResponse);
+    return ret;
 }
 
-bool BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t bValue) {
-    DCC_LOGI("Verifying cv%d==%d", cv, bValue);
-    uint8_t packet[4];
+etl::expected<bool, CvCommError> BaseChannel::verifyCVByteProg(uint16_t cv, uint8_t value){
+
+    DCC_LOGI("Verifying cv%d==%d", cv, value);
+
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError::InvalidState);
+    }
+
+    uint8_t packet[3];
 
     cv--;
 
-    packet[0] = 0x74 | (highByte(cv) & 0x03);
-    packet[1] = lowByte(cv);
-	packet[2] = bValue;
+    packet[0] = B1_OPS_PREFIX | B1_VERIFY_BYTE | cvHighBits(cv);
+    packet[1] = cvLowBits(cv);
+    packet[2] = value;
 
-    sendPacketFully(resetPacket, 2, 1);    // NMRA recommends starting with 3 reset packets
-    sendPacketFully(resetPacket, 2, 3);
-    uint baseline = getBaselineCurrent();
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError::InvalidState);
+    }
+
+    unsigned baseline = getBaselineCurrent();
+    if(!sendPacketFully(resetPacket, PRE_PACKET_REPEATS)) return etl::unexpected(CvCommError::Timeout);    // NMRA recommends starting with 3 reset packets
     resetMaxCurrent();
-	sendPacketFully(packet, 3, 5);         // NMRA recommends 5 verify packets
-	sendPacketFully(resetPacket, 2, 1);    // forces code to wait until all repeats of packet are completed (and decoder begins to respond)
+    if(!sendPacketFully(packet, READ_REPEATS)) return etl::unexpected(CvCommError::Timeout);         // NMRA recommends 5 verify packets
+    if(!sendPacketFully(resetPacket, POST_READ_REPEATS)) return etl::unexpected(CvCommError::Timeout);
 
     return checkCurrentResponse(baseline);
 
 }
 
-bool BaseChannel::writeCVByteProg(int cv, uint8_t bValue) {
-    uint8_t packet[4];
-    uint baseline;
+etl::expected<void, CvCommError> BaseChannel::writeCVByteProg(uint16_t cv, uint8_t value) {
 
-    cv--;                              // actual CV addresses are cv-1 (0-1023)
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError{CvCommError::InvalidState});
+    }
 
-    packet[0]=0x7C | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[1]=lowByte(cv);
-    packet[2]=bValue;
+    uint8_t packet[3];
 
-    sendPacketFully(resetPacket,2,1);
-    sendPacketFully(packet,3,4);
-    sendPacketFully(resetPacket,2,1);
-    sendPacketFully(idlePacket,2,10);
+    cv--;  // actual CV addresses are cv-1 (0-1023)
 
-    baseline = getBaselineCurrent();
+    packet[0] = B1_OPS_PREFIX | B1_WRITE_BYTE | cvHighBits(cv);
+    packet[1] = cvLowBits(cv);
+    packet[2] = value;
 
-    packet[0]=0x74 | (highByte(cv)&0x03);   // set-up to re-verify entire byte
+    sendPacketFully(resetPacket, PRE_PACKET_REPEATS);
+    sendPacketFully(packet, WRITE_REPEATS);
+    sendPacketFully(resetPacket, POST_WRITE_REPEATS);
 
-    sendPacketFully(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    // turn into "verify byte" packet
+    unsigned baseline = getBaselineCurrent();
+    packet[0] = B1_OPS_PREFIX | B1_VERIFY_BYTE | cvHighBits(cv);
+
+    sendPacketFully(resetPacket, PRE_PACKET_REPEATS);
     resetMaxCurrent();
-    sendPacketFully(packet,3,5);               // NMRA recommends 5 verfy packets
-    sendPacketFully(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
+    sendPacketFully(packet, READ_REPEATS);
+    sendPacketFully(resetPacket, POST_READ_REPEATS);
 
-    return checkCurrentResponse(baseline);
+    if (!checkCurrentResponse(baseline)) return etl::unexpected(CvCommError{CvCommError::NoResponse});
+    return {};
 
 }
 
-bool BaseChannel::writeCVBitProg(int cv, uint8_t bNum, uint8_t bValue){
-    uint8_t packet[4];
-    uint baseline;
+etl::expected<void, CvCommError> BaseChannel::writeCVBitProg(uint16_t cv, uint8_t bit_num, uint8_t value){
 
-    cv--;                              // actual CV addresses are cv-1 (0-1023)
-    bValue &= 0x1;
-    bNum &= 0x7;
+    if(packets.used_loco_slots() != 0) {
+        // sending packets reliably needs no locos.
+        return etl::unexpected(CvCommError{CvCommError::InvalidState});
+    }
 
-    packet[0] = 0x78 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[1] = lowByte(cv);
-    packet[2] = 0xF0 | bValue<<3 | bNum;
+    uint8_t packet[3];
 
-    sendPacketFully(resetPacket,2,1);
-    sendPacketFully(packet,3,4);
-    sendPacketFully(resetPacket,2,1);
-    sendPacketFully(idlePacket,2,10);
+    cv--;  // actual CV addresses are cv-1 (0-1023)
+    value &= 0x1;
+    bit_num &= 0x7;
 
-    baseline = getBaselineCurrent();
+    packet[0] = B1_OPS_PREFIX | B1_BIT_MANIP | cvHighBits(cv);
+    packet[1] = cvLowBits(cv);
+    packet[2] = B2_BIT_MANIP | B2_BIT_WRITE | (value<<3) | bit_num;
 
-    bitClear(packet[2],4);              // change instruction code from Write Bit to Verify Bit
+    sendPacketFully(resetPacket, PRE_PACKET_REPEATS);
+    sendPacketFully(packet, WRITE_REPEATS);
+    sendPacketFully(resetPacket, POST_WRITE_REPEATS);
 
-    sendPacketFully(resetPacket,2,3);          // NMRA recommends starting with 3 reset packets
+    unsigned baseline = getBaselineCurrent();
+
+    // Turn it into a "verify bit" packet
+    packet[2] = B2_BIT_MANIP | B2_BIT_VERIFY | (value<<3) | bit_num;
+
+    sendPacketFully(resetPacket, PRE_PACKET_REPEATS);
     resetMaxCurrent();
-    sendPacketFully(packet,3,5);               // NMRA recommends 5 verfy packets
-    sendPacketFully(resetPacket,2,1);          // forces code to wait until all repeats of bRead are completed (and decoder begins to respond)
+    sendPacketFully(packet, READ_REPEATS);
+    sendPacketFully(resetPacket, POST_READ_REPEATS);
 
-    return checkCurrentResponse(baseline);
+    if(!checkCurrentResponse(baseline)) return etl::unexpected(CvCommError{CvCommError::NoResponse});
+    return {};
 
 }
 
-void BaseChannel::writeCVByteMain(LocoAddress addr, int cv, uint8_t bValue) {
-    uint8_t packet[6];   // save space for checksum byte
+void BaseChannel::writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value) {
+    DCC_LOGI("addr=%s cv%hu=%d", String(addr).c_str(), cv, value);
 
-    byte nB=0;
+    uint8_t packet[5];
 
     cv--;
 
-    uint16_t iAddr = addr.addr();
-    if( addr.isLong() )
-        packet[nB++]=highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
+    auto it = encode_address(addr, packet);
 
-    packet[nB++] = lowByte(iAddr);
-    packet[nB++] = 0xEC | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    packet[nB++] = lowByte(cv);
-    packet[nB++] = bValue;
+    *it++ = B1_MAIN_LONGFORM | B1_WRITE_BYTE | cvHighBits(cv);
+    *it++ = cvLowBits(cv);
+    *it++ = value;
 
-    sendPacketFully(packet,nB,4);
+    sendPacketFully(etl::span{packet, it}, WRITE_REPEATS);
 
 }
 
-void BaseChannel::writeCVBitMain(LocoAddress addr, int cv, uint8_t bNum, uint8_t bValue) {
-    uint8_t b[6];                      // save space for checksum byte
-
-    byte nB=0;
+void BaseChannel::writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num, uint8_t value) {
+    DCC_LOGI("addr=%s cv%hu[%u]=%d", String(addr).c_str(), cv, bit_num, value);
+    uint8_t packet[5];
 
     cv--;
+    value &= 0x1;
+    bit_num &= 0x3;
 
-    bValue &= 0x1;
-    bNum &= 0x3;
+    auto it = encode_address(addr, packet);
 
-    uint16_t iAddr = addr.addr();
-    if( addr.isLong() )
-        b[nB++] = highByte(iAddr) | 0xC0;      // convert train number into a two-byte address
+    *it++ = B1_MAIN_LONGFORM | B1_BIT_MANIP | cvHighBits(cv);
+    *it++ = cvLowBits(cv);
+    *it++ = B2_BIT_MANIP | B2_BIT_WRITE | (value<<3) | bit_num;
 
-    b[nB++]=lowByte(iAddr);
-    b[nB++]=0xE8 | (highByte(cv)&0x03);   // any CV>1023 will become modulus(1024) due to bit-mask of 0x03
-    b[nB++]=lowByte(cv);
-    b[nB++]=0xF0 | bValue<<3 | bNum;
-
-    sendPacketFully(b,nB,4);
+    sendPacketFully(etl::span{packet, it}, WRITE_REPEATS);
 
 }
 
