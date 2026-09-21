@@ -81,8 +81,8 @@ public:
 
     etl::expected<uint8_t, CvCommError> readCVProg(uint16_t cv);
     etl::expected<bool, CvCommError> verifyCVByteProg(uint16_t cv, uint8_t value);
-    bool writeCVByteProg(uint16_t cv, uint8_t value);
-    bool writeCVBitProg(uint16_t cv, uint8_t bit_num, uint8_t value);
+    etl::expected<void, CvCommError> writeCVByteProg(uint16_t cv, uint8_t value);
+    etl::expected<void, CvCommError> writeCVBitProg(uint16_t cv, uint8_t bit_num, uint8_t value);
     void writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value);
     void writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num, uint8_t value);
 

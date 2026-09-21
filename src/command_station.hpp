@@ -195,12 +195,12 @@ public:
     bool writeCvProg(uint16_t cv, uint8_t val) {
         //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
-        return dccProg->writeCVByteProg(cv, val);
+        return dccProg->writeCVByteProg(cv, val).has_value();
     }
     bool writeCvProgBit(uint16_t cv, uint8_t bit, bool val) {
         //IDCCChannel *dccProg = dccMain;
         if(dccProg ==nullptr) return false;
-        return dccProg->writeCVBitProg(cv, bit, val);
+        return dccProg->writeCVBitProg(cv, bit, val).has_value();
     }
     void writeCvMain(LocoAddress addr, uint16_t cv, uint8_t val) {
         if(dccMain==nullptr) return;
