@@ -50,8 +50,12 @@ public:
     virtual bool getPower() const = 0;
 
     /**
+     * Sends throttle command and resends it periodically.
      */
     void sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
+
+    /** Sends throttle command once. */
+    void sendThrottleOnce(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
 
     /** Sends a function group command to a locomotive.
      * Can either put it in a refreshing slot or send once directly to tracks.
