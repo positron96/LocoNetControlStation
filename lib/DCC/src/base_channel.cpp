@@ -26,7 +26,7 @@ void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, boo
 }
 
 void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {
-    DCC_LOGI("addr %d, group=%d fn=%08x", addr.addr(), (uint8_t)group, fn);
+    DCC_LOGI("addr %d, group=%d fn=0x%08x", addr.addr(), (uint8_t)group, fn);
 
     packets.put_loco_fn_packet(addr, group, fn);
 
@@ -91,11 +91,12 @@ bool BaseChannel::sendPacketFully(const etl::span<uint8_t> packet, size_t nRepea
 // #define PIN_DBG1 12
 // #define PIN_DBG2 14
 
-constexpr uint8_t CV_LONGFORM  = 0b0111'0000;
-constexpr uint8_t CV_SHORTFORM = 0b0110'0000;
-constexpr uint8_t CV_BIT_MANIP = 0b1000;
-constexpr uint8_t CV_VERIFY_BYTE = 0b0100;
-constexpr uint8_t CV_WRITE_BYTE = 0b1100;
+constexpr uint8_t B1_OPS_PREFIX     = 0b0111'0000;
+constexpr uint8_t B1_MAIN_LONGFORM  = 0b1110'0000;
+constexpr uint8_t B1_MAIN_SHORTFORM = 0b0110'0000;
+constexpr uint8_t B1_BIT_MANIP = 0b1000;
+constexpr uint8_t B1_VERIFY_BYTE = 0b0100;
+constexpr uint8_t B1_WRITE_BYTE = 0b1100;
 
 constexpr uint8_t B2_BIT_WRITE = 0b1'0000;
 constexpr uint8_t B2_BIT_VERIFY = 0;
@@ -127,7 +128,7 @@ etl::expected<uint8_t, CvCommError> BaseChannel::readCVProg(uint16_t cv) {
     int ret;
 
     cv--;     // actual CV addresses are cv-1 (0-1023)
-    packet[0] = CV_LONGFORM | CV_BIT_MANIP | cvHighBits(cv);
+    packet[0] = B1_OPS_PREFIX | B1_BIT_MANIP | cvHighBits(cv);
     packet[1] = cvLowBits(cv);
 
     ret = 0;
@@ -170,7 +171,7 @@ etl::expected<bool, CvCommError> BaseChannel::verifyCVByteProg(uint16_t cv, uint
 
     cv--;
 
-    packet[0] = CV_LONGFORM | CV_VERIFY_BYTE | cvHighBits(cv);
+    packet[0] = B1_OPS_PREFIX | B1_VERIFY_BYTE | cvHighBits(cv);
     packet[1] = cvLowBits(cv);
     packet[2] = value;
 
@@ -200,7 +201,7 @@ etl::expected<void, CvCommError> BaseChannel::writeCVByteProg(uint16_t cv, uint8
 
     cv--;  // actual CV addresses are cv-1 (0-1023)
 
-    packet[0] = CV_LONGFORM | CV_WRITE_BYTE | cvHighBits(cv);
+    packet[0] = B1_OPS_PREFIX | B1_WRITE_BYTE | cvHighBits(cv);
     packet[1] = cvLowBits(cv);
     packet[2] = value;
 
@@ -210,7 +211,7 @@ etl::expected<void, CvCommError> BaseChannel::writeCVByteProg(uint16_t cv, uint8
 
     // turn into "verify byte" packet
     unsigned baseline = getBaselineCurrent();
-    packet[0] = CV_LONGFORM | CV_VERIFY_BYTE | cvHighBits(cv);
+    packet[0] = B1_OPS_PREFIX | B1_VERIFY_BYTE | cvHighBits(cv);
 
     sendPacketFully(resetPacket, PRE_PACKET_REPEATS);
     resetMaxCurrent();
@@ -235,7 +236,7 @@ etl::expected<void, CvCommError> BaseChannel::writeCVBitProg(uint16_t cv, uint8_
     value &= 0x1;
     bit_num &= 0x7;
 
-    packet[0] = CV_LONGFORM | CV_BIT_MANIP | cvHighBits(cv);
+    packet[0] = B1_OPS_PREFIX | B1_BIT_MANIP | cvHighBits(cv);
     packet[1] = cvLowBits(cv);
     packet[2] = B2_BIT_MANIP | B2_BIT_WRITE | (value<<3) | bit_num;
 
@@ -259,13 +260,15 @@ etl::expected<void, CvCommError> BaseChannel::writeCVBitProg(uint16_t cv, uint8_
 }
 
 void BaseChannel::writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value) {
+    DCC_LOGI("addr=%s cv%hu=%d", String(addr).c_str(), cv, value);
+
     uint8_t packet[5];
 
     cv--;
 
     auto it = encode_address(addr, packet);
 
-    *it++ = CV_LONGFORM | CV_WRITE_BYTE | cvHighBits(cv);
+    *it++ = B1_MAIN_LONGFORM | B1_WRITE_BYTE | cvHighBits(cv);
     *it++ = cvLowBits(cv);
     *it++ = value;
 
@@ -274,6 +277,7 @@ void BaseChannel::writeCVByteMain(LocoAddress addr, uint16_t cv, uint8_t value) 
 }
 
 void BaseChannel::writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num, uint8_t value) {
+    DCC_LOGI("addr=%s cv%hu[%u]=%d", String(addr).c_str(), cv, bit_num, value);
     uint8_t packet[5];
 
     cv--;
@@ -282,7 +286,7 @@ void BaseChannel::writeCVBitMain(LocoAddress addr, uint16_t cv, uint8_t bit_num,
 
     auto it = encode_address(addr, packet);
 
-    *it++ = CV_LONGFORM | CV_BIT_MANIP | cvHighBits(cv);
+    *it++ = B1_MAIN_LONGFORM | B1_BIT_MANIP | cvHighBits(cv);
     *it++ = cvLowBits(cv);
     *it++ = B2_BIT_MANIP | B2_BIT_WRITE | (value<<3) | bit_num;
 

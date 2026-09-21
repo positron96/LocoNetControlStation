@@ -30,7 +30,7 @@ public:
         }
 
         static_assert(WINDOW_SIZE > 2, "Window size must be greater than 2 to calculate trimmed value.");
-        return (sum - minValue - maxValue) / (WINDOW_SIZE - 2);
+        return (sum - minValue - maxValue) / ((T)WINDOW_SIZE - 2);
     }
 
 private:
@@ -102,7 +102,7 @@ public:
 
         if(cur > overCurrentThreshold) {
             digitalWrite(pinEn, LOW); // act immediately before any notifications
-            DCC_LOGW("Overcurrent: %dmV, %d mA > %d mA\n", mv, cur, overCurrentThreshold);
+            DCC_LOGW("Overcurrent: %humV, %hu mA > %hu mA\n", mv, cur, overCurrentThreshold);
             overCurrentFlag = true;
             overCurrentEventPending = true;
         }
