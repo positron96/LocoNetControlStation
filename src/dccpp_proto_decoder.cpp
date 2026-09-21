@@ -5,7 +5,7 @@
 #include <etl/string_utilities.h>
 #include <etl/string_view.h>
 #include <etl/to_arithmetic.h>
-#include <etl/array.h>
+#include <etl/vector.h>
 
 #define FILE_LOG_LEVEL LEVEL_WARN
 #include "log.h"
@@ -28,16 +28,16 @@ namespace dccpp {
         return true;
     }
 
-    size_t split_tokens(etl::string_view in, etl::array<etl::string_view, 8> &parts) {
-        size_t count = 0;
+    LocoAddress fromInt(unsigned a) {
+        if(a<=127) return LocoAddress::shortAddr(a);
+        return LocoAddress::longAddr(a);
+    }
+
+    void split_tokens(etl::string_view in, etl::ivector<etl::string_view> &parts) {
         etl::optional<etl::string_view> token;
-        auto remaining = etl::trim_view_whitespace(in);
-
-        while((token = etl::get_token(remaining, etl::whitespace<char>::value(), token, true)) && count < parts.size()) {
-            parts[count++] = token.value();
+        while ((token = etl::get_token(in, " ", token, true))) {
+            parts.emplace_back(token.value());
         }
-
-        return count;
     }
 
     void DccppStreamHandler::loop() {
@@ -69,8 +69,9 @@ namespace dccpp {
             return;
         }
 
-        etl::array<etl::string_view, 8> parts{};
-        const size_t count = split_tokens(inner, parts);
+        etl::vector<etl::string_view, 8> parts{};
+        split_tokens(inner, parts);
+        const size_t count = parts.size();
         if(count == 0) {
             LOGE("DCC++ parse error: no tokens in '%.*s'", FMT_SV(inner));
             return;
@@ -100,7 +101,6 @@ namespace dccpp {
             case 'b':
             case 'B':
             case 'R':
-            case 'r':
                 break;
             default:
                 LOGE("DCC++ parse error: unsupported command '%.*s'", FMT_SV(cmd));
@@ -113,7 +113,8 @@ namespace dccpp {
                 // power control: <0> or <1>
                 bool v = cmd[0] == '1';
                 if(parts.size()==1) {
-                    CS.setPowerState(v);
+                    CS.getMainTrack()->setPower(v);
+                    CS.getProgTrack()->setPower(v);
                 } else {
                     if(parts[1] == "MAIN") {
                         CS.getMainTrack()->setPower(v);
@@ -124,6 +125,7 @@ namespace dccpp {
                 break;
             }
             case 'R': {
+                // read byte on prog: < R CV CALLBACKNUM CALLBACKSUB >
                 if(count < 4) {
                     LOGE("DCC++ parse error: invalid CV read command '%.*s'", FMT_SV(trimmed));
                     return;
@@ -138,9 +140,8 @@ namespace dccpp {
                 stream->println(t);
                 break;
             }
-            case 'r':
-                break;
             case 'W': {
+                // write byte on prog: < W CV VALUE CALLBACKNUM CALLBACKSUB >
                 if(count < 5) {
                     LOGE("DCC++ parse error: invalid CV write command '%.*s'", FMT_SV(trimmed));
                     return;
@@ -155,11 +156,23 @@ namespace dccpp {
                 stream->println(t);
                 break;
             }
-            case 'w':
-                // not implemented
+            case 'w': {
+                // write byte on main: < w CAB CV VALUE >
+                if(count < 4) {
+                    LOGE("DCC++ parse error: invalid CV write command '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+                unsigned addr = 0, cv = 0, value = 0;
+                if(!parse_uint(parts[1], addr) || !parse_uint(parts[2], cv) || !parse_uint(parts[3], value)) {
+                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+                CS.writeCvMain(fromInt(addr), cv, value);
+                stream->println("OK");
                 break;
-            case 'B':
-            case 'b': {
+            }
+            case 'B': {
+                // write bit on prog: < B CV BIT VALUE CALLBACKNUM CALLBACKSUB >
                 if(count < 6) {
                     LOGE("DCC++ parse error: invalid CV bit write command '%.*s'", FMT_SV(trimmed));
                     return;
@@ -176,6 +189,9 @@ namespace dccpp {
                 (void)callback_sub;
                 break;
             }
+            case 'b':
+                // write bit on main: < b CAB CV BIT VALUE >
+                break;
             case 'T':
             case 't': {
                 // turnout listing/define/control: <T> | <T ID> | <T ID THROW> | <T ID ADDRESS SUBADDRESS>
@@ -187,6 +203,74 @@ namespace dccpp {
             }
             case 'f': {
                 // cab function command: <f CAB BYTE1 [BYTE2]>
+                if(count < 3) {
+                    LOGE("DCC++ parse error: invalid cab function command '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+
+                unsigned cab = 0, byte1 = 0, byte2 = 0;
+                if(!parse_uint(parts[1], cab) || !parse_uint(parts[2], byte1)) {
+                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+                if(count >= 4 && !parse_uint(parts[3], byte2)) {
+                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+
+                const auto loco = fromInt(cab);
+                if(!loco.isValid()) {
+                    LOGE("DCC++ parse error: invalid cab address in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+
+                const auto slot = CS.findOrAllocateLocoSlot(loco);
+                if(slot == 0) {
+                    LOGE("DCC++ parse error: no loco slot available for '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+                CS.setLocoSlotRefresh(slot, true);
+
+                if(count == 3) {
+                    switch(byte1 & 0xF0u) {
+                        case 0x80u:
+                        case 0x90u: {
+                            const uint32_t f0_4 = ((byte1 & 0x10u) >> 4)
+                                                | ((byte1 & 0x0Fu) << 1);
+                            CS.setLocoFns(slot, dcc::fn_group::F0_4, f0_4);
+                            break;
+                        }
+                        case 0xA0u: {
+                            const uint32_t f9_12 = (static_cast<uint32_t>(byte1 & 0x0Fu) << 9);
+                            CS.setLocoFns(slot, dcc::fn_group::F9_12, f9_12);
+                            break;
+                        }
+                        case 0xB0u: {
+                            const uint32_t f5_8 = (static_cast<uint32_t>(byte1 & 0x0Fu) << 5);
+                            CS.setLocoFns(slot, dcc::fn_group::F5_8, f5_8);
+                            break;
+                        }
+                        default:
+                            LOGE("DCC++ parse error: invalid function byte in '%.*s'", FMT_SV(trimmed));
+                            return;
+                    }
+                } else {
+                    switch(byte1) {
+                        case 0xDEu: {
+                            const uint32_t f13_20 = (static_cast<uint32_t>(byte2) << 13);
+                            CS.setLocoFns(slot, dcc::fn_group::F13_20, f13_20);
+                            break;
+                        }
+                        case 0xDFu: {
+                            const uint32_t f21_28 = (static_cast<uint32_t>(byte2) << 21);
+                            CS.setLocoFns(slot, dcc::fn_group::F21_28, f21_28);
+                            break;
+                        }
+                        default:
+                            LOGE("DCC++ parse error: invalid extended function byte in '%.*s'", FMT_SV(trimmed));
+                            return;
+                    }
+                }
                 break;
             }
             case 's':

@@ -11,6 +11,8 @@
 
 /**
  * DCC++ protocol handler.
+ *
+ * @see https://github.com/DccPlusPlus/BaseStation/wiki/Commands-for-DCCpp-BaseStation
  **/
 
 namespace dccpp {
