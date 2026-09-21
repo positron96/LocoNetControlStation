@@ -54,7 +54,7 @@ public:
     void sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd);
 
     /** Sends a function group command to a locomotive.
-     * Can either put it in a refreshing slot or only send once.
+     * Can either put it in a refreshing slot or send once directly to tracks.
      */
     void sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn);
 

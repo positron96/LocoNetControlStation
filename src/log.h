@@ -5,9 +5,28 @@
  *
  * Usage:
  *
- * // in Makefile or other build system: GLOBAL_LOG_LEVEL = LEVEL_INFO
- * #define LOG_LEVEL LEVEL_DEBUG
- * #include "log.h"
+ * In Makefile or other build system: GLOBAL_LOG_LEVEL = LEVEL_INFO
+ *
+ * If headers don't do logging and don't include this file:
+ *
+ *   // file.cpp:
+ *   #define LOG_LEVEL LEVEL_DEBUG
+ *   #include "log.h"
+ *
+ * If headers include this file too (this is rather cumbersome, so not recommended):
+ *
+ *   // file.hpp
+ *   #ifdef LOG_LEVEL
+ *   #undef LOG_LEVEL
+ *   #endif
+ *   #define LOG_LEVEL  LEVEL_DEBUG
+ *   #include "log.h"
+ *
+ *
+ * Any file that uses logging should include this file (headers too).
+ * Include this as the last include, or other headers may overwrite your level
+ *  if they configure logging themselves.
+ * (of course, system headers don't use this lib, so they may come later)
  */
 
 #ifndef LOG_H_
@@ -35,6 +54,7 @@
     #undef LOGI
     #undef LOGI_ISR
     #undef LOGW
+    #undef LOGW_ISR
     #undef LOGE
     #undef LOGE_ISR
 #endif

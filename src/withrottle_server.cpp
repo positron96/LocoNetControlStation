@@ -5,11 +5,11 @@
 #include "dcc/loco_address.hpp"
 #include "dcc/accessory_address.hpp"
 
-#define FILE_LOG_LEVEL  LEVEL_INFO
-#include "log.h"
-
 #include <etl/vector.h>
 #include <etl/to_arithmetic.h>
+
+#define FILE_LOG_LEVEL  LEVEL_INFO
+#include "log.h"
 
 /* Network parameters */
 #define TURNOUT_PREF "LT"
@@ -478,7 +478,7 @@ void WiThrottleServer::ClientData::checkHeartbeat() {
     if ((wdt.timedOut2() && health==ClientHealth::SoftTimeout)) {
         LOGI("timeout exceeded twice: closing connection" );
         health = ClientHealth::HardTimeout;
-        cli->close();
+        cli->close();  // this will trigger clientStop and clean accordingly
     }
 
 }

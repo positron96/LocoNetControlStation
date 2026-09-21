@@ -1,5 +1,9 @@
 #include "command_station.hpp"
 
+
+#define LOG_LEVEL LEVEL_INFO
+#include "log.h"
+
 CommandStation CS;
 
 uint8_t CommandStation::LocoData::dccSpeedByte() const {
@@ -54,7 +58,7 @@ uint8_t CommandStation::findOrAllocateLocoSlot(LocoAddress addr) {
 void CommandStation::releaseLocoSlot(uint8_t slot) {
     auto it = locoSlot.find(getSlot(slot).addr);
     if(it == locoSlot.end()) {
-        CS_DEBUGF("invalid slot");
+        LOGW("invalid slot");
         return;
     }
     releaseLocoSlot(it);
@@ -62,18 +66,18 @@ void CommandStation::releaseLocoSlot(uint8_t slot) {
 
 CommandStation::LocoSlotMap::iterator CommandStation::releaseLocoSlot(CommandStation::LocoSlotMap::iterator it) {
     uint8_t slot = it->second;
-    CS_DEBUGF("Releasing slot %d", slot);
+    LOGI("Releasing slot %d", slot);
     setLocoSlotRefresh(slot, false);
     slots[slot-1].deallocate();
     return locoSlot.erase(it);
 }
 
 void CommandStation::setLocoSlotRefresh(uint8_t slot, bool refresh) {
-    if(!isSlotSupported(slot)) { CS_DEBUGF("invalid slot"); return; }
+    if(!isSlotSupported(slot)) { LOGW("invalid slot"); return; }
     LocoData &dd = getSlot(slot);
-    if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
+    if(!dd.allocated()) { LOGW("slot not allocated"); return; }
     if(dd.refreshing == refresh) return;
-    CS_DEBUGF("slot %d refresh %c", slot, refresh?'Y':'N');
+    LOGI("slot %d refresh %c", slot, refresh?'Y':'N');
     dd.refreshing = refresh;
 
     dd.resetWatchdog();
@@ -82,7 +86,13 @@ void CommandStation::setLocoSlotRefresh(uint8_t slot, bool refresh) {
     } else {
         // TODO: somehow send 0 speed to track
         dccMain->unloadSlot(dd.addr);
-    }
+
+/** Resets slot watchdog timer. */
+void CommandStation::kickSlot(uint8_t slot) {
+    assert(isSlotSupported(slot));
+    LocoData &dd = getSlot(slot);
+    if(!dd.allocated()) { LOGW("slot not allocated"); return; }
+    dd.resetWatchdog();
 }
 
 void CommandStation::setSlotOwner(uint8_t slot, void* o) {
@@ -186,21 +196,20 @@ void CommandStation::loop() {
         LocoData &dd = getSlot(slot);
         // Slots that are refreshed will stop refreshing after a timeout.
         // Those that have no owner expire faster.
-        // Slots that aren't refreshed get removed after a second timeout.
         if(dd.refreshing) {
             if(( dd.hasOwner() && dd.wdt.timedOut()) ||
                 (!dd.hasOwner() && dd.wdt.timedOut2())
             ) {
-                CS_DEBUGF("slot %d %s stopping after %lds", slot,
-                    !dd.hasOwner() ? "(without owner)" : "",
+                LOGI("slot %d %s stopping after %lds", slot,
+                    !dd.hasOwner() ? "(no owner)" : "",
                     (ms - dd.wdt.getLastUpdate())/1000 );
                 setLocoSlotRefresh(slot, false);
                 dd.resetWatchdog();
             }
         } else {
-            // non-refreshing slots get removed
+            // Slots that aren't refreshed get removed after a second timeout.
             if(dd.wdt.timedOut()) {
-                CS_DEBUGF("slot %d clearing after %lds", slot,
+                LOGI("slot %d clearing after %lds", slot,
                     (ms - dd.wdt.getLastUpdate())/1000 );
                 it = releaseLocoSlot(it);
                 slotRemoved = true;
@@ -233,7 +242,7 @@ TurnoutState CommandStation::getTurnoutState(const dcc::AccessoryAddress addr) {
 }
 
 TurnoutState CommandStation::turnoutAction(dcc::AccessoryAddress addr, bool fromRoster, TurnoutAction action) {
-    CS_DEBUGF("addr11=%d named=%d action=%d", addr.longAddr(), fromRoster, (int)action );
+    LOGI("addr11=%d named=%d action=%d", addr.longAddr(), fromRoster, (int)action );
 
     TurnoutState newState = TurnoutState::THROWN;
 
@@ -249,12 +258,12 @@ TurnoutState CommandStation::turnoutAction(dcc::AccessoryAddress addr, bool from
             t->second.state = newState;
             addr = t->second.addr;
         } else {
-            CS_DEBUGF("Did not find turnout in roster");
+            LOGW("Did not find turnout in roster");
             return TurnoutState::UNKNOWN;
         }
     } else {
         if (action==TurnoutAction::TOGGLE) {
-            CS_DEBUGF("Trying to toggle numeric turnout");
+            LOGW("Trying to toggle numeric turnout");
             newState = TurnoutState::THROWN;
         } else {  // throw or close
             newState = actionToState(action);
@@ -263,7 +272,7 @@ TurnoutState CommandStation::turnoutAction(dcc::AccessoryAddress addr, bool from
         if(!turnoutData.full()) {
             // add turnout to roster
             addTurnout({addr, int(turnoutData.size()+1), newState});
-            CS_DEBUGF("Added new turnout to roster: ID=%d, addr=%d", addr.get11bitAddr() );
+            LOGI("Added new turnout to roster: ID=%d, addr=%d", int(turnoutData.size()+1), addr.get11bitAddr() );
         }
     }
 
@@ -272,14 +281,14 @@ TurnoutState CommandStation::turnoutAction(dcc::AccessoryAddress addr, bool from
     // send to LocoNet
     // FIXME: this is a dirty hack.
     // If LocoNet calls this function, it will be bounced back to bus.
-    // Fortunately, right now, accessory commands from LocoNet do not get propagated to DCC
-    // and this command is only called from WiThrottle code.
+    // Fortunately, right now, accessory commands from LocoNet do not get propagated to DCC.
+    // And for now, it's either here or in every source of accessory commands
+    //  (WiThrottle, DCC++, ...).
+    // Proper solution will need a message router that does not bounce commands back to source.
     if(locoNet!=nullptr) {
         LnMsg ttt = makeSwRec(addr.longAddr(), true, newState==TurnoutState::THROWN);
         locoNet->broadcast(ttt);
     }
-
-    //sendDCCppCmd("a "+String(addr)+" "+sub+" "+int(newStat) );
 
     return newState;
 }

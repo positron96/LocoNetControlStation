@@ -249,7 +249,7 @@ namespace ui {
                     }
 
                     int32_t t = (millis() - data.wdt.getLastUpdate())/1000;
-                    if(t>60) {
+                    if(t>15) {
                         v += " (" + String(t)+ "s ago)";
                     }
 

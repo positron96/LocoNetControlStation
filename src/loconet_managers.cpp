@@ -9,7 +9,7 @@
 
 constexpr uint8_t MAX_LOCO_SLOT = 120; // in traditional LocoNet (more in DCS240 and up)
 
-/// LocoNet 1.0 tells 0x7F, but JMRI expects OPC_WR_SL_DATA
+/// LocoNet 1.0 says 0x7F, but JMRI expects OPC_WR_SL_DATA
 constexpr uint8_t PROG_LACK = OPC_WR_SL_DATA;//0x7F;
 
 /** Creates LocoAddress (short/long) from LocoNet address. */

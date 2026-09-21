@@ -109,15 +109,20 @@ namespace ui {
         return x;
     }
 
+    /** Draws the status bar at the top of the display.
+     *
+     * The items displayed (starting from right edge):
+     * - WiFi connection status (if enabled)
+     * - Program track status
+     * - Main track status and allocated slots count
+     */
     void drawStatusbar(U8G2 &u8g2) {
-
-        unsigned x = 2; // small margin
         unsigned y = Display::STATUS_BAR_HEIGHT - 2;
 
         u8g2.drawHLine(0, y, u8g2.getWidth());
         u8g2.setFontPosBottom();
 
-        x = u8g2.getWidth();
+        unsigned x = u8g2.getWidth();
 
         #if USE_WIFI==1
         x -= 15;

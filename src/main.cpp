@@ -32,8 +32,9 @@
 #include <Arduino.h>
 
 #include <etl/callback_timer_atomic.h>
+
 #include <stdio.h>
-#include <atomic>
+
 
 LocoNetBus bus;
 

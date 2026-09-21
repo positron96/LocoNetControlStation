@@ -5,13 +5,14 @@
 
 using millis_t = decltype(millis());
 
-#define W_LOGI(format, ...)   do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__);  } while(0)
-
 /**
+ * A watchdog class that checks against up to 2 timeout periods.
+ *
  * @param TIMEOUT how long to wait for update before timing out, ms
  * @param FUTURE_COMPENSATION - if somewhy kick happens "after" timedOut, then math inside
  *      timedOut goes crazy and fires timedOut immediately. For this reason, kick stored timestamp
  *      rolled back some time in the past (by this value, in ms)
+ * @param TIMEOUT2 (optional) if not 0, enables second timeout, ms.
  */
 template<millis_t TIMEOUT, millis_t FUTURE_COMPENSATION=0, millis_t TIMEOUT2=0>
 class Watchdog {

@@ -20,14 +20,6 @@
 #include <etl/functional.h> // for reference_wrapper
 
 
-#define CS_DEBUG
-
-#ifdef CS_DEBUG
-#define CS_DEBUGF(format, ...)  do{ log_printf(ARDUHAL_LOG_FORMAT(I, format), ##__VA_ARGS__);  } while(0)
-#else
-#define CS_DEBUGF
-#endif
-
 enum class TurnoutState {
     CLOSED,THROWN, UNKNOWN
 };
@@ -49,8 +41,8 @@ public:
 
     static constexpr uint8_t MAX_SLOTS = 10;
 
-    static constexpr millis_t PURGE_TIMEOUT = 120*1000; // 2min
-    static constexpr millis_t SMALL_PURGE_TIMEOUT = 30'000;  // 30sec
+    static constexpr millis_t PURGE_TIMEOUT = 2 * 60'000;
+    static constexpr millis_t STOP_REFRESH_TIMEOUT = 30'000;
 
     CommandStation(): dccMain(nullptr), dccProg(nullptr), locoNet(nullptr) {
         loadTurnouts();
@@ -87,7 +79,7 @@ public:
         int8_t dir; ///< 1 = FWD, 0 = REW
         Fns fn;
         bool refreshing;
-        Watchdog<PURGE_TIMEOUT, 500, SMALL_PURGE_TIMEOUT> wdt;
+        Watchdog<PURGE_TIMEOUT, 500, STOP_REFRESH_TIMEOUT> wdt;
         void* owner; /// throttle that uses this slot
         bool allocated() const { return addr.isValid(); }
         void resetWatchdog() { wdt.kick(); }
@@ -127,14 +119,11 @@ public:
 
     size_t getAllocatedSlotsCount() const { return locoSlot.size(); }
 
+    /** Sets whether slot data is transmitted to DCC track. */
     void setLocoSlotRefresh(uint8_t slot, bool refresh);
 
-    void kickSlot(uint8_t slot) {
-        assert(isSlotSupported(slot));
-        LocoData &dd = getSlot(slot);
-        if(!dd.allocated()) { CS_DEBUGF("slot not allocated"); return; }
-        dd.resetWatchdog();
-    }
+    /** Resets slot watchdog timer. */
+    void kickSlot(uint8_t slot);
 
     LocoAddress getLocoAddr(uint8_t slot) {
         if(!isSlotAllocated(slot)) return LocoAddress{};
@@ -154,7 +143,6 @@ public:
      * */
     void setLocoDir(uint8_t slot, uint8_t dir);
     uint8_t getLocoDir(uint8_t slot) { return getSlot(slot).dir; }
-
 
     void setLocoSpeed(uint8_t slot, LocoSpeed spd);
     LocoSpeed getLocoSpeed(uint8_t slot) { return getSlot(slot).speed;  }
