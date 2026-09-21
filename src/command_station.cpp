@@ -83,9 +83,18 @@ void CommandStation::setLocoSlotRefresh(uint8_t slot, bool refresh) {
     dd.resetWatchdog();
     if(refresh) {
         // no need to do anything, DCC will start on setLocoSpeed/setLocoFn
+        //   and there is nothing to output before that.
+        // TODO: if setLocoSpeed&Co was called before enabling refresh,
+        //   they should be sent here.
+        //   But at the moment refresh=true is set at init of the slot.
     } else {
-        // TODO: somehow send 0 speed to track
         dccMain->unloadSlot(dd.addr);
+        // send stop command in case loco was moving.
+        if (dd.speed.isMoving()) {
+            dccMain->sendThrottleOnce(dd.addr, SPEED_EMGR, dd.speedMode, true);
+        }
+    }
+}
 
 /** Resets slot watchdog timer. */
 void CommandStation::kickSlot(uint8_t slot) {
