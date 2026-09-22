@@ -78,8 +78,8 @@ namespace led {
          *   qualitatively distinct from "normal".
          */
         static constexpr uint32_t on_intervals[state_count]    = {500,  300, 150};
-        static constexpr uint32_t off_intervals[state_count]   = {500,  300, 150};
-        static constexpr uint32_t pause_intervals[state_count] = {1500, 0,   0};
+        static constexpr uint32_t off_intervals[state_count]   = {200,  300, 150};
+        static constexpr uint32_t pause_intervals[state_count] = {1000, 0,   0};
         static constexpr bool continuous_pattern[state_count] = {false, true, true};
 
         uint8_t pin;
@@ -138,7 +138,7 @@ namespace led {
             const uint32_t on_time_ms = on_intervals[active_priority];
             const uint32_t off_time_ms = off_intervals[active_priority];
             const uint8_t total_blinks = blink_count[active_priority];
-            const bool is_continuous = continuous_pattern[active_priority] || total_blinks <= 1;
+            const bool is_continuous = continuous_pattern[active_priority];
 
             switch(phase) {  // transitioning from this phase
                 case Phase::on:

@@ -108,8 +108,8 @@ void setup() {
     Serial.printf(" USE_DISPLAY=%d\n", USE_DISPLAY);
     Serial.printf(" USE_WIFI=%d\n", USE_WIFI);
 
-    pinMode(PIN_BT, INPUT);
-    pinMode(PIN_BT2, INPUT);
+    pinMode(PIN_BT, INPUT_PULLUP);
+    pinMode(PIN_BT2, INPUT_PULLUP);
 
     // pinMode(PIN_DBG1, OUTPUT);
     // pinMode(PIN_DBG2, OUTPUT);
@@ -241,20 +241,11 @@ void loop() {
     if(millis()>nextInRead) {
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
-            //CS.turnoutAction(6, false, v ? TurnoutAction::THROW : TurnoutAction::CLOSE);
-            auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(16));
             if(v) {
-                CS.setLocoSlotRefresh(slot, true);
-                CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
-                //CS.setLocoFns(slot, 0xFFFFFFFF, 0xFFFFFFFF); // all on
-            } else {
-                //CS.setLocoFns(slot, 0xFFFFFFFF, 0);
-                CS.releaseLocoSlot(slot);
+                auto ret = CS.readCVProg(1);
+                if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
+                else Serial.printf("CV1=%d\n", ret.value());
             }
-
-            // Serial.printf( "reporting sensor %d\n", v==HIGH) ;
-            // reportSensor(&bus, 1, v==HIGH);
-            // Serial.printf("errs: rx:%d,  tx:%d\n", locoNetPhy.getRxStats()->rxErrors, locoNetPhy.getTxStats()->txErrors );
         }
         inState = v;
 
