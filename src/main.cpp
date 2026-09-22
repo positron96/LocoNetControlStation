@@ -297,7 +297,16 @@ void tick20ms() {
 
 
 void tick1s() {
-#if USE_DISPLAY==0 && USE_WIFI==1
-    Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
+#if USE_WIFI==1
+    if(WiFi.getMode() == WIFI_STA) {
+        if(!WiFi.isConnected()) {
+            statusLed.enable_state(led::State::attention);
+        } else {
+            statusLed.disable_state(led::State::attention);
+        }
+    }
 #endif
+// #if USE_DISPLAY==0 && USE_WIFI==1
+//     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
+// #endif
 }
