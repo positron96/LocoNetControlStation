@@ -97,10 +97,10 @@ namespace ui {
         auto font = u8g2.getU8g2()->font;
         if(track->getOvercurrentStatus()) {
             u8g2.setFont(u8g2_font_open_iconic_thing_1x_t);
-            x -= drawGlyphLeft(u8g2, x, y-1, 0x4E);
+            x -= drawGlyphLeft(u8g2, x, y-1, 0x4E); // flame
         } else {
             u8g2.setFont(u8g2_font_open_iconic_check_1x_t);
-            x -= drawGlyphLeft(u8g2, x, y-1, track->getPower() ? 0x40 : 0x44);
+            x -= drawGlyphLeft(u8g2, x, y-1, track->getPower() ? 0x40 : 0x44); // V or X
         }
         x -= 1;
         u8g2.setFont(font);

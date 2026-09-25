@@ -86,7 +86,7 @@ namespace ui {
             u8g2.setFont(u8g2_font_nokiafc22_tr);
             u8g2.setFontPosBottom();
             x = 0;
-            y += u8g2.getMaxCharHeight()+1;
+            y += 1;
 
             switch(cur_page) {
                 case StatusPage::Tracks: drawPowerPage(u8g2, x, y);  break;
@@ -101,6 +101,7 @@ namespace ui {
 
         #ifdef USE_WIFI
         void drawWiFiPage(U8G2 &u8g2, int x, int y) {
+            y += u8g2.getMaxCharHeight();
             int h = u8g2.getMaxCharHeight() + 1;
             String v;
 
@@ -148,6 +149,7 @@ namespace ui {
         }
 
         void drawLbServerPage(U8G2 &u8g2, int x, int y) {
+            y += u8g2.getMaxCharHeight();
             if(lbServer!=nullptr) {
                 String v = lbServer->getInfo();
                 drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
@@ -156,6 +158,7 @@ namespace ui {
 
 
         void drawWiThrottlePage(U8G2 &u8g2, int x, int y) {
+            y += u8g2.getMaxCharHeight();
             if(wtServer!=nullptr) {
                 String v = wtServer->getInfo();
                 drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
@@ -177,10 +180,13 @@ namespace ui {
             long absRounded = (roundedToHundredth >= 0) ? roundedToHundredth : -roundedToHundredth;
             long whole = absRounded / 100;
             long frac = absRounded % 100;
-            snprintf(v, sizeof(v), "%s%ld.%02ld", roundedToHundredth < 0 ? "-" : "", whole, frac);
             u8g2.setFont(u8g2_font_profont17_tn); // big numbers
+            // align to decimal dot, so get width of integer part
+            snprintf(v, sizeof(v), "%s%ld", roundedToHundredth < 0 ? "-" : "", whole);
+            unsigned iw = u8g2.getStrWidth(v);
+            snprintf(v, sizeof(v), "%s%ld.%02ld", roundedToHundredth < 0 ? "-" : "", whole, frac);
             int h = u8g2.getMaxCharHeight();
-            tx += u8g2.drawStr(tx, y+2, v);
+            tx = tx + u8g2.drawStr(tx-iw, y+3, v) - iw; // advance tx only by fractional part
             tx += 2;
 
             u8g2.setFont(font);
@@ -188,19 +194,22 @@ namespace ui {
             return y;
         }
 
+        constexpr static unsigned value_dot_pos = 60;
+
         int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track) {
             auto font = u8g2.getU8g2()->font;
             int tx = x;
-            tx += u8g2.drawStr(tx, y, name) + 10;
+            u8g2.drawStr(tx, y, name);
+            tx = x + value_dot_pos;
             if(track->getOvercurrentStatus()) {
                 u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
                 u8g2.drawGlyph(tx, y+1, 0x43);
-                y += u8g2.getMaxCharHeight();
+                y += u8g2.getMaxCharHeight() + 1;
                 u8g2.setFont(font);
             } else if(track->getPower() == false) {
                 u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
                 u8g2.drawGlyph(tx, y+1, 0x4E);
-                y += u8g2.getMaxCharHeight();
+                y += u8g2.getMaxCharHeight() + 1;
                 u8g2.setFont(font);
             } else {
                 y = drawValue(u8g2, tx, y, track->getCurrent(), "A");
@@ -211,14 +220,13 @@ namespace ui {
 
         void drawPowerPage(U8G2 &u8g2, int x, int y) {
             x = 5;
-            y += 10;
+            y += u8g2.getMaxCharHeight() + 8;
 
-            int voltage = analogReadMilliVolts(PIN_VSENSE) * VSENSE_COEF;
+            int voltage_mv = analogReadMilliVolts(PIN_VSENSE) * VSENSE_COEF;
             int tx = x;
             tx += u8g2.drawStr(x, y, "Input:");
-            y = drawValue(u8g2, tx + 10, y, voltage, "V");
+            y = drawValue(u8g2, x + value_dot_pos, y, voltage_mv, "V");
 
-            String v;
             const dcc::BaseChannel *mainTrack = CS.getMainTrack();
             if(mainTrack!=nullptr) {
                 y = drawTrack(u8g2, x, y, "Main:", mainTrack);
@@ -231,6 +239,7 @@ namespace ui {
         }
 
         void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y) {
+            y += u8g2.getMaxCharHeight();
             int h = u8g2.getMaxCharHeight() + 1;
 
             if(CS.getAllocatedSlotsCount() == 0) {
@@ -245,7 +254,7 @@ namespace ui {
                     }
                     if(data.hasOwner()) {
                         const uintptr_t o = (const uintptr_t)data.owner;
-                        v += " h" + String(o & 0xFFFF, HEX);
+                        v += " h" + String(o & 0xFF, HEX);
                     }
 
                     int32_t t = (millis() - data.wdt.getLastUpdate())/1000;
