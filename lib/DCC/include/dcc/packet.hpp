@@ -3,6 +3,7 @@
 #include "loco_address.hpp"
 #include "loco_speed.hpp"
 #include "accessory_address.hpp"
+#include "log.hpp"
 
 #include <etl/vector.h>
 #include <etl/array.h>
@@ -66,7 +67,7 @@ namespace dcc {
         for(size_t i=1; i<len; i++)
             crc ^= src[i];
 
-        etl::bit_stream_writer s(dst, etl::endian::big);
+        etl::bit_stream_writer s(dst, etl::bit_order::msb_first);
         if(preamble_bits != 0) s.write(0xFFFFFFFF, preamble_bits);  // preamble (max 32 bits)
         for(size_t i=0; i<len; i++) {
             s.write(0, 1); // data start bit
@@ -187,72 +188,24 @@ namespace dcc {
 
     }
 
-    inline auto make_f0_f4_packet(LocoAddress addr, uint32_t fns) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        *it++ = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Eu) >> 1u;
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
-    inline auto make_f5_f8_packet(LocoAddress addr, uint32_t state) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        state >>= 5;
-        *it++ = 0b1011'0000u | (state & 0b1111);
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
-    inline auto make_f9_f12_packet(LocoAddress addr, uint32_t fns) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        fns >>= 9;
-        *it++ = 0b1010'0000u | (fns & 0b1111);
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
-    inline auto make_f13_f20_packet(LocoAddress addr, uint32_t fns) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        fns >>= 13;
-        *it++ = 0b1101'1110u;
-        *it++ = fns & 0xFF;
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
-    inline auto make_f21_f28_packet(LocoAddress addr, uint32_t fns) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        fns >>= 21;
-        *it++ = 0b1101'1111u;
-        *it++ = fns & 0xFF;
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
-    inline auto make_f29_f36_packet(LocoAddress addr, uint32_t fns) {
-        etl::vector<uint8_t, 4> data;
-        auto it = encode_address(addr, data.begin());
-        fns >>= 29;
-        *it++ = 0b1101'1000u;
-        *it++ = fns & 0b1111;  //!!! we have only 4 bits left in uint32_t fns, so we can only set F29-F32, F33-F36 are not supported
-        data.uninitialized_resize(std::distance(data.begin(), it));
-        return data;
-    }
-
     inline auto make_fn_packet(LocoAddress addr, fn_group fg, uint32_t fns) {
+        etl::vector<uint8_t, 4> data;
+        auto it = encode_address(addr, data.begin());
+
         switch(fg) {
-            case fn_group::F0_4:   return make_f0_f4_packet(addr, fns);
-            case fn_group::F5_8:   return make_f5_f8_packet(addr, fns);
-            case fn_group::F9_12:  return make_f9_f12_packet(addr, fns);
-            case fn_group::F13_20: return make_f13_f20_packet(addr, fns);
-            case fn_group::F21_28: return make_f21_f28_packet(addr, fns);
-            case fn_group::F29_36: return make_f29_f36_packet(addr, fns);
-            default:                return make_f0_f4_packet(addr, 0); // should not happen, return something valid
+            case fn_group::F0_4:               *it++ = 0b1000'0000u | (fns & 0b1u) << 4u | (fns & 0x1Eu) >> 1u; break;
+            case fn_group::F5_8:   fns >>= 5;  *it++ = 0b1011'0000u | (fns & 0b1111); break;
+            case fn_group::F9_12:  fns >>= 9;  *it++ = 0b1010'0000u | (fns & 0b1111); break;
+            case fn_group::F13_20: fns >>= 13; *it++ = 0b1101'1110u; *it++ = fns & 0xFF; break;
+            case fn_group::F21_28: fns >>= 21; *it++ = 0b1101'1111u; *it++ = fns & 0xFF; break;
+            case fn_group::F29_36: fns >>= 29; *it++ = 0b1101'1000u; *it++ = fns & 0b111;  break; //!!! we have only 3 bits left in uint32_t fns, so we can only set F29-F31, F32-F36 are not supported
+            default:
+                DCC_LOGW("Unknown function group");
+                assert(false);
         }
+
+        data.uninitialized_resize(std::distance(data.begin(), it));
+        return data;
     }
 
     inline auto make_accessory_packet(const AccessoryAddress &addr, bool thrown) {

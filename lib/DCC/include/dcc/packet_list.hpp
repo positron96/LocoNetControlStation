@@ -57,11 +57,11 @@ namespace dcc {
         // TODO: for S14 mode, F0 bit is also needed
         bool put_loco_speed_dir_packet(const LocoAddress addr, const LocoSpeed speed, const SpeedMode mode, const bool fwd) {
 
+            auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
             auto it = find_or_add_slot(addr);
             if(it == loco_slots.end() ) {
                 return false;
             }
-            auto bytes = make_speed_dir_packet(addr, speed, mode, fwd);
             it->second.packets[0] = packet_from_bytes(bytes); // here is actual putting into table
             enqueue_slot_packet(SlotLocation{it, 0}, speed.isEmgr() ? -100 : 0);
             DCC_LOGI("Addr:%d, spd:%d(%s) %c, %s",
@@ -78,7 +78,7 @@ namespace dcc {
                 // use non-slot packet for extra functions
                 return put_generic_packet(bytes, FN_PACKET_REPEATS, 0);
             }
-            idx += 1; // 0th index is speed+dir
+            idx += 1; // 0th index is speed+dir, offset by 1
             auto it = find_or_add_slot(addr);
             if(it == loco_slots.end() ) {
                 return false;
@@ -281,7 +281,7 @@ namespace dcc {
             auto it = loco_slots.find(addr);
             if(it == loco_slots.end() ) {
                 if(!loco_slots.full()) {
-                    it = loco_slots.insert(ETL_OR_STD::make_pair(addr, LocoSlot{})).first;
+                    it = loco_slots.try_emplace(addr).first; // creates optional<LocoSlot>
                 }
             }
             return it;

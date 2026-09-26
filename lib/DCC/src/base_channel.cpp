@@ -21,19 +21,15 @@ PacketBits idle_packet_bits = PacketBits::from_packet(idlePacket);
 
 void BaseChannel::sendThrottle(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
 
-    DCC_LOGI("addr %d, speed=%d(%s) %c", addr.addr(), sp.get128(), sm.c_str(), fwd?'F':'R');
+    DCC_LOGI("addr %d, speed=%d(%s) %s", addr.addr(), sp.get128(), sm.c_str(), fwd?"FWD":"REV");
     packets.put_loco_speed_dir_packet(addr, sp, sm, fwd);
 }
 
 void BaseChannel::sendThrottleOnce(LocoAddress addr, LocoSpeed sp, SpeedMode sm, bool fwd) {
-    DCC_LOGI("addr %d, speed=%d(%s) %c", addr.addr(), sp.get128(), sm.c_str(), fwd?'F':'R');
+    DCC_LOGI("addr %d, speed=%d(%s) %s", addr.addr(), sp.get128(), sm.c_str(), fwd?"FWD":"REV");
 
     auto bytes = make_speed_dir_packet(addr, sp, sm, fwd);
     packets.put_generic_packet(bytes, sp.isEmgr() ? -100 : 0);
-
-    DCC_LOGI("Addr:%d, spd:%d(%s) %c, %s",
-        addr.addr(), sp.get128(), sm.c_str(), fwd?'F':'R',
-        fmt_span(bytes));
 }
 
 void BaseChannel::sendFunctionGroup(LocoAddress addr, fn_group group, uint32_t fn) {

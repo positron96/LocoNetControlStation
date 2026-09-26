@@ -6,7 +6,7 @@
         "extraScript": "extra-script.py"
     },
     "dependencies": {
-        "Embedded Template Library": "*"
+        "Embedded Template Library": ">=20.49"
     }
 
 }
