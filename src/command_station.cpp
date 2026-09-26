@@ -82,11 +82,15 @@ void CommandStation::setLocoSlotRefresh(uint8_t slot, bool refresh) {
 
     dd.resetWatchdog();
     if(refresh) {
-        // no need to do anything, DCC will start on setLocoSpeed/setLocoFn
-        //   and there is nothing to output before that.
-        // TODO: if setLocoSpeed&Co was called before enabling refresh,
-        //   they should be sent here.
-        //   But at the moment refresh=true is set at init of the slot.
+        // sync channel data with ours
+        dccMain->sendThrottle(dd.addr, dd.speed, dd.speedMode, dd.dir);
+        uint32_t f = dd.fn.to_ulong();
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F0_4, f);
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F5_8, f);
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F9_12, f);
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F13_20, f);
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F21_28, f);
+        dccMain->sendFunctionGroup(dd.addr, dcc::fn_group::F29_36, f);
     } else {
         dccMain->unloadSlot(dd.addr);
         // send stop command in case loco was moving.
@@ -148,11 +152,12 @@ void CommandStation::setLocoFn(uint8_t slot, uint8_t fn, bool val) {
     // CS_DEBUGF("slot %d FN%d=%d", slot, fn, val);
 
     dd.fn[fn] = val;
-    using dcc::fn_group;
-    fn_group fg = dcc::fn_to_group(fn);
-    uint32_t ifn = dd.fn.value<uint32_t>();
+    if(dd.refreshing) {
+        dcc::fn_group fg = dcc::fn_to_group(fn);
+        uint32_t ifn = dd.fn.value<uint32_t>();
 
-    dccMain->sendFunctionGroup(dd.addr, fg, ifn);
+        dccMain->sendFunctionGroup(dd.addr, fg, ifn);
+    }
 }
 
 void CommandStation::setLocoFns(uint8_t slot, dcc::fn_group fg, uint32_t vals) {
@@ -162,10 +167,12 @@ void CommandStation::setLocoFns(uint8_t slot, dcc::fn_group fg, uint32_t vals) {
     uint32_t mask = dcc::fn_group_mask(fg);
     vals = (current & ~mask) | (vals & mask);
     if(vals == current) return;
-    // CS_DEBUGF("slot %d FN G%d = %d", slot, (int)fg, vals);
-
-    dccMain->sendFunctionGroup(dd.addr, fg, vals);
     dd.fn = LocoData::Fns( vals );
+    // CS_DEBUGF("slot %d FN G%d = %d", slot, (int)fg, vals);
+    if(dd.refreshing) {
+        dccMain->sendFunctionGroup(dd.addr, fg, vals);
+    }
+
 }
 
 void CommandStation::setLocoFns(uint8_t slot, uint32_t mask, uint32_t vals ) {
@@ -176,18 +183,20 @@ void CommandStation::setLocoFns(uint8_t slot, uint32_t mask, uint32_t vals ) {
     vals = (current & ~mask) | vals; // updated value for all bits
     uint32_t changed = current ^ vals;
 
-    for(size_t g=0; g<dcc::FN_NUMBER; g++) {
-        dcc::fn_group fg = static_cast<dcc::fn_group>(g);
-        uint32_t gm = dcc::fn_group_mask(fg);
-        // if required mask intersects function group mask
-        //  and these bits differ from current value,
-        // update bits (v=) and send function group
-        if((mask & gm) != 0 && (changed & gm) != 0) {
-            dccMain->sendFunctionGroup(dd.addr, fg, vals);
+    dd.fn = LocoData::Fns( vals );
+
+    if(dd.refreshing) {
+        for(size_t g=0; g<dcc::FN_NUMBER; g++) {
+            dcc::fn_group fg = static_cast<dcc::fn_group>(g);
+            uint32_t gm = dcc::fn_group_mask(fg);
+            // if required mask intersects function group mask
+            //  and these bits differ from current value,
+            // update bits (v=) and send function group
+            if((mask & gm) != 0 && (changed & gm) != 0) {
+                dccMain->sendFunctionGroup(dd.addr, fg, vals);
+            }
         }
     }
-
-    dd.fn = LocoData::Fns( vals );
 }
 
 
