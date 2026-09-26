@@ -79,47 +79,27 @@ namespace dccpp {
 
         const auto cmd = parts[0];
 
-        switch(cmd.front()) {
-            case '0':
-            case '1':
-            case 's':
-            case 'S':
-            case 'Q':
-            case 'q':
-            case 'T':
-            case 't':
-            case 'E':
-            case 'e':
-            case 'D':
-            case 'd':
-            case 'Z':
-            case 'z':
-            case 'a':
-            case 'f':
-            case 'w':
-            case 'W':
-            case 'b':
-            case 'B':
-            case 'R':
-                break;
-            default:
-                LOGE("DCC++ parse error: unsupported command '%.*s'", FMT_SV(cmd));
-                return;
-        }
 
         switch(cmd.front()) {
             case '0':
             case '1': {
                 // power control: <0> or <1>
                 bool v = cmd[0] == '1';
+                String ret;
                 if(parts.size()==1) {
                     CS.getMainTrack()->setPower(v);
                     CS.getProgTrack()->setPower(v);
+                    ret = String("<p") + cmd[0] + ">";
+                    stream->println(ret);
                 } else {
+                    // DCC-EX command: <0|1 MAIN|PROG>
+                    ret = String("<p") + cmd[0] + " " + String(parts[1].data(), parts[1].length()) + ">";
                     if(parts[1] == "MAIN") {
                         CS.getMainTrack()->setPower(v);
+                        stream->println(ret);
                     } else if(parts[1] == "PROG") {
                         CS.getProgTrack()->setPower(v);
+                        stream->println(ret);
                     }
                 }
                 break;
@@ -203,13 +183,9 @@ namespace dccpp {
             }
             case 'f': {
                 // cab function command: <f CAB BYTE1 [BYTE2]>
-                if(count < 3) {
-                    LOGE("DCC++ parse error: invalid cab function command '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
 
                 unsigned cab = 0, byte1 = 0, byte2 = 0;
-                if(!parse_uint(parts[1], cab) || !parse_uint(parts[2], byte1)) {
+                if(count<3 || !parse_uint(parts[1], cab) || !parse_uint(parts[2], byte1)) {
                     LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
                     return;
                 }
@@ -229,7 +205,6 @@ namespace dccpp {
                     LOGE("DCC++ parse error: no loco slot available for '%.*s'", FMT_SV(trimmed));
                     return;
                 }
-                CS.setLocoSlotRefresh(slot, true);
 
                 if(count == 3) {
                     switch(byte1 & 0xF0u) {
@@ -271,6 +246,31 @@ namespace dccpp {
                             return;
                     }
                 }
+                CS.setLocoSlotRefresh(slot, true);
+                break;
+            }
+            case 'F': {
+                // DCC-EX cab function command: <F CAB fn state>
+
+                unsigned cab = 0, fn = 0, state = 0;
+                if(count<4 || !parse_uint(parts[1], cab) || !parse_uint(parts[2], fn) || !parse_uint(parts[3], state)) {
+                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+
+                const auto loco = fromInt(cab);
+                if(!loco.isValid()) {
+                    LOGE("DCC++ parse error: invalid cab address in '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+
+                const auto slot = CS.findOrAllocateLocoSlot(loco);
+                if(slot == 0) {
+                    LOGE("DCC++ parse error: no loco slot available for '%.*s'", FMT_SV(trimmed));
+                    return;
+                }
+                CS.setLocoFn(slot, fn, state!=0);
+                CS.setLocoSlotRefresh(slot, true);
                 break;
             }
             case 's':
