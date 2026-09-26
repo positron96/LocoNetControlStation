@@ -12,13 +12,12 @@
 #define DCC_MAIN_PIN 25
 #define DCC_MAIN_PIN_EN 32
 #define DCC_MAIN_PIN_SENSE 36
-// per 1000mA: mV = 1.575mA * 680 Ohm
+// per 1000mA: mV = 1.575mA * R Ohm
 #define DCC_MAIN_MV_TO_MA_COEF  (1000.0f / 680.0f / 1.575f)  // 3V ADC is ~3A
 #define DCC_PROG_PIN 26
 #define DCC_PROG_PIN_EN 33
 #define DCC_PROG_PIN_SENSE 39
-// per 1000mA: mV = 1.575mA * 18000 Ohm
-#define DCC_PROG_MV_TO_MA_COEF  (1000.0f / 18000.0f / 1.575f)  // 3V ADC is ~100mA
+#define DCC_PROG_MV_TO_MA_COEF  (1000.0f / 3900.0f / 1.575f)
 
 #define PIN_DISP_SDA 21
 #define PIN_DISP_SCL 22
