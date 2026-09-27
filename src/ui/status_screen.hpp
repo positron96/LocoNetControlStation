@@ -8,6 +8,8 @@
 #include "../withrottle_server.hpp"
 #include "../loconet_tcp_server.hpp"
 
+#include <dcc/esp32_current_meter.hpp>
+
 #include <etl/enum_type.h>
 #include <etl/string_view.h>
 #include <etl/string_utilities.h>
@@ -222,6 +224,7 @@ namespace ui {
             x = 5;
             y += u8g2.getMaxCharHeight() + 8;
 
+            while(dcc::ESP32CurrentMeter::isBusy()) {delayMicroseconds(10);}
             int voltage_mv = analogReadMilliVolts(PIN_VSENSE) * VSENSE_COEF;
             int tx = x;
             tx += u8g2.drawStr(x, y, "Input:");

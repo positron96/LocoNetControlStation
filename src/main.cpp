@@ -41,7 +41,7 @@
 LocoNetBus bus;
 
 #include <LocoNetStreamESP32.h>
-//LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
+LocoNetStreamESP32 locoNetPhy(2, LOCONET_PIN_RX, LOCONET_PIN_TX, false, true, &bus); // UART2
 LocoNetDispatcher parser(&bus);
 
 LbServer lbServer(LBSERVER_DEFAULT_TCP_PORT, &bus);
@@ -116,7 +116,7 @@ void setup() {
 
     statusLed.begin();
 
-    //locoNetPhy.start();
+    locoNetPhy.start();
     //lSerial.begin();
 
     parser.onPacket(CALLBACK_FOR_ALL_OPCODES, [](const lnMsg *rxPacket) {
@@ -213,7 +213,7 @@ void setup() {
     withrottleServer.begin();
     dccMain.add_observer(withrottleServer);  // withrottle doesn't need prog channel
 #else
-    statusLed.enable_state(led::State::normal, 3);
+    statusLed.enable_state(led::State::normal, 3); // 3=WIFI disabled
 #endif
 
 }
@@ -228,6 +228,7 @@ void loop() {
     CS.loop();
     //lSerial.loop();
     dccppHandler.loop();
+    locoNetPhy.process();
 
     uint32_t ms = millis();
     static uint32_t lastMs = millis(); // don't start from 0 as connecting to wifi can take a lot
@@ -242,9 +243,12 @@ void loop() {
         int v = 1-digitalRead(PIN_BT);
         if(v!=inState) {
             if(v) {
-                auto ret = CS.readCVProg(1);
-                if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
-                else Serial.printf("CV1=%d\n", ret.value());
+                // auto ret = CS.readCVProg(1);
+                // if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
+                // else Serial.printf("CV1=%d\n", ret.value());
+                dcc::AccessoryAddress addr = dcc::AccessoryAddress::from9bit(10, 1);
+                LnMsg ttt = makeSwRec(addr.longAddr(), true, true);
+                locoNetPhy.send(&ttt);
             }
         }
         inState = v;

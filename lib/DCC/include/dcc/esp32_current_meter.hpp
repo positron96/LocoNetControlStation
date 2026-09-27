@@ -6,6 +6,8 @@
 
 //#include <esp_adc_cal.h>
 
+#include <atomic>
+
 namespace dcc {
 
     /**
@@ -31,16 +33,23 @@ namespace dcc {
             _adcTimer = nullptr;
         }
 
+        static bool isBusy() { return busy; }
+
     private:
         esp_timer_handle_t _adcTimer;
+        static std::atomic<bool> busy;
 
         static void adcTimerFunc_c(void* arg) {
             static_cast<ESP32CurrentMeter*>(arg)->adcTimerFunc();
         }
         void adcTimerFunc() {
+            busy = true;
             for(auto ch: channels) {
                 ch->updateCurrent();
             }
+            busy = false;
         }
     };
+
+    inline std::atomic<bool> ESP32CurrentMeter::busy{false};
 }
