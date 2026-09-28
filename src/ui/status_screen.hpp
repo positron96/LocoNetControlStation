@@ -19,9 +19,11 @@ namespace ui {
             Locos,
             WiFi,
             LbServer,
-            WiThrottle
+            WiThrottle,
         };
         static constexpr size_t N_PAGES = 5;
+        StatusPage advance(int8_t step);
+
         ETL_DECLARE_ENUM_TYPE(StatusPage, uint8_t)
         ETL_ENUM_TYPE(Tracks, "Tracks")
         ETL_ENUM_TYPE(Locos, "Locos")
@@ -38,9 +40,9 @@ namespace ui {
 
         WiThrottleServer *wtServer;
         LbServer *lbServer;
-        StatusPage cur_page{StatusPage::Tracks};
-        uint32_t last_page_change{0};
-        uint32_t page_duration{DEFAULT_PAGE_DURATION};
+        StatusPage curPage{StatusPage::Tracks};
+        uint32_t lastPageChange{0};
+        uint32_t pageDuration{DEFAULT_PAGE_DURATION};
 
         void setPage(StatusPage page, uint32_t duration = DEFAULT_PAGE_DURATION);
         void loop() override;
@@ -62,7 +64,7 @@ namespace ui {
         #endif
 
         int drawValue(U8G2 &u8g2, int x, int y, int value, const char* suffix);
-            int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track);
+        int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track);
         void drawPowerPage(U8G2 &u8g2, int x, int y);
         void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y);
     };

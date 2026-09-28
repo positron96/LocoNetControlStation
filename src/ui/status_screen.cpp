@@ -14,42 +14,53 @@ namespace ui {
 
 constexpr unsigned value_dot_pos = 60;
 
+bool isPageValid(StatusPage page) {
+    if(page == StatusPage::WiFi && USE_WIFI == 0) return false;
+    if(page == StatusPage::LbServer && USE_WIFI == 0) return false;
+    if(page == StatusPage::WiThrottle && USE_WIFI == 0) return false;
+    return true;
+}
+
+StatusPage StatusPage::advance(int8_t step) {
+    step += StatusPage::N_PAGES; // in case it's negative
+    auto nextPage = *this;
+    for(int i = 0; i < StatusPage::N_PAGES - 1; i++) {
+        nextPage = StatusPage{StatusPage::value_type((nextPage.get_value() + step) % StatusPage::N_PAGES)};
+        if(isPageValid(nextPage)) return nextPage;
+    }
+    assert(false); // absolutely no valid pages is impossible
+    return StatusPage{0};
+}
+
 void StatusScreen::setPage(StatusPage page, uint32_t duration) {
-    if(cur_page == page) return;
-    cur_page = page;
-    title = cur_page.c_str();
-    last_page_change = millis();
-    page_duration = duration;
+    if(curPage == page) return;
+    curPage = page;
+    title = curPage.c_str();
+    lastPageChange = millis();
+    pageDuration = duration;
     setDirty();
 }
 
 void StatusScreen::loop() {
-    if(millis() - last_page_change <= page_duration) return;
-    page_duration = DEFAULT_PAGE_DURATION;
-    last_page_change = millis();
+    if(millis() - lastPageChange <= pageDuration) return;
+    pageDuration = DEFAULT_PAGE_DURATION;
+    lastPageChange = millis();
 
-    for(int i = 1; i < StatusPage::N_PAGES; i++) {
-        uint8_t nextPage = (cur_page.get_value() + i) % StatusPage::N_PAGES;
-        if(nextPage == 2 && USE_WIFI == 0) continue;
-        if(nextPage == 3 && (USE_WIFI == 0 || lbServer == nullptr)) continue;
-        if(nextPage == 4 && (USE_WIFI == 0 || wtServer == nullptr)) continue;
-        setPage(StatusPage{nextPage});
-        break;
-    }
+    setPage(curPage.advance(1));
 }
 
 void StatusScreen::notification(const dcc::PowerEvent &) {
-    setDirty();
+    if(curPage == StatusPage::Tracks) setDirty();
 }
 
 void StatusScreen::onShow() {
-    last_page_change = millis();
+    lastPageChange = millis();
 }
 
 void StatusScreen::drawContents() {
     U8G2 &u8g2 = Display::u8g2;
     int scroller_width = u8g2.getWidth() / StatusPage::N_PAGES;
-    int x = cur_page * scroller_width;
+    int x = curPage * scroller_width;
     int y = Display::STATUS_BAR_HEIGHT;
 
     u8g2.drawHLine(x, y, scroller_width);
@@ -57,7 +68,7 @@ void StatusScreen::drawContents() {
     u8g2.setFontPosBottom();
     y += 1;
 
-    switch(cur_page) {
+    switch(curPage) {
         case StatusPage::Tracks: drawPowerPage(u8g2, 0, y); break;
         case StatusPage::Locos: drawLocosPage(u8g2, 0, y); break;
 #if USE_WIFI == 1
@@ -70,13 +81,13 @@ void StatusScreen::drawContents() {
 
 bool StatusScreen::onButtonEvent(unsigned button, bool pressed, bool held) {
     if(!pressed || held) return false;
-    uint8_t nextPage;
+    int8_t inc;
     switch(button) {
-        case 0: nextPage = (cur_page.get_value() + 1) % StatusPage::N_PAGES; break;
-        case 1: nextPage = (cur_page.get_value() + StatusPage::N_PAGES - 1) % StatusPage::N_PAGES; break;
+        case 0: inc = 1; break;
+        case 1: inc = -1; break;
         default: return false;
     }
-    setPage(StatusPage{nextPage}, 10'000);
+    setPage(curPage.advance(inc));
     return true;
 }
 
@@ -121,19 +132,17 @@ void StatusScreen::drawMultiStr(U8G2 &u8g2, int x, int y, const etl::string_view
 }
 
 void StatusScreen::drawLbServerPage(U8G2 &u8g2, int x, int y) {
+    if(lbServer == nullptr) return;
     y += u8g2.getMaxCharHeight();
-    if(lbServer != nullptr) {
-        String v = lbServer->getInfo();
-        drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
-    }
+    String v = lbServer->getInfo();
+    drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
 }
 
 void StatusScreen::drawWiThrottlePage(U8G2 &u8g2, int x, int y) {
+    if(wtServer == nullptr) return;
     y += u8g2.getMaxCharHeight();
-    if(wtServer != nullptr) {
-        String v = wtServer->getInfo();
-        drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
-    }
+    String v = wtServer->getInfo();
+    drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
 }
 #endif
 
