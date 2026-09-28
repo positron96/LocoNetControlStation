@@ -246,8 +246,16 @@ void loop() {
     static unsigned long nextButtonsRead = millis();
 
     if(millis()>nextButtonsRead) {
-        if(buttons[0].add(1 - digitalRead(PIN_BT))) {
-            if(buttons[0].is_set()) {
+        buttons[0].add(1 - digitalRead(PIN_BT));
+        buttons[1].add(1 - digitalRead(PIN_BT2));
+
+        #if USE_DISPLAY==1
+            for(size_t i=0; i<buttons.size(); i++) {
+                if(buttons[i].has_changed())
+                    disp.handleButtonEvent(i, buttons[i].is_set(), buttons[i].is_held());
+            }
+        #else
+            if(buttons[0].has_changed() && buttons[0].is_set()) {
                 // auto ret = CS.readCVProg(1);
                 // if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
                 // else Serial.printf("CV1=%d\n", ret.value());
@@ -255,29 +263,30 @@ void loop() {
                 LnMsg ttt = makeSwRec(addr.longAddr(), true, true);
                 locoNetPhy.send(&ttt);
             }
-        }
 
-        if(buttons[1].add(1 - digitalRead(PIN_BT2))) {
-            auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(32));
-            if(buttons[1].is_set()) {
-                CS.setLocoSlotRefresh(slot, true);
-                CS.setLocoSpeed(slot, buttons[1].is_set() ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
-                //CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
-                CS.setLocoFn(slot, 0, 1);
-                CS.setLocoFn(slot, 5, 1);
-                CS.setLocoFn(slot, 8, 1);
+            if(buttons[1].has_changed() && buttons[1].is_set()) {
+                auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(32));
+                if(buttons[1].is_set()) {
+                    CS.setLocoSlotRefresh(slot, true);
+                    CS.setLocoSpeed(slot, buttons[1].is_set() ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                    //CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                    CS.setLocoFn(slot, 0, 1);
+                    CS.setLocoFn(slot, 5, 1);
+                    CS.setLocoFn(slot, 8, 1);
 
-            } else {
-                CS.releaseLocoSlot(slot);
+                } else {
+                    CS.releaseLocoSlot(slot);
+                }
+                // if(dccMain.getPower()) {
+                //     dccMain.setPower(false);
+                //     dccProg.setPower(false);
+                // } else {
+                //     dccMain.setPower(true);
+                //     dccProg.setPower(true);
+                // }
             }
-            // if(dccMain.getPower()) {
-            //     dccMain.setPower(false);
-            //     dccProg.setPower(false);
-            // } else {
-            //     dccMain.setPower(true);
-            //     dccProg.setPower(true);
-            // }
-        }
+
+        #endif
 
         nextButtonsRead = millis() + BUTTON_REFRESH_INTL;
     }
@@ -286,24 +295,24 @@ void loop() {
 
 
 void tick20ms() {
-#if USE_DISPLAY==1
-    disp.loop();
-#endif
+    #if USE_DISPLAY==1
+        disp.loop();
+    #endif
     currentMeter.checkOvercurrent();
 }
 
 
 void tick1s() {
-#if USE_WIFI==1
-    if(WiFi.getMode() == WIFI_STA) {
-        if(!WiFi.isConnected()) {
-            statusLed.enable_state(led::State::attention);
-        } else {
-            statusLed.disable_state(led::State::attention);
+    #if USE_WIFI==1
+        if(WiFi.getMode() == WIFI_STA) {
+            if(!WiFi.isConnected()) {
+                statusLed.enable_state(led::State::attention);
+            } else {
+                statusLed.disable_state(led::State::attention);
+            }
         }
-    }
-#endif
-// #if USE_DISPLAY==0 && USE_WIFI==1
-//     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
-// #endif
+    #endif
+    // #if USE_DISPLAY==0 && USE_WIFI==1
+    //     Serial.println(WiFi.isConnected() ? (String("RSSI:")+WiFi.RSSI()) : "No WIFI");
+    // #endif
 }

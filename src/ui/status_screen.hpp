@@ -1,21 +1,15 @@
 #pragma once
 
 #include "../config.hpp"
-
 #include "display.hpp"
 
-#include "../command_station.hpp"
-#include "../withrottle_server.hpp"
-#include "../loconet_tcp_server.hpp"
-
-#include <dcc/esp32_current_meter.hpp>
+#include <dcc/power_event.hpp>
 
 #include <etl/enum_type.h>
 #include <etl/string_view.h>
-#include <etl/string_utilities.h>
 
-#include <WiFi.h>
-#include <Arduino.h>
+class LbServer;
+class WiThrottleServer;
 
 namespace ui {
 
@@ -31,246 +25,46 @@ namespace ui {
         ETL_DECLARE_ENUM_TYPE(StatusPage, uint8_t)
         ETL_ENUM_TYPE(Tracks, "Tracks")
         ETL_ENUM_TYPE(Locos, "Locos")
-        ETL_ENUM_TYPE(WiFi,  "WiFi")
-        ETL_ENUM_TYPE(LbServer,  "LnTCP")
-        ETL_ENUM_TYPE(WiThrottle,  "WiThrottle")
+        ETL_ENUM_TYPE(WiFi, "WiFi")
+        ETL_ENUM_TYPE(LbServer, "LnTCP")
+        ETL_ENUM_TYPE(WiThrottle, "WiThrottle")
         ETL_END_ENUM_TYPE
     };
 
     class StatusScreen: public Screen, public dcc::PowerObserver {
     public:
 
+        constexpr static uint32_t DEFAULT_PAGE_DURATION = 4000;
+
         WiThrottleServer *wtServer;
         LbServer *lbServer;
         StatusPage cur_page{StatusPage::Tracks};
         uint32_t last_page_change{0};
+        uint32_t page_duration{DEFAULT_PAGE_DURATION};
 
-        void setPage(StatusPage page) {
-            if(cur_page == page) return;
-            cur_page = page;
-            title = cur_page.c_str();
-            setDirty();
-        }
-
-        void loop() override {
-            if(millis()-last_page_change>4000) {
-
-                last_page_change = millis();
-
-                for(int i=1; i<StatusPage::N_PAGES; i++) {
-                    uint8_t nextPage = (cur_page.get_value()+i) % StatusPage::N_PAGES;
-                    if(nextPage==2 && USE_WIFI==0) continue;
-                    if(nextPage==3 && (USE_WIFI==0 || lbServer==nullptr)) continue;
-                    if(nextPage==4 && (USE_WIFI==0 || wtServer==nullptr)) continue;
-                    setPage(StatusPage{nextPage});
-                    break;
-                }
-            }
-        }
-
-        void notification(const dcc::PowerEvent &event) override {
-            setDirty();
-        }
+        void setPage(StatusPage page, uint32_t duration = DEFAULT_PAGE_DURATION);
+        void loop() override;
+        void notification(const dcc::PowerEvent &event) override;
 
     protected:
+        void onShow() override;
+        void drawContents() override;
+        bool onButtonEvent(unsigned button, bool pressed, bool held) override;
 
-        void onShow() override { last_page_change = millis(); }
-
-        void drawContents() override {
-            U8G2 &u8g2 = Display::u8g2;
-            int scroller_width = u8g2.getWidth() / StatusPage::N_PAGES;
-            int x = cur_page*scroller_width;
-            int y = Display::STATUS_BAR_HEIGHT;
-
-            u8g2.drawHLine(x, y, scroller_width);
-
-            //u8g2_font_6x13B_tr    u8g2_font_9x6LED_tr
-            u8g2.setFont(u8g2_font_nokiafc22_tr);
-            u8g2.setFontPosBottom();
-            x = 0;
-            y += 1;
-
-            switch(cur_page) {
-                case StatusPage::Tracks: drawPowerPage(u8g2, x, y);  break;
-                case StatusPage::Locos: drawLocosPage(u8g2, x, y);  break;
-            #if USE_WIFI==1
-                case StatusPage::WiFi: drawWiFiPage(u8g2, x, y);  break;
-                case StatusPage::LbServer: drawLbServerPage(u8g2, x, y); break;
-                case StatusPage::WiThrottle: drawWiThrottlePage(u8g2, x, y); break;
-            #endif
-            }
-        }
+        private:
 
         #ifdef USE_WIFI
-        void drawWiFiPage(U8G2 &u8g2, int x, int y) {
-            y += u8g2.getMaxCharHeight();
-            int h = u8g2.getMaxCharHeight() + 1;
-            String v;
-
-            if((WiFi.getMode() & WIFI_MODE_AP) != 0) {
-                v = "AP: " + String(WiFi.softAPSSID());
-                u8g2.drawStr(x, y, v.c_str()); y += h;
-
-                v = "AP IP: " + WiFi.softAPIP().toString();
-                u8g2.drawStr(x, y, v.c_str()); y += h;
-
-                v = WiFi.softAPgetStationNum() + " clients";
-                u8g2.drawStr(x, y, v.c_str()); y += h;
-            }
-
-            if((WiFi.getMode() & WIFI_MODE_STA) != 0) {
-                bool connected = WiFi.isConnected();
-                if(!connected) {
-                    u8g2.drawStr(x, y, "STA Not connected");
-                } else {
-                    v = "STA: "+ String(WiFi.SSID());
-                    u8g2.drawStr(x, y, v.c_str());
-
-                    // drawWifiBars(u8g2, x+t+2, y-dy, WiFi.RSSI(), 4, 4, 12, 1);
-                    y += h;
-
-                    v = "STA IP: " + WiFi.localIP().toString();
-                    u8g2.drawStr(x, y, v.c_str());
-                }
-            }
-        }
-
-        void drawStrView(U8G2 &u8g2, int x, int y, const etl::string_view s) {
-            for(char c: s) {
-                x+=u8g2.drawGlyph(x, y, c);
-            }
-        }
-
-        void drawMultiStr(U8G2 &u8g2, int x, int y, const etl::string_view s) {
-            int h = u8g2.getMaxCharHeight() + 1;
-            etl::optional<etl::string_view> token;
-            while ((token = etl::get_token(s, "\n\r", token, true))) {
-                drawStrView(u8g2, x, y, token.value());
-                y += h;
-            }
-        }
-
-        void drawLbServerPage(U8G2 &u8g2, int x, int y) {
-            y += u8g2.getMaxCharHeight();
-            if(lbServer!=nullptr) {
-                String v = lbServer->getInfo();
-                drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
-            }
-        }
-
-
-        void drawWiThrottlePage(U8G2 &u8g2, int x, int y) {
-            y += u8g2.getMaxCharHeight();
-            if(wtServer!=nullptr) {
-                String v = wtServer->getInfo();
-                drawMultiStr(u8g2, x, y, {v.c_str(), v.length()});
-            }
-        }
+        void drawWiFiPage(U8G2 &u8g2, int x, int y);
+        void drawStrView(U8G2 &u8g2, int x, int y, const etl::string_view s);
+        void drawMultiStr(U8G2 &u8g2, int x, int y, const etl::string_view s);
+        void drawLbServerPage(U8G2 &u8g2, int x, int y);
+        void drawWiThrottlePage(U8G2 &u8g2, int x, int y);
         #endif
 
-        /** Draws a fixed point value.
-         * Value is with 3 decimal places (i.e. float_val*1000)
-         */
-        int drawValue(U8G2 &u8g2, int x, int y, int value, const char* suffix) {
-            auto font = u8g2.getU8g2()->font;
-            char v[20];
-            int tx = x;
-
-            // value is fixed-point with 3 decimal places (real_value * 1000)
-            // Convert to N.NN by rounding to the nearest hundredth.
-            long roundedToHundredth = (value >= 0 ? value + 5 : value - 5) / 10;
-            long absRounded = (roundedToHundredth >= 0) ? roundedToHundredth : -roundedToHundredth;
-            long whole = absRounded / 100;
-            long frac = absRounded % 100;
-            u8g2.setFont(u8g2_font_profont17_tn); // big numbers
-            // align to decimal dot, so get width of integer part
-            snprintf(v, sizeof(v), "%s%ld", roundedToHundredth < 0 ? "-" : "", whole);
-            unsigned iw = u8g2.getStrWidth(v);
-            snprintf(v, sizeof(v), "%s%ld.%02ld", roundedToHundredth < 0 ? "-" : "", whole, frac);
-            int h = u8g2.getMaxCharHeight();
-            tx = tx + u8g2.drawStr(tx-iw, y+3, v) - iw; // advance tx only by fractional part
-            tx += 2;
-
-            u8g2.setFont(font);
-            u8g2.drawStr(tx, y, suffix); y += h - 2;
-            return y;
-        }
-
-        constexpr static unsigned value_dot_pos = 60;
-
-        int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track) {
-            auto font = u8g2.getU8g2()->font;
-            int tx = x;
-            u8g2.drawStr(tx, y, name);
-            tx = x + value_dot_pos;
-            if(track->getOvercurrentStatus()) {
-                u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
-                u8g2.drawGlyph(tx, y+1, 0x43);
-                y += u8g2.getMaxCharHeight() + 1;
-                u8g2.setFont(font);
-            } else if(track->getPower() == false) {
-                u8g2.setFont(u8g2_font_open_iconic_embedded_2x_t);
-                u8g2.drawGlyph(tx, y+1, 0x4E);
-                y += u8g2.getMaxCharHeight() + 1;
-                u8g2.setFont(font);
-            } else {
-                y = drawValue(u8g2, tx, y, track->getCurrent(), "A");
-            }
-            return y;
-        }
-
-
-        void drawPowerPage(U8G2 &u8g2, int x, int y) {
-            x = 5;
-            y += u8g2.getMaxCharHeight() + 8;
-
-            while(dcc::ESP32CurrentMeter::isBusy()) {delayMicroseconds(10);}
-            int voltage_mv = analogReadMilliVolts(PIN_VSENSE) * VSENSE_COEF;
-            int tx = x;
-            tx += u8g2.drawStr(x, y, "Input:");
-            y = drawValue(u8g2, x + value_dot_pos, y, voltage_mv, "V");
-
-            const dcc::BaseChannel *mainTrack = CS.getMainTrack();
-            if(mainTrack!=nullptr) {
-                y = drawTrack(u8g2, x, y, "Main:", mainTrack);
-            }
-
-            const dcc::BaseChannel *progTrack = CS.getProgTrack();
-            if(progTrack!=nullptr) {
-                drawTrack(u8g2, x, y, "Prog:", progTrack);
-            }
-        }
-
-        void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y) {
-            y += u8g2.getMaxCharHeight();
-            int h = u8g2.getMaxCharHeight() + 1;
-
-            if(CS.getAllocatedSlotsCount() == 0) {
-                u8g2.drawStr(x, y, "No locos");
-            } else {
-                String v;
-                for(const auto slot: CS.getAllocatedSlots()) {
-                    const auto &data = CS.getSlotData(slot);
-                    v = String(slot) + ": " + String(data.addr) + " ";
-                    if(data.refreshing) {
-                        v += (data.dir==1?"F ":"R ") + String(data.speed);
-                    }
-                    if(data.hasOwner()) {
-                        const uintptr_t o = (const uintptr_t)data.owner;
-                        v += " h" + String(o & 0xFF, HEX);
-                    }
-
-                    int32_t t = (millis() - data.wdt.getLastUpdate())/1000;
-                    if(t>15) {
-                        v += " (" + String(t)+ "s ago)";
-                    }
-
-                    u8g2.drawStr(x, y, v.c_str());
-                    y += h;
-                }
-            }
-        }
-
+        int drawValue(U8G2 &u8g2, int x, int y, int value, const char* suffix);
+            int drawTrack(U8G2 &u8g2, int x, int y, const char* name, const dcc::BaseChannel *track);
+        void drawPowerPage(U8G2 &u8g2, int x, int y);
+        void drawLocosPage(U8G2 &u8g2, unsigned x, unsigned y);
     };
 
 }  // namespace ui

@@ -6,6 +6,7 @@ namespace ui {
 
     class Screen;
 
+    /** Class for the physical display. */
     class Display {
     public:
         static U8G2 &u8g2;
@@ -28,6 +29,8 @@ namespace ui {
 
         static Display *getDisplay() { return inst; }
 
+        void handleButtonEvent(unsigned button, bool pressed, bool held);
+
     private:
 
         static Display *inst;
@@ -40,6 +43,7 @@ namespace ui {
     };
 
 
+    /** An object drawn on the Display. */
     class Screen {
     public:
 
@@ -63,7 +67,7 @@ namespace ui {
 
         virtual void drawContents() = 0;
 
-        // virtual void onButtonPressed(Button bt, int8_t arg) {};
+        virtual bool onButtonEvent(unsigned bt, bool pressed, bool held) { return false; }
 
         // virtual void onPotValueChanged(int pot, int val) {};
 

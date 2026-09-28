@@ -53,6 +53,12 @@ namespace ui {
         dirty = false;
     }
 
+    void Display::handleButtonEvent(unsigned button, bool pressed, bool held) {
+        if(cScreen != nullptr) {
+            if(cScreen->onButtonEvent(button, pressed, held)) setDirty();
+        }
+    }
+
     u8g2_uint_t drawWifiBars(U8G2 &u8g2, int x, int y, int rssi, int maxBars, int barWidth, int maxHeight, int spacing) {
         int activeBars = map(rssi, -100, -50, 1, maxBars);
         activeBars = constrain(activeBars, 1, maxBars);
