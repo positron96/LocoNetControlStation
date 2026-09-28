@@ -34,6 +34,7 @@
 #include <Arduino.h>
 
 #include <etl/callback_timer_atomic.h>
+#include <etl/debounce.h>
 
 #include <stdio.h>
 
@@ -80,6 +81,12 @@ using TimerType = etl::callback_timer_atomic<3, std::atomic_uint>;
 TimerType timerController;
 etl::timer::id::type timer20ms;
 etl::timer::id::type timer1s;
+
+constexpr unsigned BUTTON_REFRESH_INTL = 5; // in ms
+etl::array<
+    etl::debounce<10 / BUTTON_REFRESH_INTL, 500 / BUTTON_REFRESH_INTL>,
+    2
+> buttons;
 
 class PowerStatusObserver: public dcc::PowerObserver {
     void notification(const dcc::PowerEvent &event) override {
@@ -236,13 +243,11 @@ void loop() {
         lastMs = ms;
     }
 
-    static unsigned long nextInRead = 0;
-    static int inState = 0;
-    static int inState2 = 0;
-    if(millis()>nextInRead) {
-        int v = 1-digitalRead(PIN_BT);
-        if(v!=inState) {
-            if(v) {
+    static unsigned long nextButtonsRead = millis();
+
+    if(millis()>nextButtonsRead) {
+        if(buttons[0].add(1 - digitalRead(PIN_BT))) {
+            if(buttons[0].is_set()) {
                 // auto ret = CS.readCVProg(1);
                 // if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
                 // else Serial.printf("CV1=%d\n", ret.value());
@@ -251,14 +256,12 @@ void loop() {
                 locoNetPhy.send(&ttt);
             }
         }
-        inState = v;
 
-        v = 1-digitalRead(PIN_BT2);
-        if(v!=inState2) {
+        if(buttons[1].add(1 - digitalRead(PIN_BT2))) {
             auto slot = CS.findOrAllocateLocoSlot(LocoAddress::shortAddr(32));
-            if(v) {
+            if(buttons[1].is_set()) {
                 CS.setLocoSlotRefresh(slot, true);
-                CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
+                CS.setLocoSpeed(slot, buttons[1].is_set() ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
                 //CS.setLocoSpeed(slot, v ? LocoSpeed::from128(64) : LocoSpeed::from128(0));
                 CS.setLocoFn(slot, 0, 1);
                 CS.setLocoFn(slot, 5, 1);
@@ -275,9 +278,8 @@ void loop() {
             //     dccProg.setPower(true);
             // }
         }
-        inState2 = v;
 
-        nextInRead = millis() + 10;
+        nextButtonsRead = millis() + BUTTON_REFRESH_INTL;
     }
 
 }
