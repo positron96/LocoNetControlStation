@@ -1,6 +1,7 @@
 #include "dccpp_proto_decoder.hpp"
 
 #include "command_station.hpp"
+#include "config.hpp"
 
 #include <etl/string_utilities.h>
 #include <etl/string_view.h>
@@ -14,15 +15,9 @@
 
 namespace dccpp {
 
-    bool parse_int(etl::string_view text, int &value) {
-        auto parsed = etl::to_arithmetic<int>(text);
-        if(!parsed) return false;
-        value = parsed.value();
-        return true;
-    }
-
-    bool parse_uint(etl::string_view text, unsigned &value) {
-        auto parsed = etl::to_arithmetic<unsigned>(text);
+    template<typename T>
+    bool parse(etl::string_view text, T &value) {
+        auto parsed = etl::to_arithmetic<T>(text);
         if(!parsed) return false;
         value = parsed.value();
         return true;
@@ -53,6 +48,10 @@ namespace dccpp {
         }
     }
 
+    String sv_str(etl::string_view sv) {
+        return String(sv.data(), sv.length());
+    }
+
     void DccppStreamHandler::process_line(const etl::string_view line) {
         if(line.empty()) return;
 
@@ -79,6 +78,12 @@ namespace dccpp {
 
         const auto cmd = parts[0];
 
+        #define CHECK(cond, msg, ...) do { \
+            if(!(cond)) { \
+                LOGE(msg "('%.*s')", ##__VA_ARGS__, FMT_SV(trimmed)); \
+                return; \
+            } } while(0)
+
 
         switch(cmd.front()) {
             case '0':
@@ -86,14 +91,14 @@ namespace dccpp {
                 // power control: <0> or <1>
                 bool v = cmd[0] == '1';
                 String ret;
-                if(parts.size()==1) {
+                if(count == 1) {
                     CS.getMainTrack()->setPower(v);
                     CS.getProgTrack()->setPower(v);
                     ret = String("<p") + cmd[0] + ">";
                     stream->println(ret);
                 } else {
                     // DCC-EX command: <0|1 MAIN|PROG>
-                    ret = String("<p") + cmd[0] + " " + String(parts[1].data(), parts[1].length()) + ">";
+                    ret = String("<p") + cmd[0] + " " + sv_str(parts[1]) + ">";
                     if(parts[1] == "MAIN") {
                         CS.getMainTrack()->setPower(v);
                         stream->println(ret);
@@ -105,106 +110,78 @@ namespace dccpp {
                 break;
             }
             case 'R': {
-                // read byte on prog: < R CV CALLBACKNUM CALLBACKSUB >
-                if(count < 4) {
-                    LOGE("DCC++ parse error: invalid CV read command '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                // read byte on prog: <R CV CALLBACKNUM CALLBACKSUB>
+                CHECK(count >= 4, "Invalid CV read command");
                 unsigned cv = 0, callback_num = 0, callback_sub = 0;
-                if(!parse_uint(parts[1], cv) || !parse_uint(parts[2], callback_num) || !parse_uint(parts[3], callback_sub)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(parse<unsigned>(parts[1], cv) && parse<unsigned>(parts[2], callback_num) && parse<unsigned>(parts[3], callback_sub),
+                    "Bad numeric args");
+
                 auto ret = CS.readCVProg(cv);
                 String t = String("<r ") + callback_num + " " + callback_sub + " " + (ret?(int)ret.value():-1) +">";
                 stream->println(t);
                 break;
             }
             case 'W': {
-                // write byte on prog: < W CV VALUE CALLBACKNUM CALLBACKSUB >
-                if(count < 5) {
-                    LOGE("DCC++ parse error: invalid CV write command '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                // write byte on prog: <W CV VALUE CALLBACKNUM CALLBACKSUB>
+                CHECK(count >= 5, "Invalid CV write command");
+
                 unsigned cv = 0, value = 0, callback_num = 0, callback_sub = 0;
-                if(!parse_uint(parts[1], cv) || !parse_uint(parts[2], value) || !parse_uint(parts[3], callback_num) || !parse_uint(parts[4], callback_sub)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(parse<unsigned>(parts[1], cv) && parse<unsigned>(parts[2], value) && parse<unsigned>(parts[3], callback_num) && parse<unsigned>(parts[4], callback_sub),
+                    "Bad numeric args");
                 auto ret = CS.writeCvProg(cv, value);
                 String t = String("<r ") + callback_num + " " + callback_sub + " " + (ret?(int)value:-1) + ">";
                 stream->println(t);
                 break;
             }
             case 'w': {
-                // write byte on main: < w CAB CV VALUE >
-                if(count < 4) {
-                    LOGE("DCC++ parse error: invalid CV write command '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                // write byte on main: <w CAB CV VALUE>
+                CHECK(count >= 4, "Invalid CV write command");
                 unsigned addr = 0, cv = 0, value = 0;
-                if(!parse_uint(parts[1], addr) || !parse_uint(parts[2], cv) || !parse_uint(parts[3], value)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(parse<unsigned>(parts[1], addr) && parse<unsigned>(parts[2], cv) && parse<unsigned>(parts[3], value),
+                    "Bad numeric args");
                 CS.writeCvMain(fromInt(addr), cv, value);
-                stream->println("OK");
                 break;
             }
-            case 'B': {
-                // write bit on prog: < B CV BIT VALUE CALLBACKNUM CALLBACKSUB >
-                if(count < 6) {
-                    LOGE("DCC++ parse error: invalid CV bit write command '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
-                unsigned cv = 0, bit = 0, value = 0, callback_num = 0, callback_sub = 0;
-                if(!parse_uint(parts[1], cv) || !parse_uint(parts[2], bit) || !parse_uint(parts[3], value) || !parse_uint(parts[4], callback_num) || !parse_uint(parts[5], callback_sub)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
-                (void)cv;
-                (void)bit;
-                (void)value;
-                (void)callback_num;
-                (void)callback_sub;
-                break;
-            }
-            case 'b':
-                // write bit on main: < b CAB CV BIT VALUE >
-                break;
-            case 'T':
             case 't': {
-                // turnout listing/define/control: <T> | <T ID> | <T ID THROW> | <T ID ADDRESS SUBADDRESS>
+                // throttle: <t REGISTER CAB SPEED DIRECTION>
+                CHECK(count >= 5, "Invalid throttle command");
+                int speed = 0;
+                unsigned reg = 0, cab = 0, direction = 0;
+                CHECK(parse<unsigned>(parts[1], reg) && parse<unsigned>(parts[2], cab)
+                    && parse<int>(parts[3], speed) && parse<unsigned>(parts[4], direction), "Bad numeric args");
+                CHECK(CS.isSlotSupported(reg) && speed >= -1 && speed <= 126 && direction < 2, "Invalid throttle args");
+                const auto loco = fromInt(cab);
+                CHECK(loco.isValid(), "Invalid cab address");
+                if(!CS.isSlotAllocated(reg)) CS.initLocoSlot(reg, loco);
+                CS.setLocoSpeed(reg, speed < 0 ? SPEED_EMGR : LocoSpeed::fromDCC(speed, SpeedMode::S128));
+                CS.setLocoDir(reg, direction);
+                CS.setLocoSlotRefresh(reg, true);
+                stream->println(String("<T ") + reg + " " + (speed < 0 ? 0 : speed) + " " + direction + ">");
                 break;
             }
             case 'a': {
                 // accessory command: <a ADDRESS SUBADDRESS ACTIVATE>
+                CHECK(count >= 4, "Invalid accessory command");
+                unsigned addr = 0, subaddr = 0, activate = 0;
+                CHECK(parse<unsigned>(parts[1], addr) && parse<unsigned>(parts[2], subaddr)
+                    && parse<unsigned>(parts[3], activate) && addr <= 511 && subaddr < 4 && activate < 2, "Bad accessory args");
+                //TODO: broadcast to LocoNet as well
+                CS.getMainTrack()->sendAccessory(dcc::AccessoryAddress::from9bit(addr, subaddr), activate != 0);
                 break;
             }
             case 'f': {
                 // cab function command: <f CAB BYTE1 [BYTE2]>
 
                 unsigned cab = 0, byte1 = 0, byte2 = 0;
-                if(count<3 || !parse_uint(parts[1], cab) || !parse_uint(parts[2], byte1)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
-                if(count >= 4 && !parse_uint(parts[3], byte2)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(count >= 3 && parse<unsigned>(parts[1], cab) && parse<unsigned>(parts[2], byte1),
+                    "Bad numeric args");
+                if(count >= 4) CHECK(parse<unsigned>(parts[3], byte2), "Bad numeric args");
 
                 const auto loco = fromInt(cab);
-                if(!loco.isValid()) {
-                    LOGE("DCC++ parse error: invalid cab address in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(loco.isValid(), "Invalid cab address");
 
                 const auto slot = CS.findOrAllocateLocoSlot(loco);
-                if(slot == 0) {
-                    LOGE("DCC++ parse error: no loco slot available for '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(slot != 0, "No loco slot available");
 
                 if(count == 3) {
                     switch(byte1 & 0xF0u) {
@@ -226,8 +203,7 @@ namespace dccpp {
                             break;
                         }
                         default:
-                            LOGE("DCC++ parse error: invalid function byte in '%.*s'", FMT_SV(trimmed));
-                            return;
+                        CHECK(false, "Invalid function byte");
                     }
                 } else {
                     switch(byte1) {
@@ -242,8 +218,7 @@ namespace dccpp {
                             break;
                         }
                         default:
-                            LOGE("DCC++ parse error: invalid extended function byte in '%.*s'", FMT_SV(trimmed));
-                            return;
+                            CHECK(false, "Invalid extended function byte");
                     }
                 }
                 CS.setLocoSlotRefresh(slot, true);
@@ -253,52 +228,71 @@ namespace dccpp {
                 // DCC-EX cab function command: <F CAB fn state>
 
                 unsigned cab = 0, fn = 0, state = 0;
-                if(count<4 || !parse_uint(parts[1], cab) || !parse_uint(parts[2], fn) || !parse_uint(parts[3], state)) {
-                    LOGE("DCC++ parse error: bad numeric args in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(count>=4 && parse<unsigned>(parts[1], cab) && parse<unsigned>(parts[2], fn) && parse<unsigned>(parts[3], state),
+                    "Bad numeric args");
 
                 const auto loco = fromInt(cab);
-                if(!loco.isValid()) {
-                    LOGE("DCC++ parse error: invalid cab address in '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(loco.isValid(), "Invalid address");
 
                 const auto slot = CS.findOrAllocateLocoSlot(loco);
-                if(slot == 0) {
-                    LOGE("DCC++ parse error: no loco slot available for '%.*s'", FMT_SV(trimmed));
-                    return;
-                }
+                CHECK(slot != 0, "No loco slot available");
                 CS.setLocoFn(slot, fn, state!=0);
                 CS.setLocoSlotRefresh(slot, true);
                 break;
             }
-            case 's':
-            case 'S':
-            case 'Q':
-            case 'q': {
-                // status/list/query commands
+            case 's': {
+                // Info: <s>
+                char msg[30];
+                for(const auto slot: CS.getAllocatedSlots()) {
+                    const auto &data = CS.getSlotData(slot);
+                    snprintf(msg, sizeof(msg), "<T%u %u %d>", slot, data.speed.get128(), data.dir ? 1 : 0);
+                    stream->println(msg);
+                }
+                stream->println(String("<p") + (CS.getPowerState() ? "1>" : "0>"));
+                stream->println(String("<i") + (CS_FULL_NAME " / " PCB_NAME ">"));
                 break;
             }
-            case 'Z':
-            case 'z': {
-                // output pin commands: <Z ID STATE> | <Z ID PIN IFLAG>
+            case 'c': {
+                // DCC++ extension: <c CurrentMAIN {current} C Milli 0 {max_ma} 1 {trip_ma}>
+                char msg[30];
+                const auto &track = CS.getMainTrack();
+                snprintf(msg, sizeof(msg), "<c CurrentMAIN %u C Milli 0 %u 1 %u>",
+                    track->getCurrent(), track->getMaxCurrent(), track->getMaxCurrent()
+                );
+                stream->println(msg);
                 break;
             }
-            case 'E':
-            case 'e': {
-                // save/erase EEPROM
+            case '#': {
+                // DCC++ extension: <#> Request number of supported cabs
+                stream->println(String("<# ") + CommandStation::MAX_SLOTS + ">");
                 break;
             }
-            case 'D':
-            case 'd': {
-                // diagnostics (ignored here for now)
+
+            // Stubs
+
+            case 'B': {
+                // write bit on prog: <B CV BIT VALUE CALLBACKNUM CALLBACKSUB>
+                // CV bit programming is unsupported; report verification failure.
+                CHECK(count >= 6, "Invalid CV bit write command");
+                stream->println(String("<r ") + sv_str(parts[4]) + " " + sv_str(parts[5]) + " -1>");
                 break;
             }
+            // write bit on main: < b CAB CV BIT VALUE >
+            // CV bit programming is intentionally unsupported; documented response is none.
+            case 'b': break;
+            // Turnout commands <T ID ADDRESS SUBADDRESS>; <T ID>; <T>
+            case 'T': { stream->println("<X>"); break; }
+            case 'S': // create/edit/remove sensors
+            case 'Q': { /* query sensors */ stream->println("<X>"); break; }
+            // output pin commands: <Z ID STATE> | <Z ID PIN IFLAG>
+            case 'Z': { stream->println("<X>"); break;}
+            case 'E': {/* save eeprom */ stream->println("<e 0 0 0>"); break; }
+            case 'e': { /* erase eeprom */ stream->println("<O>"); break; }
+            case 'D': { /* diagnostics (ignored for now) */ break;}
             default:
-                LOGE("DCC++ parse error: unhandled command '%.*s'", FMT_SV(cmd));
-                return;
+                CHECK(false, "Unhandled command");
         }
+        #undef CHECK
     }
 
 }
