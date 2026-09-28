@@ -59,6 +59,7 @@ public:
 
     void setPowerState(bool v) {
         if( dccMain!=nullptr ) dccMain->setPower(v);
+        if( dccProg!=nullptr ) dccProg->setPower(v);
     }
 
     bool getPowerState() const {
