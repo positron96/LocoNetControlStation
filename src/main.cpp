@@ -249,6 +249,10 @@ void loop() {
         buttons[0].add(1 - digitalRead(PIN_BT));
         buttons[1].add(1 - digitalRead(PIN_BT2));
 
+        if(buttons[0].has_changed() && buttons[0].is_held()) {
+            CS.setPowerState(!CS.getPowerState());
+        }
+
         #if USE_DISPLAY==1
             for(size_t i=0; i<buttons.size(); i++) {
                 if(buttons[i].has_changed())
@@ -259,7 +263,7 @@ void loop() {
                 // auto ret = CS.readCVProg(1);
                 // if(!ret) Serial.printf("CV1 err: %s\n", ret.error().c_str());
                 // else Serial.printf("CV1=%d\n", ret.value());
-                dcc::AccessoryAddress addr = dcc::AccessoryAddress::from9bit(10, 1);
+                dcc::AccessoryAddress addr = dcc::AccessoryAddress::from11bit(10);
                 LnMsg ttt = makeSwRec(addr.longAddr(), true, true);
                 locoNetPhy.send(&ttt);
             }

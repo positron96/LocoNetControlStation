@@ -83,8 +83,8 @@ bool StatusScreen::onButtonEvent(unsigned button, bool pressed, bool held) {
     if(!pressed || held) return false;
     int8_t inc;
     switch(button) {
-        case 0: inc = 1; break;
-        case 1: inc = -1; break;
+        case 0: inc = -1; break;
+        case 1: inc = 1; break;
         default: return false;
     }
     setPage(curPage.advance(inc));

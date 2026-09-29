@@ -254,7 +254,7 @@ namespace dccpp {
             }
             case 'c': {
                 // DCC++ extension: <c CurrentMAIN {current} C Milli 0 {max_ma} 1 {trip_ma}>
-                char msg[30];
+                char msg[46];
                 const auto &track = CS.getMainTrack();
                 snprintf(msg, sizeof(msg), "<c CurrentMAIN %u C Milli 0 %u 1 %u>",
                     track->getCurrent(), track->getMaxCurrent(), track->getMaxCurrent()
